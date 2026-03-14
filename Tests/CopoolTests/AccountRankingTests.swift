@@ -12,7 +12,43 @@ final class AccountRankingTests: XCTestCase {
         XCTAssertEqual(picked?.id, best.id)
     }
 
-    private func makeAccount(id: String, weekUsed: Double, hourUsed: Double) -> AccountSummary {
+    func testAutoSwitchTargetIsNilWhenCurrentAccountNotExhausted() {
+        let current = makeAccount(id: "current", weekUsed: 60, hourUsed: 70, isCurrent: true)
+        let better = makeAccount(id: "better", weekUsed: 10, hourUsed: 15)
+
+        let target = AccountRanking.pickAutoSwitchTarget([current, better])
+
+        XCTAssertNil(target)
+    }
+
+    func testAutoSwitchTargetChoosesBestAlternativeWhenCurrentIsExhausted() {
+        let exhaustedCurrent = makeAccount(id: "current", weekUsed: 100, hourUsed: 95, isCurrent: true)
+        let bestAlternative = makeAccount(id: "best", weekUsed: 20, hourUsed: 15)
+        let otherAlternative = makeAccount(id: "other", weekUsed: 40, hourUsed: 25)
+
+        let target = AccountRanking.pickAutoSwitchTarget([exhaustedCurrent, otherAlternative, bestAlternative])
+
+        XCTAssertEqual(target?.id, bestAlternative.id)
+    }
+
+    func testAutoSwitchTargetIsNilWhenNoCurrentAccount() {
+        let accountA = makeAccount(id: "a", weekUsed: 100, hourUsed: 100)
+        let accountB = makeAccount(id: "b", weekUsed: 5, hourUsed: 5)
+
+        let target = AccountRanking.pickAutoSwitchTarget([accountA, accountB])
+
+        XCTAssertNil(target)
+    }
+
+    func testAutoSwitchTargetIsNilWhenCurrentExhaustedButNoAlternative() {
+        let current = makeAccount(id: "current", weekUsed: 100, hourUsed: 100, isCurrent: true)
+
+        let target = AccountRanking.pickAutoSwitchTarget([current])
+
+        XCTAssertNil(target)
+    }
+
+    private func makeAccount(id: String, weekUsed: Double, hourUsed: Double, isCurrent: Bool = false) -> AccountSummary {
         AccountSummary(
             id: id,
             label: id,
@@ -31,7 +67,7 @@ final class AccountRankingTests: XCTestCase {
                 credits: nil
             ),
             usageError: nil,
-            isCurrent: false
+            isCurrent: isCurrent
         )
     }
 }

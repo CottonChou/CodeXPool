@@ -1,13 +1,17 @@
 import Foundation
+import OSLog
 
 actor RemoteProxyService: RemoteProxyServiceProtocol {
-    private let repoRoot: URL
+    private let logger = Logger(subsystem: "Copool", category: "RemoteProxyService")
+    private let repoRoot: URL?
     private let sourceAccountStorePath: URL
+    private let sourceAuthPath: URL
     private let fileManager: FileManager
 
-    init(repoRoot: URL, sourceAccountStorePath: URL, fileManager: FileManager = .default) {
+    init(repoRoot: URL?, sourceAccountStorePath: URL, sourceAuthPath: URL, fileManager: FileManager = .default) {
         self.repoRoot = repoRoot
         self.sourceAccountStorePath = sourceAccountStorePath
+        self.sourceAuthPath = sourceAuthPath
         self.fileManager = fileManager
     }
 
@@ -53,7 +57,7 @@ actor RemoteProxyService: RemoteProxyServiceProtocol {
         let server = try validate(server)
         try ensureSSHToolsAvailable(for: server)
 
-        let binaryPath = try ensureDaemonBinary()
+        let binaryPath = try ensureDaemonBinary(for: server)
         let serviceName = systemdServiceName(for: server)
         let serviceContent = renderSystemdUnit(server: server, serviceName: serviceName)
 
@@ -66,14 +70,8 @@ actor RemoteProxyService: RemoteProxyServiceProtocol {
         let localService = temp.appendingPathComponent(serviceName, isDirectory: false)
 
         try fileManager.copyItem(at: binaryPath, to: localBinary)
-        if fileManager.fileExists(atPath: sourceAccountStorePath.path) {
-            try fileManager.copyItem(at: sourceAccountStorePath, to: localAccounts)
-        } else {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            let data = try encoder.encode(AccountsStore())
-            try data.write(to: localAccounts)
-        }
+        let accountsData = try buildRemoteAccountsStoreData()
+        try accountsData.write(to: localAccounts, options: .atomic)
         try serviceContent.write(to: localService, atomically: true, encoding: .utf8)
 
         let stageDir = "/tmp/codex-tools-remote-\(safeFragment(server.id))-\(Int(Date().timeIntervalSince1970))"
@@ -120,7 +118,8 @@ actor RemoteProxyService: RemoteProxyServiceProtocol {
 
         return try runSSH(
             server: normalized,
-            command: withRootPrivileges("journalctl -u \(shellQuote(serviceName)) -n \(count) --no-pager")
+            command: withRootPrivileges("journalctl -u \(shellQuote(serviceName)) -n \(count) --no-pager"),
+            timeout: 20
         )
     }
 
@@ -171,29 +170,459 @@ actor RemoteProxyService: RemoteProxyServiceProtocol {
         }
     }
 
-    private func ensureDaemonBinary() throws -> URL {
-        let manifestPath = repoRoot.appendingPathComponent("src-tauri/proxyd/Cargo.toml", isDirectory: false)
-        let binaryPath = repoRoot.appendingPathComponent("src-tauri/proxyd/target/release/codex-tools-proxyd", isDirectory: false)
-
-        if fileManager.fileExists(atPath: binaryPath.path) {
-            return binaryPath
+    private func ensureDaemonBinary(for server: RemoteServerConfig) throws -> URL {
+        let platform = try detectRemoteLinuxPlatform(for: server)
+        guard let manifestPath = proxydManifestPath() else {
+            throw AppError.io(L10n.tr("error.remote.unavailable_missing_proxyd_source"))
+        }
+        guard CommandRunner.resolveExecutable("cargo") != nil else {
+            throw AppError.io("\(L10n.tr("error.remote.build_proxyd_failed")): cargo command not found")
         }
 
-        _ = try CommandRunner.runChecked(
-            "/usr/bin/env",
-            arguments: ["cargo", "build", "--manifest-path", manifestPath.path, "--release"],
-            currentDirectory: repoRoot,
-            errorPrefix: L10n.tr("error.remote.build_proxyd_failed")
-        )
+        try ensureLinuxBuildDependenciesIfNeeded()
+        let targetDir = try proxydBuildTargetDirectory()
+        let manifestDirectory = manifestPath.deletingLastPathComponent()
+        var buildErrors: [String] = []
 
-        guard fileManager.fileExists(atPath: binaryPath.path) else {
-            throw AppError.io(L10n.tr("error.remote.proxyd_not_found_after_build"))
+        for target in [platform.primaryTarget, platform.fallbackTarget] {
+            try ensureRustTargetAddedIfPossible(target)
+            let binaryPath = targetDir
+                .appendingPathComponent(target, isDirectory: true)
+                .appendingPathComponent("release", isDirectory: true)
+                .appendingPathComponent(RepositoryLocator.proxydBinaryName, isDirectory: false)
+
+            if fileManager.isExecutableFile(atPath: binaryPath.path) {
+                return binaryPath
+            }
+
+            for build in buildAttemptCommands(manifestPath: manifestPath, target: target, targetDir: targetDir) {
+                let result = try CommandRunner.run(
+                    "/usr/bin/env",
+                    arguments: build.command,
+                    currentDirectory: manifestDirectory
+                )
+                if result.status == 0, fileManager.isExecutableFile(atPath: binaryPath.path) {
+                    return binaryPath
+                }
+                let details = result.stderr.isEmpty ? result.stdout : result.stderr
+                let compact = details.trimmingCharacters(in: .whitespacesAndNewlines)
+                let message = compact.isEmpty ? "exit \(result.status)" : compact
+                buildErrors.append("\(build.label): \(message)")
+            }
         }
 
-        return binaryPath
+        let suffix = buildErrors.isEmpty ? "" : " \(buildErrors.joined(separator: " | "))"
+        throw AppError.io("\(L10n.tr("error.remote.build_proxyd_failed")):\(suffix)")
     }
 
-    private func runSSH(server: RemoteServerConfig, command: String) throws -> String {
+    private func proxydManifestPath() -> URL? {
+        if let repoRoot {
+            let manifest = repoRoot.appendingPathComponent(RepositoryLocator.proxydManifestRelativePath, isDirectory: false)
+            if fileManager.fileExists(atPath: manifest.path) {
+                return manifest
+            }
+        }
+
+        let bundled = Bundle.main.resourceURL?
+            .appendingPathComponent(RepositoryLocator.proxydBundledManifestRelativePath, isDirectory: false)
+        if let bundled, fileManager.fileExists(atPath: bundled.path) {
+            return bundled
+        }
+
+        return nil
+    }
+
+    private func buildRemoteAccountsStoreData() throws -> Data {
+        var mergedStore = AccountsStore()
+        var loadDiagnostics: [String] = []
+
+        for path in candidateAccountStorePaths() {
+            guard fileManager.fileExists(atPath: path.path) else {
+                continue
+            }
+            do {
+                let store = try decodeAccountsStore(from: path)
+                mergeAccounts(from: store.accounts, into: &mergedStore)
+                let usable = store.accounts.filter(isProxyUsable(account:)).count
+                loadDiagnostics.append("\(path.path): total=\(store.accounts.count), usable=\(usable)")
+            } catch {
+                loadDiagnostics.append("\(path.path): decode_failed=\(error.localizedDescription)")
+                logger.error("Failed to decode account store for remote deploy at \(path.path, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            }
+        }
+
+        if !mergedStore.accounts.contains(where: isProxyUsable(account:)),
+           let auth = try readCurrentAuthJSONValue(),
+           let imported = buildStoredAccount(fromCurrentAuth: auth) {
+            if let index = mergedStore.accounts.firstIndex(where: { $0.accountID == imported.accountID }) {
+                mergedStore.accounts[index] = imported
+            } else {
+                mergedStore.accounts.append(imported)
+            }
+            loadDiagnostics.append("current_auth_imported=\(imported.accountID)")
+        }
+
+        let usableAccounts = mergedStore.accounts.filter(isProxyUsable(account:))
+        guard !usableAccounts.isEmpty else {
+            let details = loadDiagnostics.isEmpty ? "" : " [\(loadDiagnostics.joined(separator: " | "))]"
+            throw AppError.invalidData("\(L10n.tr("error.remote.no_usable_accounts_for_deploy"))\(details)")
+        }
+
+        logger.info(
+            "Prepared remote accounts for deploy. source=\(self.sourceAccountStorePath.path, privacy: .public), merged_total=\(mergedStore.accounts.count), usable=\(usableAccounts.count)"
+        )
+
+        return try encodeRemoteCompatibleStore(mergedStore)
+    }
+
+    private func candidateAccountStorePaths() -> [URL] {
+        let home = fileManager.homeDirectoryForCurrentUser
+        let fallbackSwiftStore = home
+            .appendingPathComponent("Library", isDirectory: true)
+            .appendingPathComponent("Application Support", isDirectory: true)
+            .appendingPathComponent("CodexToolsSwift", isDirectory: true)
+            .appendingPathComponent("accounts.json", isDirectory: false)
+        let legacyTauriStore = home
+            .appendingPathComponent("Library", isDirectory: true)
+            .appendingPathComponent("Application Support", isDirectory: true)
+            .appendingPathComponent("com.carry.codex-tools", isDirectory: true)
+            .appendingPathComponent("accounts.json", isDirectory: false)
+
+        var unique: [URL] = []
+        var seen = Set<String>()
+        for path in [sourceAccountStorePath, fallbackSwiftStore, legacyTauriStore] {
+            if seen.insert(path.path).inserted {
+                unique.append(path)
+            }
+        }
+        return unique
+    }
+
+    private func decodeAccountsStore(from path: URL) throws -> AccountsStore {
+        let data = try Data(contentsOf: path)
+        let decoder = JSONDecoder()
+        if let decoded = try? decoder.decode(AccountsStore.self, from: data) {
+            return decoded
+        }
+        if let recovered = StoreFileRepository.extractFirstJSONObjectData(from: data),
+           let decoded = try? decoder.decode(AccountsStore.self, from: recovered) {
+            return decoded
+        }
+        throw AppError.invalidData("Invalid accounts.json format")
+    }
+
+    private func mergeAccounts(from incoming: [StoredAccount], into merged: inout AccountsStore) {
+        for account in incoming {
+            if let index = merged.accounts.firstIndex(where: { $0.accountID == account.accountID }) {
+                merged.accounts[index] = preferredAccount(existing: merged.accounts[index], incoming: account)
+            } else {
+                merged.accounts.append(account)
+            }
+        }
+    }
+
+    private func preferredAccount(existing: StoredAccount, incoming: StoredAccount) -> StoredAccount {
+        let existingUsable = isProxyUsable(account: existing)
+        let incomingUsable = isProxyUsable(account: incoming)
+        if incomingUsable != existingUsable {
+            return incomingUsable ? incoming : existing
+        }
+        if incoming.updatedAt != existing.updatedAt {
+            return incoming.updatedAt > existing.updatedAt ? incoming : existing
+        }
+        return existing
+    }
+
+    private func encodeRemoteCompatibleStore(_ store: AccountsStore) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let raw = try encoder.encode(store)
+
+        let any = try JSONSerialization.jsonObject(with: raw)
+        guard var root = any as? [String: Any] else {
+            return raw
+        }
+
+        root["settings"] = remoteSettingsObject(from: store.settings)
+        return try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
+    }
+
+    private func remoteSettingsObject(from settings: AppSettings) -> [String: Any] {
+        [
+            "launchAtStartup": settings.launchAtStartup,
+            "trayUsageDisplayMode": settings.trayUsageDisplayMode.rawValue,
+            "launchCodexAfterSwitch": settings.launchCodexAfterSwitch,
+            "syncOpencodeOpenaiAuth": settings.syncOpencodeOpenaiAuth,
+            "restartEditorsOnSwitch": settings.restartEditorsOnSwitch,
+            "restartEditorTargets": settings.restartEditorTargets.map(\.rawValue),
+            "autoStartApiProxy": settings.autoStartApiProxy,
+            "remoteServers": [],
+            "apiProxyApiKey": NSNull(),
+            "locale": legacyLocaleIdentifier(for: settings.locale),
+        ]
+    }
+
+    private func legacyLocaleIdentifier(for locale: String) -> String {
+        switch AppLocale.resolve(locale) {
+        case .simplifiedChinese:
+            return "zh-CN"
+        case .english:
+            return "en-US"
+        case .japanese:
+            return "ja-JP"
+        case .korean:
+            return "ko-KR"
+        }
+    }
+
+    private func readCurrentAuthJSONValue() throws -> JSONValue? {
+        guard fileManager.fileExists(atPath: sourceAuthPath.path) else {
+            return nil
+        }
+        let data = try Data(contentsOf: sourceAuthPath)
+        let object = try JSONSerialization.jsonObject(with: data)
+        return try JSONValue.from(any: object)
+    }
+
+    private func buildStoredAccount(fromCurrentAuth auth: JSONValue) -> StoredAccount? {
+        guard let extracted = extractAuthFromJSONValue(auth) else {
+            return nil
+        }
+        let now = Int64(Date().timeIntervalSince1970)
+        let label = extracted.email ?? "Remote Imported \(extracted.accountID.prefix(8))"
+        return StoredAccount(
+            id: UUID().uuidString,
+            label: label,
+            email: extracted.email,
+            accountID: extracted.accountID,
+            planType: extracted.planType,
+            teamName: nil,
+            teamAlias: nil,
+            authJSON: auth,
+            addedAt: now,
+            updatedAt: now,
+            usage: nil,
+            usageError: nil
+        )
+    }
+
+    private func isProxyUsable(account: StoredAccount) -> Bool {
+        extractAuthFromJSONValue(account.authJSON) != nil
+    }
+
+    private func extractAuthFromJSONValue(_ auth: JSONValue) -> (accountID: String, email: String?, planType: String?)? {
+        let mode = auth["auth_mode"]?.stringValue?.lowercased() ?? ""
+        guard let tokens = authTokenObject(from: auth) else {
+            if !mode.isEmpty && mode != "chatgpt" && mode != "chatgpt_auth_tokens" {
+                return nil
+            }
+            return nil
+        }
+
+        guard tokens["access_token"]?.stringValue != nil,
+              let idToken = tokens["id_token"]?.stringValue else {
+            return nil
+        }
+
+        var accountID = tokens["account_id"]?.stringValue
+        var email: String?
+        var planType: String?
+        if let claims = try? decodeJWTPayload(idToken) {
+            email = claims["email"]?.stringValue
+            if accountID == nil {
+                accountID = claims["https://api.openai.com/auth"]?["chatgpt_account_id"]?.stringValue
+            }
+            planType = claims["https://api.openai.com/auth"]?["chatgpt_plan_type"]?.stringValue
+        }
+        guard let accountID, !accountID.isEmpty else {
+            return nil
+        }
+        return (accountID, email, planType)
+    }
+
+    private func authTokenObject(from auth: JSONValue) -> [String: JSONValue]? {
+        if let tokens = auth["tokens"]?.objectValue {
+            return tokens
+        }
+
+        if let object = auth.objectValue,
+           object["access_token"]?.stringValue != nil,
+           object["id_token"]?.stringValue != nil {
+            return object
+        }
+
+        return nil
+    }
+
+    private func decodeJWTPayload(_ token: String) throws -> JSONValue {
+        let segments = token.split(separator: ".", omittingEmptySubsequences: false)
+        guard segments.count > 1 else {
+            throw AppError.invalidData(L10n.tr("error.auth.id_token_invalid_format"))
+        }
+
+        var payload = String(segments[1])
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        let remainder = payload.count % 4
+        if remainder > 0 {
+            payload += String(repeating: "=", count: 4 - remainder)
+        }
+        guard let data = Data(base64Encoded: payload) else {
+            throw AppError.invalidData(L10n.tr("error.auth.decode_id_token_failed"))
+        }
+        let object = try JSONSerialization.jsonObject(with: data)
+        return try JSONValue.from(any: object)
+    }
+
+    private func proxydBuildTargetDirectory() throws -> URL {
+        let caches = try fileManager.url(
+            for: .cachesDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        let path = caches
+            .appendingPathComponent("Copool", isDirectory: true)
+            .appendingPathComponent("proxyd-target", isDirectory: true)
+        try fileManager.createDirectory(at: path, withIntermediateDirectories: true)
+        return path
+    }
+
+    private func ensureRustTargetAddedIfPossible(_ target: String) throws {
+        guard CommandRunner.resolveExecutable("rustup") != nil else {
+            return
+        }
+        _ = try? CommandRunner.run("/usr/bin/env", arguments: ["rustup", "target", "add", target])
+    }
+
+    private func buildAttemptCommands(manifestPath: URL, target: String, targetDir: URL) -> [BuildAttempt] {
+        let manifest = manifestPath.path
+        let targetDirPath = targetDir.path
+        var attempts: [BuildAttempt] = []
+
+        if CommandRunner.resolveExecutable("cross") != nil {
+            attempts.append(
+                BuildAttempt(
+                    label: "cross \(target)",
+                    command: [
+                        "cross", "build",
+                        "--manifest-path", manifest,
+                        "--release",
+                        "--target", target,
+                        "--target-dir", targetDirPath,
+                    ]
+                )
+            )
+        }
+
+        if hasCargoZigbuild() {
+            attempts.append(
+                BuildAttempt(
+                    label: "cargo zigbuild \(target)",
+                    command: [
+                        "cargo", "zigbuild",
+                        "--manifest-path", manifest,
+                        "--release",
+                        "--target", target,
+                        "--target-dir", targetDirPath,
+                    ]
+                )
+            )
+        }
+
+        attempts.append(
+            BuildAttempt(
+                label: "cargo build \(target)",
+                command: [
+                    "cargo", "build",
+                    "--manifest-path", manifest,
+                    "--release",
+                    "--target", target,
+                    "--target-dir", targetDirPath,
+                ]
+            )
+        )
+
+        return attempts
+    }
+
+    private func hasCargoZigbuild() -> Bool {
+        guard CommandRunner.resolveExecutable("zig") != nil else {
+            return false
+        }
+        if CommandRunner.resolveExecutable("cargo-zigbuild") != nil {
+            return true
+        }
+        guard CommandRunner.resolveExecutable("cargo") != nil else {
+            return false
+        }
+        if let help = try? CommandRunner.run("/usr/bin/env", arguments: ["cargo", "zigbuild", "--help"]) {
+            return help.status == 0
+        }
+        return false
+    }
+
+    private func ensureLinuxBuildDependenciesIfNeeded() throws {
+        if CommandRunner.resolveExecutable("cross") != nil || hasCargoZigbuild() {
+            return
+        }
+
+        #if os(macOS)
+        guard CommandRunner.resolveExecutable("brew") != nil else {
+            return
+        }
+
+        if CommandRunner.resolveExecutable("zig") == nil {
+            _ = try CommandRunner.runChecked(
+                "/usr/bin/env",
+                arguments: ["brew", "install", "zig"],
+                errorPrefix: "\(L10n.tr("error.remote.build_proxyd_failed")) (install zig)"
+            )
+        }
+
+        if !hasCargoZigbuild() {
+            _ = try CommandRunner.runChecked(
+                "/usr/bin/env",
+                arguments: ["cargo", "install", "cargo-zigbuild", "--locked"],
+                errorPrefix: "\(L10n.tr("error.remote.build_proxyd_failed")) (install cargo-zigbuild)"
+            )
+        }
+        #endif
+    }
+
+    private func detectRemoteLinuxPlatform(for server: RemoteServerConfig) throws -> RemoteLinuxPlatform {
+        let output = try runSSH(server: server, command: "uname -s && uname -m")
+        let lines = output
+            .split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        let os = lines.first ?? ""
+        let arch = lines.count > 1 ? lines[1] : ""
+
+        guard os == "Linux" else {
+            let value = os.isEmpty ? "unknown" : os
+            throw AppError.io("Remote deploy supports Linux only (detected: \(value))")
+        }
+
+        switch arch {
+        case "x86_64", "amd64":
+            return RemoteLinuxPlatform(
+                primaryTarget: "x86_64-unknown-linux-musl",
+                fallbackTarget: "x86_64-unknown-linux-gnu"
+            )
+        case "aarch64", "arm64":
+            return RemoteLinuxPlatform(
+                primaryTarget: "aarch64-unknown-linux-musl",
+                fallbackTarget: "aarch64-unknown-linux-gnu"
+            )
+        default:
+            let value = arch.isEmpty ? "unknown" : arch
+            throw AppError.io("Unsupported remote Linux architecture: \(value)")
+        }
+    }
+
+    private func runSSH(server: RemoteServerConfig, command: String, timeout: TimeInterval = 60) throws -> String {
         var temporaryKey: URL?
         defer {
             if let temporaryKey {
@@ -224,21 +653,30 @@ actor RemoteProxyService: RemoteProxyServiceProtocol {
             args.append("ssh")
         }
 
-        args.append(contentsOf: ["-p", String(server.sshPort), "-o", "StrictHostKeyChecking=accept-new"])
+        args.append(contentsOf: [
+            "-p", String(server.sshPort),
+            "-o", "StrictHostKeyChecking=accept-new",
+            "-o", "ConnectTimeout=12",
+            "-o", "ServerAliveInterval=10",
+            "-o", "ServerAliveCountMax=2",
+        ])
+        if server.authMode != "password" {
+            args.append(contentsOf: ["-o", "BatchMode=yes"])
+        }
         if let identityPath {
             args.append(contentsOf: ["-i", identityPath])
         }
         args.append("\(server.sshUser)@\(server.host)")
         args.append(command)
 
-        let result = try CommandRunner.run("/usr/bin/env", arguments: args)
+        let result = try CommandRunner.run("/usr/bin/env", arguments: args, timeout: timeout)
         guard result.status == 0 else {
             throw AppError.io(L10n.tr("error.remote.ssh_command_failed_format", result.stderr.isEmpty ? result.stdout : result.stderr))
         }
         return result.stdout
     }
 
-    private func runSCP(server: RemoteServerConfig, localPath: String, remotePath: String) throws {
+    private func runSCP(server: RemoteServerConfig, localPath: String, remotePath: String, timeout: TimeInterval = 90) throws {
         var temporaryKey: URL?
         defer {
             if let temporaryKey {
@@ -269,7 +707,16 @@ actor RemoteProxyService: RemoteProxyServiceProtocol {
             args.append("scp")
         }
 
-        args.append(contentsOf: ["-P", String(server.sshPort), "-o", "StrictHostKeyChecking=accept-new"])
+        args.append(contentsOf: [
+            "-P", String(server.sshPort),
+            "-o", "StrictHostKeyChecking=accept-new",
+            "-o", "ConnectTimeout=12",
+            "-o", "ServerAliveInterval=10",
+            "-o", "ServerAliveCountMax=2",
+        ])
+        if server.authMode != "password" {
+            args.append(contentsOf: ["-o", "BatchMode=yes"])
+        }
         if let identityPath {
             args.append(contentsOf: ["-i", identityPath])
         }
@@ -277,7 +724,7 @@ actor RemoteProxyService: RemoteProxyServiceProtocol {
         args.append(localPath)
         args.append("\(server.sshUser)@\(server.host):\(remotePath)")
 
-        let result = try CommandRunner.run("/usr/bin/env", arguments: args)
+        let result = try CommandRunner.run("/usr/bin/env", arguments: args, timeout: timeout)
         guard result.status == 0 else {
             throw AppError.io(L10n.tr("error.remote.scp_failed_format", result.stderr.isEmpty ? result.stdout : result.stderr))
         }
@@ -363,4 +810,14 @@ actor RemoteProxyService: RemoteProxyServiceProtocol {
     private func withRootPrivileges(_ command: String) -> String {
         "if [ \"$(id -u)\" = \"0\" ]; then \(command); else sudo sh -lc \(shellQuote(command)); fi"
     }
+}
+
+private struct RemoteLinuxPlatform {
+    let primaryTarget: String
+    let fallbackTarget: String
+}
+
+private struct BuildAttempt {
+    let label: String
+    let command: [String]
 }

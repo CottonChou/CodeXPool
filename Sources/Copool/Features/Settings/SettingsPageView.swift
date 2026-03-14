@@ -42,6 +42,12 @@ struct SettingsPageView: View {
                 }
 
                 Section("settings.section.switch_behavior") {
+                    Toggle("settings.auto_smart_switch", isOn: Binding(
+                        get: { model.settings.autoSmartSwitch },
+                        set: { model.setAutoSmartSwitch($0) }
+                    ))
+                    .toggleStyle(.switch)
+
                     Toggle("settings.sync_opencode_openai_auth", isOn: Binding(
                         get: { model.settings.syncOpencodeOpenaiAuth },
                         set: { model.setSyncOpencodeOpenaiAuth($0) }
@@ -67,21 +73,6 @@ struct SettingsPageView: View {
                     .disabled(model.installedEditorApps.isEmpty)
                 }
 
-                Section("settings.section.remote_servers_json") {
-                    Text("settings.remote_servers_hint")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    TextEditor(text: $model.remoteServersJSON)
-                        .font(.system(.caption, design: .monospaced))
-                        .frame(minHeight: 220)
-                    HStack {
-                        Spacer(minLength: 0)
-                        Button("settings.save_remote_servers") {
-                            Task { await model.saveRemoteServersJSON() }
-                        }
-                        .buttonStyle(.frostedCapsule(prominent: true))
-                    }
-                }
             }
             .formStyle(.grouped)
             .scrollIndicators(.hidden)

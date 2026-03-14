@@ -3,6 +3,7 @@
 "tab.settings" = "Settings";
 
 "common.save" = "Save";
+"common.remove" = "Remove";
 "common.copy" = "Copy";
 "common.refresh" = "Refresh";
 "common.refresh_usage" = "Refresh usage";
@@ -31,6 +32,7 @@
 "tray.used" = "Used";
 "tray.hidden" = "Hidden";
 "settings.section.switch_behavior" = "Switch Behavior";
+"settings.auto_smart_switch" = "Auto smart switch";
 "settings.sync_opencode_openai_auth" = "Sync opencode OpenAI auth";
 "settings.restart_editors_on_switch" = "Restart editors on switch";
 "settings.editor_restart_target" = "Editor restart target";
@@ -48,6 +50,8 @@
 "accounts.action.importing" = "Importing...";
 "accounts.action.add_account" = "Add account";
 "accounts.action.waiting_for_login" = "Waiting for login...";
+"accounts.action.collapse_all" = "Collapse all cards";
+"accounts.action.expand_all" = "Expand all cards";
 "accounts.empty.title" = "No accounts";
 "accounts.empty.message.no_accounts" = "No accounts yet. Import ~/.codex/auth.json first.";
 "accounts.error.load_failed" = "Failed to load accounts";
@@ -62,6 +66,7 @@
 "accounts.window.used_format" = "Used %@";
 "accounts.window.remaining_format" = "Remaining %@";
 "accounts.window.reset_at_format" = "Reset at: %@";
+"accounts.compact.used" = "USED";
 "accounts.notice.imported_format" = "Account imported: %@";
 "accounts.notice.imported_new_format" = "New account imported: %@";
 "accounts.notice.usage_refreshed" = "Usage refreshed";
@@ -102,8 +107,41 @@
 "proxy.remote.empty.message" = "Add a Linux server first, then upload proxyd and start it remotely.";
 "proxy.section.public_access" = "Public Access";
 "proxy.toggle.enable_public_access" = "Enable public access with cloudflared";
+"proxy.switch.on" = "On";
+"proxy.switch.off" = "Off";
 "proxy.field.named_tunnel_hostname_placeholder" = "Named tunnel hostname (optional)";
 "proxy.toggle.use_http2" = "Use HTTP/2";
+"proxy.public.callout.start_local_first_title" = "Start the local proxy first";
+"proxy.public.callout.start_local_first_message" = "cloudflared forwards the current local proxy port, so the local proxy must be running first.";
+"proxy.public.not_installed_label" = "cloudflared not installed";
+"proxy.public.install_title" = "Install cloudflared first";
+"proxy.public.install_message" = "You can choose quick tunnel or named tunnel after installation completes.";
+"proxy.public.install_action" = "Install cloudflared";
+"proxy.public.mode.quick_kicker" = "Quick tunnel";
+"proxy.public.mode.quick_title" = "Temporary URL";
+"proxy.public.mode.quick_message" = "Generates a temporary '*.trycloudflare.com' URL with no account required. The URL changes after restart.";
+"proxy.public.mode.named_kicker" = "Named tunnel";
+"proxy.public.mode.named_title" = "Fixed domain";
+"proxy.public.mode.named_message" = "Uses a Cloudflare API token and supports a custom hostname with a stable public URL.";
+"proxy.public.quick_note_title" = "Quick Tunnel note";
+"proxy.public.quick_note_message" = "The temporary URL changes after each restart. Cloudflare documents that Quick Tunnel does not support SSE.";
+"proxy.public.field.api_token" = "Cloudflare API Token";
+"proxy.public.field.api_token_placeholder" = "Requires Tunnel Edit + DNS Edit permissions";
+"proxy.public.field.account_id" = "Account ID";
+"proxy.public.field.account_id_placeholder" = "Cloudflare Account ID";
+"proxy.public.field.zone_id" = "Zone ID";
+"proxy.public.field.zone_id_placeholder" = "Zone ID";
+"proxy.public.field.hostname" = "Custom hostname";
+"proxy.public.field.hostname_placeholder" = "api.example.com";
+"proxy.public.refresh_status" = "Refresh public status";
+"proxy.public.start_action" = "Start public access";
+"proxy.public.stop_action" = "Stop public access";
+"proxy.public.status_title" = "Public status";
+"proxy.public.status_running_message" = "cloudflared is exposing the local proxy to the public internet";
+"proxy.public.status_stopped_message" = "A public URL will be generated after start";
+"proxy.public.url_title" = "Public URL";
+"proxy.public.install_path_title" = "Install path";
+"proxy.public.not_detected" = "Not detected";
 "proxy.status.installed" = "Installed";
 "proxy.status.not_installed" = "Not installed";
 "proxy.install_status_format" = "Install status: %@";
@@ -118,9 +156,11 @@
 "proxy.notice.cloudflared_stopped" = "cloudflared stopped";
 "proxy.notice.auto_start_updated" = "Auto-start setting updated";
 "proxy.notice.server_draft_added" = "Server draft added. Complete fields in Settings JSON.";
+"proxy.notice.remote_deploying_format" = "Remote deploy started: %@";
 "proxy.notice.remote_deploy_done_format" = "Remote deploy finished: %@";
 "proxy.notice.remote_started_format" = "Remote service started: %@";
 "proxy.notice.remote_stopped_format" = "Remote service stopped: %@";
+"proxy.notice.remote_server_removed" = "Remote server removed";
 
 "tray.refresh_usage" = "Refresh usage";
 "tray.no_accounts" = "No accounts";
@@ -146,6 +186,7 @@
 "error.usage.invalid_response" = "invalid response";
 
 "error.http_server.invalid_port_format" = "Invalid port: %@";
+"error.shell.timeout_format" = "Command timed out (%@s): %@";
 "error.shell.run_failed_format" = "Command execution failed: %@: %@";
 "error.update.github_api_invalid_response" = "Update check failed: invalid GitHub API response";
 
@@ -182,6 +223,22 @@
 "error.cloudflared.launch_failed_format" = "Failed to launch cloudflared: %@";
 "error.cloudflared.process_exited_early" = "cloudflared process exited early";
 "error.cloudflared.start_failed" = "Failed to start cloudflared";
+"error.cloudflared.named_required_fields" = "All named tunnel fields are required.";
+"error.cloudflared.named_invalid_hostname" = "The custom domain format is invalid. Enter a full hostname, for example api.example.com.";
+"error.cloudflared.quick_config_conflict" = "Quick Tunnel is incompatible with ~/.cloudflared/config.yml or config.yaml. Move that config file first, or use a named tunnel instead.";
+"error.cloudflared.named_create_failed" = "Failed to create named tunnel";
+"error.cloudflared.named_config_failed" = "Failed to write named tunnel configuration";
+"error.cloudflared.named_dns_query_failed" = "Failed to query DNS records";
+"error.cloudflared.named_dns_create_failed" = "Failed to create DNS record";
+"error.cloudflared.named_dns_update_failed" = "Failed to update DNS record";
+"error.cloudflared.named_cleanup_failed" = "Failed to clean up named tunnel";
+"error.cloudflared.api_url_invalid" = "Cloudflare API URL is invalid";
+"error.cloudflared.api_response_decode_failed_format" = "%@ (failed to decode Cloudflare response)";
+"error.cloudflared.api_response_empty_format" = "%@ (Cloudflare returned empty result)";
+"error.cloudflared.api_unknown_error" = "Unknown error";
+"error.cloudflared.api_request_failed_format" = "%@: %@";
+"error.cloudflared.create_log_dir_failed_format" = "Failed to create cloudflared log directory: %@";
+"error.cloudflared.create_log_file_failed" = "Failed to initialize cloudflared log file";
 
 "error.opencode.auth_path_not_found" = "Unable to locate opencode auth file path";
 "error.opencode.missing_tokens" = "auth.json missing tokens";
@@ -199,6 +256,7 @@
 "error.remote.ssh_not_found" = "ssh command not found";
 "error.remote.scp_not_found" = "scp command not found";
 "error.remote.sshpass_required" = "Password auth mode requires sshpass";
+"error.remote.no_usable_accounts_for_deploy" = "No usable accounts found for remote deploy. Import or authorize at least one account first.";
 "error.remote.build_proxyd_failed" = "Failed to build remote proxyd";
 "error.remote.proxyd_not_found_after_build" = "proxyd binary was not found after build";
 "error.remote.unavailable_missing_proxyd_source" = "Remote deploy is unavailable in this build because src-tauri/proxyd/Cargo.toml was not found.";

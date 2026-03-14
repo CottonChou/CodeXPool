@@ -40,7 +40,9 @@
 		82928E59A44DB5D0A6436A47 /* RepositoryLocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17E5EFBA0AA212B32AAB6710 /* RepositoryLocator.swift */; };
 		8569AB77E801277DA501BD46 /* UsageWindowSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F5229A7F5573D51E6740E23 /* UsageWindowSelector.swift */; };
 		8A97DF56318AACE5DA7A07A7 /* CloudflaredService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C139AC44A9986277E75FA765 /* CloudflaredService.swift */; };
+		A1F44E6A8B214D41B64A1201 /* PublicAccessSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F44E6A8B214D41B64A1202 /* PublicAccessSection.swift */; };
 		8E1F5360E158E01D0A36046D /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = B200F10CE9F433B769723734 /* Localizable.strings */; };
+		BDB089A4A1E246A1A4E9C001 /* proxyd-src in Resources */ = {isa = PBXBuildFile; fileRef = BDB089A4A1E246A1A4E9C002 /* proxyd-src */; };
 		92F681D52C5A373D81950C05 /* AuthFileRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1659877DCD8B9150D665ED12 /* AuthFileRepositoryTests.swift */; };
 		93F291DBC9FD57E847EB6519 /* AppLocale.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E2CF5AE0B544874B721FCC /* AppLocale.swift */; };
 		9BE1D9951912C722CF37BC67 /* SettingsPageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7B61BD243C65F84D47C5E07 /* SettingsPageView.swift */; };
@@ -117,11 +119,13 @@
 		9A29E078EE5498D6C73925F4 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/Localizable.strings; sourceTree = "<group>"; };
 		9D3340D9F24E63B0B31749E2 /* UpdateCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateCoordinator.swift; sourceTree = "<group>"; };
 		A146C7576AB39EFCD658BFED /* AppLocaleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLocaleTests.swift; sourceTree = "<group>"; };
+		A1F44E6A8B214D41B64A1202 /* PublicAccessSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublicAccessSection.swift; sourceTree = "<group>"; };
 		A4646C4F038F28A5B638A6FB /* Copool.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Copool.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AB56BDF9685A258D5CD4C18A /* OpencodeAuthSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpencodeAuthSyncService.swift; sourceTree = "<group>"; };
 		AF3990C942090A68CBEDDDE1 /* RootScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootScene.swift; sourceTree = "<group>"; };
 		B7B61BD243C65F84D47C5E07 /* SettingsPageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPageView.swift; sourceTree = "<group>"; };
 		BCFDDF034C6446339DDFAF9B /* LaunchAtStartupService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtStartupService.swift; sourceTree = "<group>"; };
+		BDB089A4A1E246A1A4E9C002 /* proxyd-src */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "proxyd-src"; sourceTree = "<group>"; };
 		C10E7339F7656FE20240B3B8 /* UsageWindowSelectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageWindowSelectorTests.swift; sourceTree = "<group>"; };
 		C139AC44A9986277E75FA765 /* CloudflaredService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudflaredService.swift; sourceTree = "<group>"; };
 		C36FDB8D2542926806D5B265 /* ViewState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewState.swift; sourceTree = "<group>"; };
@@ -216,6 +220,7 @@
 			isa = PBXGroup;
 			children = (
 				B200F10CE9F433B769723734 /* Localizable.strings */,
+				BDB089A4A1E246A1A4E9C002 /* proxyd-src */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -282,6 +287,7 @@
 			isa = PBXGroup;
 			children = (
 				D42AE96D25E97F39B6AAB9A8 /* ProxyPageModel.swift */,
+				A1F44E6A8B214D41B64A1202 /* PublicAccessSection.swift */,
 				D3AE6ECBCE990356DEB5BBE0 /* ProxyPageView.swift */,
 			);
 			path = Proxy;
@@ -412,6 +418,7 @@
 			files = (
 				77F129ACAC53652FC1D928BB /* Copool.icon in Resources */,
 				8E1F5360E158E01D0A36046D /* Localizable.strings in Resources */,
+				BDB089A4A1E246A1A4E9C001 /* proxyd-src in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -465,6 +472,7 @@
 				7F539ED7076B2EA02CB6788C /* Protocols.swift in Sources */,
 				1FF5A858AFC00A862295F943 /* ProxyCoordinator.swift in Sources */,
 				AEEEE6E52FAC04AFF97354C1 /* ProxyPageModel.swift in Sources */,
+				A1F44E6A8B214D41B64A1201 /* PublicAccessSection.swift in Sources */,
 				D0611DC1C82F7B37B8D91040 /* ProxyPageView.swift in Sources */,
 				17EFD9B9B9CF5294FD765876 /* RemoteProxyService.swift in Sources */,
 				82928E59A44DB5D0A6436A47 /* RepositoryLocator.swift in Sources */,

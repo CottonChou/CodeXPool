@@ -57,6 +57,11 @@ struct RootScene: View {
         .onChange(of: settingsModel.settings.locale) { _, value in
             L10n.setLocale(identifier: value)
         }
+        .onChange(of: selectedTab) { _, tab in
+            if tab == .proxy {
+                proxyModel.collapseForTabEntry()
+            }
+        }
         .task {
             await settingsModel.loadIfNeeded()
             await proxyModel.bootstrapOnAppLaunch(using: settingsModel.settings)
@@ -68,9 +73,72 @@ struct RootScene: View {
                 .allowsHitTesting(false)
                 .zIndex(10)
         }
-        .frame(minWidth: LayoutRules.minimumPanelWidth, minHeight: LayoutRules.minimumPanelHeight)
+        .background {
+            WindowSizeEnforcer(
+                minWidth: LayoutRules.minimumPanelWidth,
+                maxWidth: LayoutRules.maximumPanelWidth,
+                minHeight: LayoutRules.minimumPanelHeight,
+                idealHeight: LayoutRules.defaultPanelHeight
+            )
+            .frame(width: 0, height: 0)
+        }
+        .frame(
+            minWidth: LayoutRules.minimumPanelWidth,
+            idealWidth: LayoutRules.defaultPanelWidth,
+            maxWidth: LayoutRules.maximumPanelWidth,
+            minHeight: LayoutRules.minimumPanelHeight
+        )
     }
 }
+
+#if canImport(AppKit)
+private struct WindowSizeEnforcer: NSViewRepresentable {
+    let minWidth: CGFloat
+    let maxWidth: CGFloat
+    let minHeight: CGFloat
+    let idealHeight: CGFloat
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        DispatchQueue.main.async {
+            apply(on: view.window)
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            apply(on: nsView.window)
+        }
+    }
+
+    private func apply(on window: NSWindow?) {
+        guard let window else { return }
+        window.contentMinSize = NSSize(width: minWidth, height: minHeight)
+        window.contentMaxSize = NSSize(width: maxWidth, height: .greatestFiniteMagnitude)
+
+        var targetSize = window.contentLayoutRect.size
+        let clampedWidth = min(max(targetSize.width, minWidth), maxWidth)
+        let clampedHeight = max(targetSize.height, minHeight)
+
+        guard clampedWidth != targetSize.width || clampedHeight != targetSize.height else { return }
+        targetSize.width = clampedWidth
+        targetSize.height = clampedHeight > 0 ? clampedHeight : idealHeight
+        window.setContentSize(targetSize)
+    }
+}
+#else
+private struct WindowSizeEnforcer: View {
+    let minWidth: CGFloat
+    let maxWidth: CGFloat
+    let minHeight: CGFloat
+    let idealHeight: CGFloat
+
+    var body: some View {
+        EmptyView()
+    }
+}
+#endif
 
 private struct AppTabBar: View {
     @Binding var selection: AppTab

@@ -156,6 +156,7 @@ struct AppSettings: Codable, Equatable {
     var launchAtStartup: Bool
     var trayUsageDisplayMode: TrayUsageDisplayMode
     var launchCodexAfterSwitch: Bool
+    var autoSmartSwitch: Bool
     var syncOpencodeOpenaiAuth: Bool
     var restartEditorsOnSwitch: Bool
     var restartEditorTargets: [EditorAppID]
@@ -163,10 +164,80 @@ struct AppSettings: Codable, Equatable {
     var remoteServers: [RemoteServerConfig]
     var locale: String
 
+    enum CodingKeys: String, CodingKey {
+        case launchAtStartup
+        case trayUsageDisplayMode
+        case launchCodexAfterSwitch
+        case autoSmartSwitch
+        case syncOpencodeOpenaiAuth
+        case restartEditorsOnSwitch
+        case restartEditorTargets
+        case autoStartApiProxy
+        case remoteServers
+        case locale
+    }
+
+    init(
+        launchAtStartup: Bool,
+        trayUsageDisplayMode: TrayUsageDisplayMode,
+        launchCodexAfterSwitch: Bool,
+        autoSmartSwitch: Bool,
+        syncOpencodeOpenaiAuth: Bool,
+        restartEditorsOnSwitch: Bool,
+        restartEditorTargets: [EditorAppID],
+        autoStartApiProxy: Bool,
+        remoteServers: [RemoteServerConfig],
+        locale: String
+    ) {
+        self.launchAtStartup = launchAtStartup
+        self.trayUsageDisplayMode = trayUsageDisplayMode
+        self.launchCodexAfterSwitch = launchCodexAfterSwitch
+        self.autoSmartSwitch = autoSmartSwitch
+        self.syncOpencodeOpenaiAuth = syncOpencodeOpenaiAuth
+        self.restartEditorsOnSwitch = restartEditorsOnSwitch
+        self.restartEditorTargets = restartEditorTargets
+        self.autoStartApiProxy = autoStartApiProxy
+        self.remoteServers = remoteServers
+        self.locale = AppLocale.resolve(locale).identifier
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let fallback = AppSettings.defaultValue
+
+        launchAtStartup = try container.decodeIfPresent(Bool.self, forKey: .launchAtStartup) ?? fallback.launchAtStartup
+        trayUsageDisplayMode = try container.decodeIfPresent(TrayUsageDisplayMode.self, forKey: .trayUsageDisplayMode) ?? fallback.trayUsageDisplayMode
+        launchCodexAfterSwitch = try container.decodeIfPresent(Bool.self, forKey: .launchCodexAfterSwitch) ?? fallback.launchCodexAfterSwitch
+        autoSmartSwitch = try container.decodeIfPresent(Bool.self, forKey: .autoSmartSwitch) ?? fallback.autoSmartSwitch
+        syncOpencodeOpenaiAuth = try container.decodeIfPresent(Bool.self, forKey: .syncOpencodeOpenaiAuth) ?? fallback.syncOpencodeOpenaiAuth
+        restartEditorsOnSwitch = try container.decodeIfPresent(Bool.self, forKey: .restartEditorsOnSwitch) ?? fallback.restartEditorsOnSwitch
+        restartEditorTargets = try container.decodeIfPresent([EditorAppID].self, forKey: .restartEditorTargets) ?? fallback.restartEditorTargets
+        autoStartApiProxy = try container.decodeIfPresent(Bool.self, forKey: .autoStartApiProxy) ?? fallback.autoStartApiProxy
+        remoteServers = try container.decodeIfPresent([RemoteServerConfig].self, forKey: .remoteServers) ?? fallback.remoteServers
+
+        let rawLocale = try container.decodeIfPresent(String.self, forKey: .locale) ?? fallback.locale
+        locale = AppLocale.resolve(rawLocale).identifier
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(launchAtStartup, forKey: .launchAtStartup)
+        try container.encode(trayUsageDisplayMode, forKey: .trayUsageDisplayMode)
+        try container.encode(launchCodexAfterSwitch, forKey: .launchCodexAfterSwitch)
+        try container.encode(autoSmartSwitch, forKey: .autoSmartSwitch)
+        try container.encode(syncOpencodeOpenaiAuth, forKey: .syncOpencodeOpenaiAuth)
+        try container.encode(restartEditorsOnSwitch, forKey: .restartEditorsOnSwitch)
+        try container.encode(restartEditorTargets, forKey: .restartEditorTargets)
+        try container.encode(autoStartApiProxy, forKey: .autoStartApiProxy)
+        try container.encode(remoteServers, forKey: .remoteServers)
+        try container.encode(locale, forKey: .locale)
+    }
+
     static let defaultValue = AppSettings(
         launchAtStartup: false,
         trayUsageDisplayMode: .remaining,
         launchCodexAfterSwitch: true,
+        autoSmartSwitch: false,
         syncOpencodeOpenaiAuth: false,
         restartEditorsOnSwitch: false,
         restartEditorTargets: [],
@@ -180,6 +251,7 @@ struct AppSettingsPatch {
     var launchAtStartup: Bool? = nil
     var trayUsageDisplayMode: TrayUsageDisplayMode? = nil
     var launchCodexAfterSwitch: Bool? = nil
+    var autoSmartSwitch: Bool? = nil
     var syncOpencodeOpenaiAuth: Bool? = nil
     var restartEditorsOnSwitch: Bool? = nil
     var restartEditorTargets: [EditorAppID]? = nil
@@ -219,7 +291,14 @@ struct StartCloudflaredTunnelInput: Equatable {
     var apiProxyPort: Int
     var useHTTP2: Bool
     var mode: CloudflaredTunnelMode
-    var hostname: String?
+    var named: NamedCloudflaredTunnelInput?
+}
+
+struct NamedCloudflaredTunnelInput: Equatable {
+    var apiToken: String
+    var accountID: String
+    var zoneID: String
+    var hostname: String
 }
 
 struct CloudflaredStatus: Equatable {

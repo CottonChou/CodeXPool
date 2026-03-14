@@ -4,19 +4,21 @@ struct AccountsPageView: View {
     @ObservedObject var model: AccountsPageModel
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: LayoutRules.sectionSpacing) {
-                actionBar
-                    .padding(.horizontal, LayoutRules.pagePadding)
-                contentView
-                footerBar
-                    .padding(.horizontal, LayoutRules.pagePadding)
+        VStack(alignment: .leading, spacing: LayoutRules.sectionSpacing) {
+            actionBar
+                .padding(.horizontal, LayoutRules.pagePadding)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    contentView
+                }
+                .padding(.bottom, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.top, LayoutRules.pagePadding)
-            .padding(.bottom, 12)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .scrollIndicators(.hidden)
         }
-        .scrollIndicators(.hidden)
+        .padding(.top, LayoutRules.pagePadding)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .task {
             await model.loadIfNeeded()
         }
@@ -30,44 +32,53 @@ struct AccountsPageView: View {
                         Task { await model.importCurrentAuth() }
                     } label: {
                         Label(model.isImporting ? L10n.tr("accounts.action.importing") : L10n.tr("accounts.action.import_current_auth"), systemImage: "square.and.arrow.down")
+                            .lineLimit(1)
                     }
                     .disabled(model.isImporting || model.isAdding)
-                    .buttonStyle(.frostedCapsule(prominent: true))
+                    .buttonStyle(.frostedCapsule(prominent: true, density: .compact))
 
                     Button {
                         Task { await model.addAccountViaLogin() }
                     } label: {
                         Label(model.isAdding ? L10n.tr("accounts.action.waiting_for_login") : L10n.tr("accounts.action.add_account"), systemImage: "plus")
+                            .lineLimit(1)
                     }
                     .disabled(model.isImporting || model.isAdding)
-                    .buttonStyle(.frostedCapsule(prominent: true))
+                    .buttonStyle(.frostedCapsule(prominent: true, density: .compact))
+
+                    Button {
+                        Task { await model.smartSwitch() }
+                    } label: {
+                        Label("accounts.action.smart_switch", systemImage: "wand.and.stars")
+                            .lineLimit(1)
+                    }
+                    .buttonStyle(.frostedCapsule(prominent: true, density: .compact))
+                    .disabled(model.isImporting || model.isAdding || model.switchingAccountID != nil)
+
+                    Button {
+                        Task { await model.refreshUsage() }
+                    } label: {
+                        Image(systemName: model.isRefreshing ? "arrow.triangle.2.circlepath.circle.fill" : "arrow.clockwise")
+                    }
+                    .disabled(model.isRefreshing || model.isAdding)
+                    .buttonStyle(.frostedCapsule(prominent: true, tint: .mint, density: .compact))
                 }
             }
             .scrollIndicators(.hidden)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            Spacer(minLength: 0)
-
-            Button {
-                Task { await model.refreshUsage() }
-            } label: {
-                Image(systemName: model.isRefreshing ? "arrow.triangle.2.circlepath.circle.fill" : "arrow.clockwise")
+            CollapseChevronButton(isExpanded: !model.areAllAccountsCollapsed) {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    model.toggleAllAccountsCollapsed()
+                }
             }
-            .disabled(model.isRefreshing || model.isAdding)
-            .buttonStyle(.frostedCapsule(prominent: true, tint: .mint))
-        }
-    }
-
-    private var footerBar: some View {
-        HStack {
-            Spacer(minLength: 0)
-
-            Button {
-                Task { await model.smartSwitch() }
-            } label: {
-                Label("accounts.action.smart_switch", systemImage: "wand.and.stars")
-            }
-            .buttonStyle(.frostedCapsule(prominent: true))
-            .disabled(model.isImporting || model.isAdding || model.switchingAccountID != nil)
+            .accessibilityLabel(
+                Text(
+                    model.areAllAccountsCollapsed
+                        ? L10n.tr("accounts.action.expand_all")
+                        : L10n.tr("accounts.action.collapse_all")
+                )
+            )
         }
     }
 
@@ -84,93 +95,130 @@ struct AccountsPageView: View {
             EmptyStateView(title: L10n.tr("accounts.error.load_failed"), message: message)
                 .padding(.horizontal, LayoutRules.pagePadding)
         case .content(let accounts):
-            ScrollView(.horizontal) {
-                LazyHStack(alignment: .top, spacing: LayoutRules.accountsRowSpacing) {
-                    ForEach(accounts) { account in
-                        AccountCardView(
-                            account: account,
-                            switching: model.switchingAccountID == account.id,
-                            onSwitch: { Task { await model.switchAccount(id: account.id) } },
-                            onDelete: { Task { await model.deleteAccount(id: account.id) } }
-                        )
-                        .frame(width: LayoutRules.accountsCardWidth)
-                    }
+            let isOverviewMode = model.areAllAccountsCollapsed
+            let columns = accountGridColumns(isOverviewMode: isOverviewMode)
+            LazyVGrid(
+                columns: columns,
+                alignment: .leading,
+                spacing: LayoutRules.accountsRowSpacing
+            ) {
+                ForEach(accounts) { account in
+                    AccountCardView(
+                        account: account,
+                        isCollapsed: model.isAccountCollapsed(account.id),
+                        switching: model.switchingAccountID == account.id,
+                        onSwitch: { Task { await model.switchAccount(id: account.id) } },
+                        onDelete: { Task { await model.deleteAccount(id: account.id) } }
+                    )
+                    .frame(width: isOverviewMode ? LayoutRules.accountsCollapsedCardWidth : LayoutRules.accountsCardWidth)
                 }
-                .padding(.horizontal, LayoutRules.pagePadding)
             }
-            .scrollIndicators(.hidden)
+            .padding(.horizontal, LayoutRules.pagePadding)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+
+    private func accountGridColumns(isOverviewMode: Bool) -> [GridItem] {
+        if isOverviewMode {
+            return Array(
+                repeating: GridItem(
+                    .fixed(LayoutRules.accountsCollapsedCardWidth),
+                    spacing: LayoutRules.accountsRowSpacing,
+                    alignment: .top
+                ),
+                count: LayoutRules.accountsCollapsedColumns
+            )
+        }
+
+        return Array(
+            repeating: GridItem(
+                .fixed(LayoutRules.accountsCardWidth),
+                spacing: LayoutRules.accountsRowSpacing,
+                alignment: .top
+            ),
+            count: LayoutRules.accountsExpandedColumns
+        )
     }
 }
 
 private struct AccountCardView: View {
     let account: AccountSummary
+    let isCollapsed: Bool
     let switching: Bool
     let onSwitch: () -> Void
     let onDelete: () -> Void
     @Environment(\.locale) private var locale
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: isCollapsed ? 8 : 8) {
             HStack {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 6) {
                         stamp(text: planLabel, tint: toneColor.opacity(0.18), fg: toneColor)
                         if account.isCurrent {
-                            stamp(text: L10n.tr("accounts.card.current"), tint: Color.mint.opacity(0.2), fg: .mint)
+                            stamp(
+                                text: L10n.tr("accounts.card.current"),
+                                tint: toneColor.opacity(0.24),
+                                fg: toneColor
+                            )
                         }
                     }
-                    if let teamNameTag {
-                        stamp(
-                            text: teamNameTag,
-                            tint: Color.secondary.opacity(0.16),
-                            fg: .secondary,
-                            maxWidth: 140
-                        )
+                    if !isCollapsed, let teamNameTag {
+                        stamp(text: teamNameTag, tint: Color.secondary.opacity(0.16), fg: .secondary, maxWidth: 140)
                     }
                 }
 
                 Spacer(minLength: 0)
 
-                Button(role: .destructive, action: onDelete) {
-                    Image(systemName: "trash")
+                if !isCollapsed {
+                    Button(role: .destructive, action: onDelete) {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.frostedCapsule(prominent: true, tint: .red))
+                    .tint(.red)
+                    .controlSize(.small)
                 }
-                .buttonStyle(.frostedCapsule(prominent: true, tint: .red))
-                .tint(.red)
-                .controlSize(.small)
             }
 
-            Text(account.email ?? account.accountID)
+            Text(displayAccountName)
                 .font(.headline)
                 .foregroundStyle(account.isCurrent ? toneColor : .primary)
                 .lineLimit(1)
+                .truncationMode(.tail)
 
-            windowSection(title: L10n.tr("accounts.window.five_hour"), window: account.usage?.fiveHour, tint: .orange)
-            windowSection(title: L10n.tr("accounts.window.one_week"), window: account.usage?.oneWeek, tint: .teal)
+            if isCollapsed {
+                compactUsageSection
+            } else {
+                windowSection(title: L10n.tr("accounts.window.five_hour"), window: account.usage?.fiveHour, tint: .orange)
+                windowSection(title: L10n.tr("accounts.window.one_week"), window: account.usage?.oneWeek, tint: .teal)
 
-            HStack(spacing: 8) {
-                Text(L10n.tr("accounts.card.credits_format", creditsText))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.trailing, account.isCurrent ? 0 : 42)
-                Spacer(minLength: 0)
-            }
+                HStack(spacing: 8) {
+                    Text(L10n.tr("accounts.card.credits_format", creditsText))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.trailing, account.isCurrent ? 0 : 42)
+                    Spacer(minLength: 0)
+                }
 
-            if let usageError = account.usageError, !usageError.isEmpty {
-                Text(usageError)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .lineLimit(2)
+                if let usageError = account.usageError, !usageError.isEmpty {
+                    Text(usageError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .lineLimit(2)
+                }
             }
         }
-        .padding(10)
-        .cardSurface(cornerRadius: 12)
+        .padding(isCollapsed ? 8 : 10)
+        .cardSurface(
+            cornerRadius: 12,
+            tint: account.isCurrent ? toneColor.opacity(0.12) : nil
+        )
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(account.isCurrent ? toneColor.opacity(0.45) : .clear, lineWidth: 1)
         )
         .overlay(alignment: .bottomTrailing) {
-            if !account.isCurrent {
+            if !isCollapsed, !account.isCurrent {
                 Button {
                     onSwitch()
                 } label: {
@@ -189,6 +237,20 @@ private struct AccountCardView: View {
                 .padding(8)
             }
         }
+    }
+
+    private var compactUsageSection: some View {
+        HStack(spacing: 14) {
+            CompactUsageRing(
+                usedPercent: compactUsedPercent(account.usage?.fiveHour),
+                tint: .orange
+            )
+            CompactUsageRing(
+                usedPercent: compactUsedPercent(account.usage?.oneWeek),
+                tint: .teal
+            )
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 
     @ViewBuilder
@@ -249,6 +311,14 @@ private struct AccountCardView: View {
         return credits.balance ?? "--"
     }
 
+    private var displayAccountName: String {
+        let raw = (account.email ?? account.accountID).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let atIndex = raw.firstIndex(of: "@"), atIndex > raw.startIndex else {
+            return raw
+        }
+        return String(raw[..<atIndex])
+    }
+
     private func stamp(text: String, tint: Color, fg: Color, maxWidth: CGFloat? = nil) -> some View {
         Text(text)
             .font(.caption2.weight(.bold))
@@ -264,6 +334,11 @@ private struct AccountCardView: View {
     private func clamped(_ value: Double?) -> Double {
         guard let value else { return 100 }
         return max(0, min(100, value))
+    }
+
+    private func compactUsedPercent(_ window: UsageWindow?) -> Double? {
+        guard let used = window?.usedPercent else { return nil }
+        return max(0, min(100, used))
     }
 
     private func roundedPercent(_ value: Double) -> Double {
@@ -301,5 +376,42 @@ private struct AccountCardView: View {
         formatter.dateStyle = .short
         formatter.timeStyle = .medium
         return formatter.string(from: Date(timeIntervalSince1970: TimeInterval(epoch)))
+    }
+}
+
+private struct CompactUsageRing: View {
+    let usedPercent: Double?
+    let tint: Color
+
+    private var progress: Double {
+        guard let usedPercent else { return 0 }
+        return max(0, min(1, usedPercent / 100))
+    }
+
+    private var percentText: String {
+        guard let usedPercent else { return "--" }
+        return "\(Int(usedPercent.rounded()))%"
+    }
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.secondary.opacity(0.2), lineWidth: 6)
+            if progress > 0 {
+                Circle()
+                    .trim(from: 0, to: progress)
+                    .stroke(tint, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            }
+            VStack(spacing: 1) {
+                Text(percentText)
+                    .font(.system(size: 10, weight: .bold))
+                    .monospacedDigit()
+                Text(L10n.tr("accounts.compact.used"))
+                    .font(.system(size: 7, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: 52, height: 52)
     }
 }

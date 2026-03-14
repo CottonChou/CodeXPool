@@ -25,6 +25,7 @@ actor SettingsCoordinator {
         if let value = patch.launchAtStartup { settings.launchAtStartup = value }
         if let value = patch.trayUsageDisplayMode { settings.trayUsageDisplayMode = value }
         if let value = patch.launchCodexAfterSwitch { settings.launchCodexAfterSwitch = value }
+        if let value = patch.autoSmartSwitch { settings.autoSmartSwitch = value }
         if let value = patch.syncOpencodeOpenaiAuth { settings.syncOpencodeOpenaiAuth = value }
         if let value = patch.restartEditorsOnSwitch { settings.restartEditorsOnSwitch = value }
         if let value = patch.restartEditorTargets { settings.restartEditorTargets = value }

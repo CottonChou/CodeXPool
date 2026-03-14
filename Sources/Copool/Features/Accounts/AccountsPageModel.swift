@@ -18,6 +18,7 @@ final class AccountsPageModel: ObservableObject {
     @Published var isImporting = false
     @Published var isAdding = false
     @Published var switchingAccountID: String?
+    @Published private(set) var collapsedAccountIDs: Set<String> = []
 
     init(coordinator: AccountsCoordinator) {
         self.coordinator = coordinator
@@ -32,7 +33,7 @@ final class AccountsPageModel: ObservableObject {
     func load() async {
         do {
             let accounts = try await coordinator.listAccounts()
-            state = Self.makeViewState(accounts: accounts)
+            applyAccounts(accounts)
         } catch {
             state = .error(message: error.localizedDescription)
         }
@@ -45,7 +46,7 @@ final class AccountsPageModel: ObservableObject {
         do {
             let imported = try await coordinator.importCurrentAuthAccount(customLabel: nil)
             let accounts = try await coordinator.listAccounts()
-            state = Self.makeViewState(accounts: accounts)
+            applyAccounts(accounts)
             notice = NoticeMessage(style: .success, text: L10n.tr("accounts.notice.imported_format", imported.label))
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
@@ -59,7 +60,7 @@ final class AccountsPageModel: ObservableObject {
         do {
             let imported = try await coordinator.addAccountViaLogin(customLabel: nil)
             let accounts = try await coordinator.listAccounts()
-            state = Self.makeViewState(accounts: accounts)
+            applyAccounts(accounts)
             notice = NoticeMessage(style: .success, text: L10n.tr("accounts.notice.imported_new_format", imported.label))
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
@@ -72,7 +73,7 @@ final class AccountsPageModel: ObservableObject {
 
         do {
             let accounts = try await coordinator.refreshAllUsage()
-            state = Self.makeViewState(accounts: accounts)
+            applyAccounts(accounts)
             notice = NoticeMessage(style: .info, text: L10n.tr("accounts.notice.usage_refreshed"))
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
@@ -83,7 +84,7 @@ final class AccountsPageModel: ObservableObject {
         do {
             try await coordinator.deleteAccount(id: id)
             let accounts = try await coordinator.listAccounts()
-            state = Self.makeViewState(accounts: accounts)
+            applyAccounts(accounts)
             notice = NoticeMessage(style: .info, text: L10n.tr("accounts.notice.account_deleted"))
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
@@ -94,7 +95,7 @@ final class AccountsPageModel: ObservableObject {
         do {
             _ = try await coordinator.updateTeamAlias(id: id, alias: alias)
             let accounts = try await coordinator.listAccounts()
-            state = Self.makeViewState(accounts: accounts)
+            applyAccounts(accounts)
             notice = NoticeMessage(style: .success, text: L10n.tr("accounts.notice.team_name_updated"))
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
@@ -108,7 +109,7 @@ final class AccountsPageModel: ObservableObject {
         do {
             let execution = try await coordinator.switchAccountAndApplySettings(id: id)
             let accounts = try await coordinator.listAccounts()
-            state = Self.makeViewState(accounts: accounts)
+            applyAccounts(accounts)
             notice = buildSwitchNotice(execution: execution)
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
@@ -130,13 +131,34 @@ final class AccountsPageModel: ObservableObject {
 
             let execution = try await coordinator.switchAccountAndApplySettings(id: best.id)
             let accounts = try await coordinator.listAccounts()
-            state = Self.makeViewState(accounts: accounts)
+            applyAccounts(accounts)
             var switchNotice = buildSwitchNotice(execution: execution)
             switchNotice.text = L10n.tr("accounts.notice.smart_switched_prefix_format", best.label, switchNotice.text)
             notice = switchNotice
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
         }
+    }
+
+    func isAccountCollapsed(_ id: String) -> Bool {
+        collapsedAccountIDs.contains(id)
+    }
+
+    var areAllAccountsCollapsed: Bool {
+        guard case .content(let accounts) = state else { return false }
+        let ids = Set(accounts.map(\.id))
+        guard !ids.isEmpty else { return false }
+        return collapsedAccountIDs.isSuperset(of: ids)
+    }
+
+    func toggleAllAccountsCollapsed() {
+        guard case .content(let accounts) = state else { return }
+        let ids = Set(accounts.map(\.id))
+        guard !ids.isEmpty else {
+            collapsedAccountIDs = []
+            return
+        }
+        collapsedAccountIDs = collapsedAccountIDs.isSuperset(of: ids) ? [] : ids
     }
 
     static func makeViewState(accounts: [AccountSummary]) -> ViewState<[AccountSummary]> {
@@ -174,5 +196,16 @@ final class AccountsPageModel: ObservableObject {
         }
 
         return NoticeMessage(style: style, text: segments.joined(separator: " · "))
+    }
+
+    private func applyAccounts(_ accounts: [AccountSummary]) {
+        let sorted = AccountRanking.sortByRemaining(accounts)
+        let availableIDs = Set(sorted.map(\.id))
+        collapsedAccountIDs = collapsedAccountIDs.intersection(availableIDs)
+        if sorted.isEmpty {
+            state = .empty(message: L10n.tr("accounts.empty.message.no_accounts"))
+        } else {
+            state = .content(sorted)
+        }
     }
 }

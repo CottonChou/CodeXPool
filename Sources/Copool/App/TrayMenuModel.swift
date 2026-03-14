@@ -6,6 +6,7 @@ final class TrayMenuModel: ObservableObject {
     private let accountsCoordinator: AccountsCoordinator
     private let settingsCoordinator: SettingsCoordinator
     private var refreshTask: Task<Void, Never>?
+    private var autoSmartSwitchEnabled = false
 
     @Published var accounts: [AccountSummary] = []
     @Published var mode: TrayUsageDisplayMode = .remaining
@@ -43,7 +44,11 @@ final class TrayMenuModel: ObservableObject {
             applySettings(settings)
 
             if forceUsageRefresh {
-                accounts = try await accountsCoordinator.refreshAllUsage()
+                _ = try await accountsCoordinator.refreshAllUsage()
+                if autoSmartSwitchEnabled {
+                    _ = try await accountsCoordinator.autoSmartSwitchIfNeeded()
+                }
+                accounts = try await accountsCoordinator.listAccounts()
             } else {
                 accounts = try await accountsCoordinator.listAccounts()
             }
@@ -55,6 +60,7 @@ final class TrayMenuModel: ObservableObject {
 
     func applySettings(_ settings: AppSettings) {
         mode = settings.trayUsageDisplayMode
+        autoSmartSwitchEnabled = settings.autoSmartSwitch
     }
 
     var title: String {

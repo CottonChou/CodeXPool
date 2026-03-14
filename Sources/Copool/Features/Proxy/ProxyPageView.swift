@@ -9,8 +9,7 @@ struct ProxyPageView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: LayoutRules.sectionSpacing) {
-                proxyHero
-                proxyDetailCards
+                apiProxySection
                 remoteSection
                 cloudflaredSection
             }
@@ -22,71 +21,145 @@ struct ProxyPageView: View {
         }
     }
 
-    private var proxyHero: some View {
-        SectionCard(title: L10n.tr("proxy.section.api_proxy")) {
-            VStack(spacing: 12) {
-                HStack {
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(model.proxyStatus.running ? Color.mint : Color.gray)
-                            .frame(width: 8, height: 8)
-                        Text(
-                            L10n.tr(
-                                "proxy.status_line_format",
-                                model.proxyStatus.running ? L10n.tr("proxy.status.running") : L10n.tr("proxy.status.stopped")
-                            )
-                        )
-                    }
-                    Spacer(minLength: 0)
-                    Text(L10n.tr("proxy.port_line_format", model.proxyStatus.port.map(String.init) ?? "--"))
-                    Text(L10n.tr("proxy.available_accounts_format", String(model.proxyStatus.availableAccounts)))
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
+    private var apiProxySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Text(L10n.tr("proxy.section.api_proxy"))
+                    .font(.headline)
 
-                HStack {
-                    TextField("8787", text: $model.preferredPortText)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+                Spacer(minLength: 0)
 
-                HStack(spacing: 10) {
-                    Button("proxy.action.refresh_status") {
-                        Task { await model.refreshStatus() }
+                CollapseChevronButton(isExpanded: model.apiProxySectionExpanded) {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        model.apiProxySectionExpanded.toggle()
                     }
-                    .buttonStyle(.frostedCapsule())
+                }
+            }
+
+            if model.apiProxySectionExpanded {
+                proxyHeroContent
+                proxyDetailCards
+            } else {
+                collapsedSummaryPills
+            }
+        }
+        .padding(16)
+        .cardSurface(cornerRadius: LayoutRules.cardRadius)
+    }
+
+    private var collapsedSummaryPills: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                statusPill
+                metricPill(L10n.tr("proxy.port_line_format", model.proxyStatus.port.map(String.init) ?? "--"))
+                metricPill(L10n.tr("proxy.available_accounts_format", String(model.proxyStatus.availableAccounts)))
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    statusPill
+                    metricPill(L10n.tr("proxy.port_line_format", model.proxyStatus.port.map(String.init) ?? "--"))
+                }
+                metricPill(L10n.tr("proxy.available_accounts_format", String(model.proxyStatus.availableAccounts)))
+            }
+        }
+    }
+
+    private var statusPill: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(model.proxyStatus.running ? Color.mint : Color.gray)
+                .frame(width: 7, height: 7)
+            Text(
+                L10n.tr(
+                    "proxy.status_line_format",
+                    model.proxyStatus.running ? L10n.tr("proxy.status.running") : L10n.tr("proxy.status.stopped")
+                )
+            )
+        }
+        .font(.subheadline.weight(.medium))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(Color.secondary.opacity(0.24), lineWidth: 1)
+        }
+    }
+
+    private func metricPill(_ text: String) -> some View {
+        Text(text)
+            .font(.subheadline.weight(.medium))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(.ultraThinMaterial, in: Capsule())
+            .overlay {
+                Capsule()
+                    .stroke(Color.secondary.opacity(0.24), lineWidth: 1)
+            }
+    }
+
+    private var proxyHeroContent: some View {
+        VStack(spacing: 12) {
+            expandedSummaryPills
+
+            HStack(spacing: 10) {
+                TextField("8787", text: $model.preferredPortText)
+                    .frostedCapsuleInput()
+                    .frame(width: LayoutRules.proxyHeroPortFieldWidth)
+
+                Button("proxy.action.refresh_status") {
+                    Task { await model.refreshStatus() }
+                }
+                .buttonStyle(.frostedCapsule())
+                .disabled(model.loading)
+
+                if model.proxyStatus.running {
+                    Button("proxy.action.stop_api_proxy", role: .destructive) {
+                        Task { await model.stopProxy() }
+                    }
+                    .buttonStyle(.frostedCapsule(prominent: true))
                     .disabled(model.loading)
-
-                    Spacer(minLength: 0)
-
-                    if model.proxyStatus.running {
-                        Button("proxy.action.stop_api_proxy", role: .destructive) {
-                            Task { await model.stopProxy() }
-                        }
-                        .buttonStyle(.frostedCapsule(prominent: true))
-                        .disabled(model.loading)
-                    } else {
-                        Button("proxy.action.start_api_proxy") {
-                            Task { await model.startProxy() }
-                        }
-                        .buttonStyle(.frostedCapsule(prominent: true))
-                        .disabled(model.loading)
+                } else {
+                    Button("proxy.action.start_api_proxy") {
+                        Task { await model.startProxy() }
                     }
+                    .buttonStyle(.frostedCapsule(prominent: true))
+                    .disabled(model.loading)
                 }
+            }
 
-                HStack {
-                    Text("proxy.start_on_launch")
-                        .font(.subheadline)
-                    Spacer(minLength: 0)
-                    Toggle("", isOn: Binding(
-                        get: { model.autoStartProxy },
-                        set: { value in
-                            Task { await model.setAutoStartProxy(value) }
-                        }
-                    ))
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
+            HStack {
+                Text("proxy.start_on_launch")
+                    .font(.subheadline)
+                Spacer(minLength: 0)
+                Toggle("", isOn: Binding(
+                    get: { model.autoStartProxy },
+                    set: { value in
+                        Task { await model.setAutoStartProxy(value) }
+                    }
+                ))
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.small)
+            }
+        }
+    }
+
+    private var expandedSummaryPills: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                statusPill
+                Spacer(minLength: 0)
+                HStack(spacing: 8) {
+                    metricPill(L10n.tr("proxy.port_line_format", model.proxyStatus.port.map(String.init) ?? "--"))
+                    metricPill(L10n.tr("proxy.available_accounts_format", String(model.proxyStatus.availableAccounts)))
+                }
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                statusPill
+                HStack(spacing: 8) {
+                    metricPill(L10n.tr("proxy.port_line_format", model.proxyStatus.port.map(String.init) ?? "--"))
+                    metricPill(L10n.tr("proxy.available_accounts_format", String(model.proxyStatus.availableAccounts)))
                 }
             }
         }
@@ -151,6 +224,9 @@ struct ProxyPageView: View {
                                 server: server,
                                 status: model.remoteStatuses[server.id],
                                 logs: model.remoteLogs[server.id],
+                                activeAction: model.remoteActions[server.id],
+                                onSave: { updated in Task { await model.saveRemoteServer(updated) } },
+                                onRemove: { id in Task { await model.removeRemoteServer(id: id) } },
                                 onRefresh: { Task { await model.refreshRemote(server: server) } },
                                 onDeploy: { Task { await model.deployRemote(server: server) } },
                                 onStart: { Task { await model.startRemote(server: server) } },
@@ -165,71 +241,7 @@ struct ProxyPageView: View {
     }
 
     private var cloudflaredSection: some View {
-        SectionCard(title: L10n.tr("proxy.section.public_access")) {
-            VStack(alignment: .leading, spacing: 12) {
-                Toggle("proxy.toggle.enable_public_access", isOn: Binding(
-                    get: { model.publicAccessEnabled },
-                    set: { value in
-                        if value {
-                            Task { await model.startCloudflared() }
-                        } else {
-                            Task { await model.stopCloudflared() }
-                        }
-                    }
-                ))
-                .toggleStyle(.switch)
-                .controlSize(.small)
-
-                HStack(spacing: 8) {
-                    Button("common.install") {
-                        Task { await model.installCloudflared() }
-                    }
-                    .buttonStyle(.frostedCapsule())
-                    .disabled(model.loading)
-
-                    Button("proxy.action.refresh_status") {
-                        Task { await model.refreshCloudflared() }
-                    }
-                    .buttonStyle(.frostedCapsule())
-                }
-
-                TextField(L10n.tr("proxy.field.named_tunnel_hostname_placeholder"), text: $model.cloudflaredHostname)
-                    .textFieldStyle(.roundedBorder)
-
-                Toggle("proxy.toggle.use_http2", isOn: $model.cloudflaredUseHTTP2)
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-
-                Text(
-                    L10n.tr(
-                        "proxy.install_status_format",
-                        model.cloudflaredStatus.installed ? L10n.tr("proxy.status.installed") : L10n.tr("proxy.status.not_installed")
-                    )
-                )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(
-                    L10n.tr(
-                        "proxy.runtime_status_format",
-                        model.cloudflaredStatus.running ? L10n.tr("proxy.status.running") : L10n.tr("proxy.status.stopped")
-                    )
-                )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                HStack {
-                    Text(L10n.tr("proxy.public_url_format", model.cloudflaredStatus.publicURL ?? "--"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                    Spacer(minLength: 0)
-                    Button("common.copy") {
-                        copyToPasteboard(model.cloudflaredStatus.publicURL)
-                    }
-                    .buttonStyle(.frostedCapsule())
-                    .disabled(model.cloudflaredStatus.publicURL == nil)
-                }
-            }
-        }
+        PublicAccessSection(model: model, onCopy: copyToPasteboard)
     }
 
     private func detailCard<Trailing: View>(
@@ -297,48 +309,353 @@ private struct RemoteServerRow: View {
     let server: RemoteServerConfig
     let status: RemoteProxyStatus?
     let logs: String?
+    let activeAction: RemoteServerAction?
+    let onSave: (RemoteServerConfig) -> Void
+    let onRemove: (String) -> Void
     let onRefresh: () -> Void
     let onDeploy: () -> Void
     let onStart: () -> Void
     let onStop: () -> Void
     let onLogs: () -> Void
+    @State private var draft: RemoteServerConfig
+    @State private var isExpanded = false
+
+    init(
+        server: RemoteServerConfig,
+        status: RemoteProxyStatus?,
+        logs: String?,
+        activeAction: RemoteServerAction?,
+        onSave: @escaping (RemoteServerConfig) -> Void,
+        onRemove: @escaping (String) -> Void,
+        onRefresh: @escaping () -> Void,
+        onDeploy: @escaping () -> Void,
+        onStart: @escaping () -> Void,
+        onStop: @escaping () -> Void,
+        onLogs: @escaping () -> Void
+    ) {
+        self.server = server
+        self.status = status
+        self.logs = logs
+        self.activeAction = activeAction
+        self.onSave = onSave
+        self.onRemove = onRemove
+        self.onRefresh = onRefresh
+        self.onDeploy = onDeploy
+        self.onStart = onStart
+        self.onStop = onStop
+        self.onLogs = onLogs
+        _draft = State(initialValue: server)
+        let isNewDraft = server.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || server.label == "new-server"
+        _isExpanded = State(initialValue: isNewDraft)
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(server.label)
-                    .font(.headline)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(draft.label.isEmpty ? "new-server" : draft.label)
+                        .font(.headline)
+                    if !isExpanded {
+                        Text("\(draft.sshUser)@\(draft.host):\(draft.listenPort)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
                 Spacer(minLength: 0)
-                Text(status?.running == true ? L10n.tr("proxy.status.running") : L10n.tr("proxy.status.stopped"))
+                CollapseChevronButton(isExpanded: isExpanded) {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isExpanded.toggle()
+                    }
+                }
+                Text(statusLabel)
                     .font(.caption.weight(.semibold))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background((status?.running == true ? Color.green : Color.gray).opacity(0.2), in: Capsule())
             }
 
-            Text("\(server.sshUser)@\(server.host):\(server.listenPort)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if isExpanded {
+                LazyVGrid(
+                columns: [
+                    GridItem(.adaptive(minimum: LayoutRules.proxyRemoteFieldMinWidth), spacing: 8),
+                ],
+                spacing: 8
+                ) {
+                    labeledField(title: "Name") {
+                        TextField("tokyo-01", text: $draft.label)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    labeledField(title: "Host") {
+                        TextField("1.2.3.4", text: $draft.host)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    labeledField(title: "SSH Port") {
+                        TextField("22", value: $draft.sshPort, format: .number.grouping(.never))
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    labeledField(title: "SSH User") {
+                        TextField("root", text: $draft.sshUser)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    labeledField(title: "Deploy Dir") {
+                        TextField("/opt/codex-tools", text: $draft.remoteDir)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    labeledField(title: "Proxy Port") {
+                        TextField("8787", value: $draft.listenPort, format: .number.grouping(.never))
+                            .textFieldStyle(.roundedBorder)
+                    }
+                }
 
-            HStack(spacing: 8) {
-                Button("common.refresh", action: onRefresh)
-                Button("common.deploy", action: onDeploy)
-                Button("common.start", action: onStart)
-                Button("common.stop", role: .destructive, action: onStop)
-                Button("common.logs", action: onLogs)
-            }
-            .buttonStyle(.frostedCapsule())
+                VStack(alignment: .leading, spacing: 8) {
+                    Picker("SSH Auth", selection: $draft.authMode) {
+                        Text("Path").tag("keyPath")
+                        Text("Private key").tag("keyContent")
+                        Text("Password").tag("password")
+                    }
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: 220, alignment: .leading)
 
-            if let logs, !logs.isEmpty {
-                Text(logs)
-                    .font(.caption.monospaced())
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(8)
+                    switch draft.authMode {
+                    case "keyContent":
+                        TextEditor(text: Binding(
+                            get: { draft.privateKey ?? "" },
+                            set: { draft.privateKey = $0 }
+                        ))
+                        .font(.caption.monospaced())
+                        .frame(minHeight: 120)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                        .background {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(Color.secondary.opacity(0.14))
+                        }
+                    case "password":
+                        SecureField("SSH password", text: Binding(
+                            get: { draft.password ?? "" },
+                            set: { draft.password = $0 }
+                        ))
+                        .textFieldStyle(.roundedBorder)
+                    default:
+                        HStack(spacing: 8) {
+                            TextField("~/.ssh/id_ed25519", text: Binding(
+                                get: { draft.identityFile ?? "" },
+                                set: { draft.identityFile = $0 }
+                            ))
+                            .textFieldStyle(.roundedBorder)
+                            Button {
+                                if let path = chooseIdentityFilePath() {
+                                    draft.identityFile = path
+                                }
+                            } label: {
+                                Image(systemName: "folder")
+                            }
+                            .buttonStyle(.frostedCapsule())
+                            .help("Choose key file")
+                        }
+                    }
+                }
+
+                ScrollView(.horizontal) {
+                    HStack(spacing: 8) {
+                        actionButton("common.save", kind: .save) { onSave(draft) }
+                        actionButton("common.remove", role: .destructive, kind: .remove) { onRemove(server.id) }
+                        actionButton("common.deploy", kind: .deploy, action: onDeploy)
+                        actionButton("common.refresh", kind: .refresh, action: onRefresh)
+                        if status?.running == true {
+                            actionButton("common.stop", role: .destructive, kind: .stop, action: onStop)
+                        } else {
+                            actionButton("common.start", kind: .start, action: onStart)
+                        }
+                        actionButton("common.logs", kind: .logs, action: onLogs)
+                    }
+                }
+                .scrollIndicators(.hidden)
+                .buttonStyle(.frostedCapsule())
+
+                LazyVGrid(
+                    columns: [
+                        GridItem(.adaptive(minimum: LayoutRules.proxyRemoteMetricMinWidth), spacing: 8),
+                    ],
+                    spacing: 8
+                ) {
+                    metricPill(title: "Installed", value: boolText(status?.installed))
+                    metricPill(title: "Systemd", value: boolText(status?.serviceInstalled))
+                    metricPill(title: "Enabled on boot", value: boolText(status?.enabled))
+                    metricPill(title: "Running", value: boolText(status?.running))
+                    metricPill(title: "PID", value: status?.pid.map(String.init) ?? "--")
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    detailCard(
+                        title: "Remote Base URL",
+                        value: status?.baseURL ?? "--",
+                        canCopy: status?.baseURL != nil
+                    )
+                    detailCard(
+                        title: "Remote API key",
+                        value: status?.apiKey ?? "Generated after first start",
+                        canCopy: status?.apiKey != nil
+                    )
+                    detailCard(
+                        title: "Service name",
+                        value: status?.serviceName ?? "Unknown",
+                        canCopy: status?.serviceName != nil
+                    )
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Remote logs")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(.secondary)
+                        Spacer(minLength: 0)
+                        Button("common.copy") {
+                            copy(logs)
+                        }
+                        .buttonStyle(.frostedCapsule())
+                        .disabled((logs ?? "").isEmpty)
+                    }
+
+                    ScrollView(.vertical) {
+                        Text((logs?.isEmpty == false ? logs! : "Logs have not been loaded yet"))
+                            .font(.caption.monospaced())
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .textSelection(.enabled)
+                            .padding(8)
+                    }
+                    .frame(height: LayoutRules.proxyRemoteLogsHeight)
                     .cardSurface(cornerRadius: 8)
-                    .textSelection(.enabled)
+                    .scrollIndicators(.visible)
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Remote error")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.secondary)
+                    Text(status?.lastError ?? L10n.tr("common.none"))
+                        .font(.caption)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(8)
+                        .cardSurface(cornerRadius: 8)
+                }
             }
         }
         .padding(10)
         .cardSurface(cornerRadius: 10)
+        .onChange(of: server) { _, newValue in
+            draft = newValue
+            if draft.label == "new-server" {
+                isExpanded = true
+            }
+        }
+    }
+
+    private var statusLabel: String {
+        if let status {
+            return status.running ? L10n.tr("proxy.status.running") : L10n.tr("proxy.status.stopped")
+        }
+        return "Unknown"
+    }
+
+    private func boolText(_ value: Bool?) -> String {
+        guard let value else { return "Unknown" }
+        return value ? "Yes" : "No"
+    }
+
+    @ViewBuilder
+    private func labeledField<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title.uppercased())
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.secondary)
+            content()
+        }
+    }
+
+    private func metricPill(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title.uppercased())
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .minimumScaleFactor(0.85)
+            Text(value)
+                .font(.headline)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(minHeight: LayoutRules.proxyRemoteMetricHeight, alignment: .topLeading)
+        .padding(8)
+        .cardSurface(cornerRadius: 10)
+    }
+
+    private func detailCard(title: String, value: String, canCopy: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(title.uppercased())
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+                Button("common.copy") {
+                    copy(canCopy ? value : nil)
+                }
+                .buttonStyle(.frostedCapsule())
+                .disabled(!canCopy)
+            }
+            Text(value)
+                .font(.caption.monospaced())
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .padding(10)
+        .cardSurface(cornerRadius: 10)
+    }
+
+    private func copy(_ value: String?) {
+        guard let value, !value.isEmpty else { return }
+        #if canImport(AppKit)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(value, forType: .string)
+        #endif
+    }
+
+    @ViewBuilder
+    private func actionButton(
+        _ titleKey: LocalizedStringKey,
+        role: ButtonRole? = nil,
+        kind: RemoteServerAction,
+        action: @escaping () -> Void
+    ) -> some View {
+        let isCurrent = activeAction == kind
+        Button(role: role, action: action) {
+            if isCurrent {
+                ProgressView()
+                    .controlSize(.small)
+            } else {
+                Text(titleKey)
+            }
+        }
+        .disabled(activeAction != nil)
+    }
+
+    private func chooseIdentityFilePath() -> String? {
+        #if canImport(AppKit)
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = false
+        panel.title = "Select SSH key file"
+        let response = panel.runModal()
+        guard response == .OK else { return nil }
+        return panel.url?.path
+        #else
+        return nil
+        #endif
     }
 }

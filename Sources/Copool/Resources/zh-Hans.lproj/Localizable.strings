@@ -3,6 +3,7 @@
 "tab.settings" = "设置";
 
 "common.save" = "保存";
+"common.remove" = "删除";
 "common.copy" = "复制";
 "common.refresh" = "刷新";
 "common.refresh_usage" = "刷新用量";
@@ -31,6 +32,7 @@
 "tray.used" = "已用额度";
 "tray.hidden" = "隐藏";
 "settings.section.switch_behavior" = "切换行为";
+"settings.auto_smart_switch" = "自动智能切换";
 "settings.sync_opencode_openai_auth" = "同步 opencode OpenAI 授权";
 "settings.restart_editors_on_switch" = "切换账号后重启编辑器";
 "settings.editor_restart_target" = "编辑器重启目标";
@@ -48,6 +50,8 @@
 "accounts.action.importing" = "导入中...";
 "accounts.action.add_account" = "添加账号";
 "accounts.action.waiting_for_login" = "等待登录完成...";
+"accounts.action.collapse_all" = "收起全部卡片";
+"accounts.action.expand_all" = "展开全部卡片";
 "accounts.empty.title" = "暂无账号";
 "accounts.empty.message.no_accounts" = "暂无账号，请先导入 ~/.codex/auth.json";
 "accounts.error.load_failed" = "账号加载失败";
@@ -62,6 +66,7 @@
 "accounts.window.used_format" = "已用 %@";
 "accounts.window.remaining_format" = "剩余 %@";
 "accounts.window.reset_at_format" = "重置时间：%@";
+"accounts.compact.used" = "已用";
 "accounts.notice.imported_format" = "已导入账号：%@";
 "accounts.notice.imported_new_format" = "新账号已导入：%@";
 "accounts.notice.usage_refreshed" = "用量刷新完成";
@@ -102,8 +107,41 @@
 "proxy.remote.empty.message" = "请先添加 Linux 服务器，再上传 proxyd 并远程启动。";
 "proxy.section.public_access" = "公网访问";
 "proxy.toggle.enable_public_access" = "启用 cloudflared 公网访问";
+"proxy.switch.on" = "On";
+"proxy.switch.off" = "Off";
 "proxy.field.named_tunnel_hostname_placeholder" = "命名隧道域名（可选）";
 "proxy.toggle.use_http2" = "使用 HTTP/2";
+"proxy.public.callout.start_local_first_title" = "先启动本地代理";
+"proxy.public.callout.start_local_first_message" = "cloudflared 只会转发当前本地代理端口，所以必须先启动本地代理。";
+"proxy.public.not_installed_label" = "cloudflared 未安装";
+"proxy.public.install_title" = "需要先安装 cloudflared";
+"proxy.public.install_message" = "安装完成后即可选择 Quick Tunnel 或命名隧道。";
+"proxy.public.install_action" = "安装 cloudflared";
+"proxy.public.mode.quick_kicker" = "Quick tunnel";
+"proxy.public.mode.quick_title" = "临时 URL";
+"proxy.public.mode.quick_message" = "无需账号即可生成临时 '*.trycloudflare.com' 地址，重启后地址会变化。";
+"proxy.public.mode.named_kicker" = "Named tunnel";
+"proxy.public.mode.named_title" = "固定域名";
+"proxy.public.mode.named_message" = "使用 Cloudflare API Token，可绑定自定义域名并保持稳定公网地址。";
+"proxy.public.quick_note_title" = "Quick Tunnel 说明";
+"proxy.public.quick_note_message" = "临时地址每次重启都会变化。Cloudflare 文档说明 Quick Tunnel 不支持 SSE。";
+"proxy.public.field.api_token" = "Cloudflare API Token";
+"proxy.public.field.api_token_placeholder" = "需要 Tunnel Edit + DNS Edit 权限";
+"proxy.public.field.account_id" = "Account ID";
+"proxy.public.field.account_id_placeholder" = "Cloudflare Account ID";
+"proxy.public.field.zone_id" = "Zone ID";
+"proxy.public.field.zone_id_placeholder" = "Zone ID";
+"proxy.public.field.hostname" = "自定义域名";
+"proxy.public.field.hostname_placeholder" = "api.example.com";
+"proxy.public.refresh_status" = "刷新公网状态";
+"proxy.public.start_action" = "启动公网访问";
+"proxy.public.stop_action" = "停止公网访问";
+"proxy.public.status_title" = "公网状态";
+"proxy.public.status_running_message" = "cloudflared 正在把本地代理暴露到公网";
+"proxy.public.status_stopped_message" = "启动后会生成公网地址";
+"proxy.public.url_title" = "公网 URL";
+"proxy.public.install_path_title" = "安装路径";
+"proxy.public.not_detected" = "未检测到";
 "proxy.status.installed" = "已安装";
 "proxy.status.not_installed" = "未安装";
 "proxy.install_status_format" = "安装状态：%@";
@@ -118,9 +156,11 @@
 "proxy.notice.cloudflared_stopped" = "cloudflared 已停止";
 "proxy.notice.auto_start_updated" = "默认启动设置已更新";
 "proxy.notice.server_draft_added" = "已添加服务器草稿，请到 Settings 的 JSON 配置补全字段";
+"proxy.notice.remote_deploying_format" = "远程部署已开始：%@";
 "proxy.notice.remote_deploy_done_format" = "远程部署完成：%@";
 "proxy.notice.remote_started_format" = "远程服务已启动：%@";
 "proxy.notice.remote_stopped_format" = "远程服务已停止：%@";
+"proxy.notice.remote_server_removed" = "已删除远程服务器";
 
 "tray.refresh_usage" = "刷新用量";
 "tray.no_accounts" = "暂无账号";
@@ -146,6 +186,7 @@
 "error.usage.invalid_response" = "响应无效";
 
 "error.http_server.invalid_port_format" = "无效端口: %@";
+"error.shell.timeout_format" = "命令执行超时（%@秒）：%@";
 "error.shell.run_failed_format" = "执行命令失败: %@: %@";
 "error.update.github_api_invalid_response" = "检查更新失败：GitHub API 响应异常";
 
@@ -182,6 +223,22 @@
 "error.cloudflared.launch_failed_format" = "启动 cloudflared 失败: %@";
 "error.cloudflared.process_exited_early" = "cloudflared 进程提前退出";
 "error.cloudflared.start_failed" = "cloudflared 启动失败";
+"error.cloudflared.named_required_fields" = "命名隧道的所有字段都必须填写。";
+"error.cloudflared.named_invalid_hostname" = "自定义域名格式无效，请填写完整 Hostname，例如 api.example.com。";
+"error.cloudflared.quick_config_conflict" = "Quick Tunnel 与 ~/.cloudflared/config.yml 或 config.yaml 不兼容，请先移走该配置文件，或改用命名隧道。";
+"error.cloudflared.named_create_failed" = "创建命名隧道失败";
+"error.cloudflared.named_config_failed" = "写入命名隧道配置失败";
+"error.cloudflared.named_dns_query_failed" = "查询 DNS 记录失败";
+"error.cloudflared.named_dns_create_failed" = "创建 DNS 记录失败";
+"error.cloudflared.named_dns_update_failed" = "更新 DNS 记录失败";
+"error.cloudflared.named_cleanup_failed" = "清理命名隧道失败";
+"error.cloudflared.api_url_invalid" = "Cloudflare API 地址无效";
+"error.cloudflared.api_response_decode_failed_format" = "%@（解析 Cloudflare 响应失败）";
+"error.cloudflared.api_response_empty_format" = "%@（Cloudflare 返回结果为空）";
+"error.cloudflared.api_unknown_error" = "未知错误";
+"error.cloudflared.api_request_failed_format" = "%@: %@";
+"error.cloudflared.create_log_dir_failed_format" = "创建 cloudflared 日志目录失败：%@";
+"error.cloudflared.create_log_file_failed" = "初始化 cloudflared 日志文件失败";
 
 "error.opencode.auth_path_not_found" = "未能定位 opencode 认证文件路径";
 "error.opencode.missing_tokens" = "auth.json 缺少 tokens";
@@ -199,6 +256,7 @@
 "error.remote.ssh_not_found" = "未检测到 ssh 命令";
 "error.remote.scp_not_found" = "未检测到 scp 命令";
 "error.remote.sshpass_required" = "密码认证模式需要 sshpass";
+"error.remote.no_usable_accounts_for_deploy" = "远程部署未检测到可用账号，请先导入或授权至少一个账号。";
 "error.remote.build_proxyd_failed" = "构建远程 proxyd 失败";
 "error.remote.proxyd_not_found_after_build" = "构建完成但未找到 proxyd 二进制";
 "error.remote.unavailable_missing_proxyd_source" = "当前构建未包含 src-tauri/proxyd/Cargo.toml，远程部署功能不可用。";

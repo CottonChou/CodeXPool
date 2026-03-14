@@ -23,6 +23,7 @@ struct CopoolApp: App {
                 .frame(
                     minWidth: LayoutRules.minimumPanelWidth,
                     idealWidth: LayoutRules.defaultPanelWidth,
+                    maxWidth: LayoutRules.maximumPanelWidth,
                     minHeight: LayoutRules.minimumPanelHeight,
                     idealHeight: LayoutRules.defaultPanelHeight
                 )

@@ -160,6 +160,15 @@ actor AccountsCoordinator {
         return (best, execution)
     }
 
+    func autoSmartSwitchIfNeeded() throws -> (AccountSummary, SwitchAccountExecutionResult)? {
+        let accounts = try listAccounts()
+        guard let target = AccountRanking.pickAutoSwitchTarget(accounts) else {
+            return nil
+        }
+        let execution = try switchAccountAndApplySettings(id: target.id)
+        return (target, execution)
+    }
+
     func addAccountViaLogin(customLabel: String?, timeoutSeconds: TimeInterval = 10 * 60) async throws -> AccountSummary {
         let backupAuth = try authRepository.readCurrentAuthOptional()
         let baselineFingerprint = fingerprint(of: backupAuth)
