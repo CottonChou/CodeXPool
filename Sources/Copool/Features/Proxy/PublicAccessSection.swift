@@ -3,6 +3,7 @@ import SwiftUI
 struct PublicAccessSection: View {
     @ObservedObject var model: ProxyPageModel
     let onCopy: (String?) -> Void
+    @State private var modeCardHeight: CGFloat = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -110,6 +111,7 @@ struct PublicAccessSection: View {
             ) {
                 model.cloudflaredTunnelMode = .quick
             }
+            .frame(height: modeCardHeight > 0 ? modeCardHeight : nil, alignment: .top)
             .disabled(!model.canEditCloudflaredInput)
 
             PublicAccessModeCard(
@@ -120,7 +122,12 @@ struct PublicAccessSection: View {
             ) {
                 model.cloudflaredTunnelMode = .named
             }
+            .frame(height: modeCardHeight > 0 ? modeCardHeight : nil, alignment: .top)
             .disabled(!model.canEditCloudflaredInput)
+        }
+        .onPreferenceChange(PublicAccessModeCardHeightKey.self) { nextHeight in
+            guard nextHeight > 0, abs(modeCardHeight - nextHeight) > 0.5 else { return }
+            modeCardHeight = nextHeight
         }
     }
 
@@ -335,7 +342,7 @@ private struct PublicAccessModeCard: View {
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.leading)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(12)
             .background(selected ? Color.accentColor.opacity(0.10) : Color.clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay {
@@ -344,6 +351,20 @@ private struct PublicAccessModeCard: View {
             }
         }
         .buttonStyle(.plain)
+        .background {
+            GeometryReader { proxy in
+                Color.clear
+                    .preference(key: PublicAccessModeCardHeightKey.self, value: proxy.size.height)
+            }
+        }
+    }
+}
+
+private struct PublicAccessModeCardHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 
