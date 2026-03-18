@@ -8,10 +8,10 @@ Copool 是一个面向 macOS 和 iOS 的 SwiftUI 应用，用于管理 Codex/Cha
 
 ## Screenshots / 截图
 
-<img src="./account.png" alt="Accounts Overview" width="720" />
-<img src="./account_2.png" alt="Accounts Detail" width="720" />
-<img src="./proxy.png" alt="Proxy" width="720" />
-<img src="./setting.png" alt="Settings" width="720" />
+<img src="./account.png" alt="Accounts Overview" width="560" />
+<img src="./account_2.png" alt="Accounts Detail" width="560" />
+<img src="./proxy.png" alt="Proxy" width="560" />
+<img src="./setting.png" alt="Settings" width="560" />
 
 ## Features / 功能
 
