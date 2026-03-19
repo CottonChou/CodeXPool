@@ -564,7 +564,7 @@ final class AccountsCoordinatorTests: XCTestCase {
     }
 
     @MainActor
-    func testAccountsPageModelRefreshSpinnerTracksOnlyRemoteUsageWhenManualRefreshServiceExists() {
+    func testAccountsPageModelRefreshStateTracksRemoteUsageWithoutDisablingManualAction() {
         let coordinator = AccountsCoordinator(
             storeRepository: InMemoryAccountsStoreRepository(store: AccountsStore()),
             authRepository: StubAuthRepository(),
@@ -588,12 +588,58 @@ final class AccountsCoordinatorTests: XCTestCase {
         )
 
         XCTAssertFalse(model.isRefreshSpinnerActive)
+        XCTAssertTrue(model.canRefreshUsageAction)
 
         model.syncRemoteUsageRefreshActivity(isRefreshing: true)
         XCTAssertTrue(model.isRefreshSpinnerActive)
+        XCTAssertTrue(model.canRefreshUsageAction)
 
         model.syncRemoteUsageRefreshActivity(isRefreshing: false)
         XCTAssertFalse(model.isRefreshSpinnerActive)
+        XCTAssertTrue(model.canRefreshUsageAction)
+    }
+
+    @MainActor
+    func testAccountsPageModelManualRefreshShowsSpinnerAndRestoresActionState() async {
+        let coordinator = AccountsCoordinator(
+            storeRepository: InMemoryAccountsStoreRepository(store: AccountsStore()),
+            authRepository: StubAuthRepository(),
+            usageService: CountingUsageService(
+                result: UsageSnapshot(
+                    fetchedAt: 1,
+                    planType: "pro",
+                    fiveHour: nil,
+                    oneWeek: nil,
+                    credits: nil
+                )
+            ),
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService()
+        )
+
+        let started = expectation(description: "manual refresh started")
+        let gate = ManualRefreshGate()
+        let model = AccountsPageModel(
+            coordinator: coordinator,
+            manualRefreshService: BlockingAccountsManualRefreshService(
+                gate: gate,
+                onStart: { started.fulfill() }
+            )
+        )
+
+        let refreshTask = Task { await model.refreshUsage() }
+        await fulfillment(of: [started], timeout: 1.0)
+
+        XCTAssertTrue(model.isRefreshSpinnerActive)
+        XCTAssertFalse(model.canRefreshUsageAction)
+
+        await gate.open()
+        _ = await refreshTask.result
+
+        XCTAssertFalse(model.isRefreshSpinnerActive)
+        XCTAssertTrue(model.canRefreshUsageAction)
     }
 }
 
@@ -686,6 +732,40 @@ private final class StubAccountsManualRefreshService: AccountsManualRefreshServi
         onPartialUpdate: @escaping @MainActor ([AccountSummary]) -> Void
     ) async throws -> [AccountSummary] {
         _ = onPartialUpdate
+        return []
+    }
+}
+
+private actor ManualRefreshGate {
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func open() {
+        continuation?.resume()
+        continuation = nil
+    }
+}
+
+private final class BlockingAccountsManualRefreshService: AccountsManualRefreshServiceProtocol, @unchecked Sendable {
+    private let gate: ManualRefreshGate
+    private let onStart: @Sendable () -> Void
+
+    init(gate: ManualRefreshGate, onStart: @escaping @Sendable () -> Void) {
+        self.gate = gate
+        self.onStart = onStart
+    }
+
+    func performManualRefresh(
+        onPartialUpdate: @escaping @MainActor ([AccountSummary]) -> Void
+    ) async throws -> [AccountSummary] {
+        _ = onPartialUpdate
+        onStart()
+        await gate.wait()
         return []
     }
 }

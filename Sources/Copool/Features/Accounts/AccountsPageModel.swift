@@ -264,7 +264,7 @@ final class AccountsPageModel: ObservableObject {
     }
 
     var canRefreshUsageAction: Bool {
-        !isRefreshing && !isAdding
+        !isManualRefreshing && !isAdding
     }
 
     func toggleAllAccountsCollapsed() {
@@ -382,9 +382,6 @@ final class AccountsPageModel: ObservableObject {
     }
 
     var isRefreshSpinnerActive: Bool {
-        if manualRefreshService == nil {
-            return isManualRefreshing
-        }
-        return isRemoteUsageRefreshing
+        isManualRefreshing || isRemoteUsageRefreshing
     }
 }
