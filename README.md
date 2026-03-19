@@ -2,7 +2,7 @@
 
 <img src="./Copool.png" alt="Copool Icon" width="160" />
 
-[![TestFlight](https://img.shields.io/badge/TestFlight-Join_Copool_iOS-0D96F6?logo=apple&logoColor=white)](https://testflight.apple.com/join/dDySzkA8)
+<a href="https://testflight.apple.com/join/dDySzkA8"><img src="./testflight.webp" alt="TestFlight" width="44" /></a>
 
 Copool is a SwiftUI app for macOS and iOS that manages Codex/ChatGPT auth accounts, usage-based smart switching, and local/remote API proxy workflows.
 
