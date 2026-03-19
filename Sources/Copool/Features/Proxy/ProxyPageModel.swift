@@ -73,6 +73,8 @@ private struct RemoteSnapshotPresentationState: Equatable {
 final class ProxyPageModel: ObservableObject {
     private enum RemoteControlPolling {
         static let snapshotSyncInterval: Duration = .seconds(1)
+        static let snapshotFreshnessWindowMilliseconds: Int64 = 5_000
+        static let remoteStatusesFreshnessWindowMilliseconds: Int64 = 12_000
         static let commandAckPollLimit = 24
         static let commandAckPollInterval: Duration = .milliseconds(250)
         static let logAckPollLimit = 36
@@ -89,6 +91,8 @@ final class ProxyPageModel: ObservableObject {
     private var didRunLaunchBootstrap = false
     private var remoteSnapshotTask: Task<Void, Never>?
     private var lastRemoteCommandID: String?
+    private var lastAppliedRemoteSnapshotSyncedAt: Int64?
+    private var lastAppliedRemoteStatusesSyncedAt: Int64?
     private var proxyPushCancellable: AnyCancellable?
 
     @Published var proxyStatus: ApiProxyStatus = .idle
@@ -190,7 +194,9 @@ final class ProxyPageModel: ObservableObject {
             configureProxyPushHandlingIfNeeded()
             await ensureProxyPushSubscriptionIfNeeded()
             await refreshRemoteSnapshot(showErrors: false)
-            await requestRemoteSnapshotRefresh(showErrors: false)
+            if shouldRequestRemoteSnapshotRefresh() {
+                await requestRemoteSnapshotRefresh(showErrors: false)
+            }
             startRemoteSnapshotSyncIfNeeded()
             return
         }
@@ -219,7 +225,9 @@ final class ProxyPageModel: ObservableObject {
     func refreshForTabEntry() async {
         if usesRemoteMacControl {
             await refreshRemoteSnapshot(showErrors: false)
-            await requestRemoteSnapshotRefresh(showErrors: false)
+            if shouldRequestRemoteSnapshotRefresh() {
+                await requestRemoteSnapshotRefresh(showErrors: false)
+            }
             return
         }
 
@@ -238,7 +246,9 @@ final class ProxyPageModel: ObservableObject {
                 configureProxyPushHandlingIfNeeded()
                 await ensureProxyPushSubscriptionIfNeeded()
                 await refreshRemoteSnapshot(showErrors: true)
-                await requestRemoteSnapshotRefresh(showErrors: false)
+                if shouldRequestRemoteSnapshotRefresh() {
+                    await requestRemoteSnapshotRefresh(showErrors: false)
+                }
                 startRemoteSnapshotSyncIfNeeded()
             } else {
                 stopRemoteSnapshotSync()
@@ -512,10 +522,7 @@ final class ProxyPageModel: ObservableObject {
             await refreshRemoteSnapshot(showErrors: false)
             return
         }
-        for server in remoteServers {
-            let status = await coordinator.remoteStatus(server: server)
-            remoteStatuses[server.id] = status
-        }
+        remoteStatuses = await coordinator.remoteStatuses(for: remoteServers)
     }
 
     func refreshRemote(server: RemoteServerConfig) async {
@@ -767,6 +774,8 @@ final class ProxyPageModel: ObservableObject {
 
     @discardableResult
     func applyRemoteSnapshot(_ snapshot: ProxyControlSnapshot) -> Bool {
+        lastAppliedRemoteSnapshotSyncedAt = snapshot.syncedAt
+        lastAppliedRemoteStatusesSyncedAt = snapshot.remoteStatusesSyncedAt
         let nextState = RemoteSnapshotPresentationState(snapshot: snapshot)
         guard nextState != currentRemoteSnapshotPresentationState else {
             return false
@@ -808,6 +817,26 @@ final class ProxyPageModel: ObservableObject {
     ) {
         guard self[keyPath: keyPath] != newValue else { return }
         self[keyPath: keyPath] = newValue
+    }
+
+    private func shouldRequestRemoteSnapshotRefresh() -> Bool {
+        guard let lastAppliedRemoteSnapshotSyncedAt else {
+            return true
+        }
+
+        let now = dateProvider.unixMillisecondsNow()
+        if now - lastAppliedRemoteSnapshotSyncedAt >= RemoteControlPolling.snapshotFreshnessWindowMilliseconds {
+            return true
+        }
+
+        guard !remoteServers.isEmpty else {
+            return false
+        }
+
+        guard let lastAppliedRemoteStatusesSyncedAt else {
+            return true
+        }
+        return now - lastAppliedRemoteStatusesSyncedAt >= RemoteControlPolling.remoteStatusesFreshnessWindowMilliseconds
     }
 
     private func requestRemoteSnapshotRefresh(

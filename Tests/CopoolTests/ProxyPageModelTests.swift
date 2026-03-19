@@ -137,6 +137,7 @@ final class ProxyPageModelTests: XCTestCase {
             cloudflaredUseHTTP2: true,
             publicAccessEnabled: true,
             remoteServers: [server],
+            remoteStatusesSyncedAt: 1_763_216_000_000,
             remoteStatuses: [server.id: remoteStatus],
             remoteLogs: [server.id: "hello"],
             lastHandledCommandID: nil,

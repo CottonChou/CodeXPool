@@ -2,7 +2,16 @@ import Foundation
 import OSLog
 
 #if os(macOS)
-actor RemoteProxyService: RemoteProxyServiceProtocol {
+final class RemoteProxyService: RemoteProxyServiceProtocol, @unchecked Sendable {
+    private enum Constants {
+        static let defaultCommandTimeout: TimeInterval = 60
+        static let defaultConnectTimeoutSeconds = 12
+        static let statusCommandTimeout: TimeInterval = 10
+        static let statusConnectTimeoutSeconds = 6
+        static let logCommandTimeout: TimeInterval = 20
+        static let fileTransferTimeout: TimeInterval = 90
+    }
+
     // private let logger = Logger(subsystem: "Copool", category: "RemoteProxyService")
     private let repoRoot: URL?
     private let sourceAccountStorePath: URL
@@ -37,7 +46,12 @@ actor RemoteProxyService: RemoteProxyServiceProtocol {
             printf 'installed=%s\\nservice_installed=%s\\nrunning=%s\\nenabled=%s\\npid=%s\\napi_key=%s\\n' "$INSTALLED" "$SERVICE_INSTALLED" "$RUNNING" "$ENABLED" "$PID" "$API_KEY"
             """
 
-            let output = try runSSH(server: normalized, command: command, timeout: 20)
+            let output = try runSSH(
+                server: normalized,
+                command: command,
+                timeout: Constants.statusCommandTimeout,
+                connectTimeout: Constants.statusConnectTimeoutSeconds
+            )
             return parseStatusOutput(output, serviceName: serviceName, host: normalized.host, listenPort: normalized.listenPort)
         } catch {
             return RemoteProxyStatus(
@@ -120,7 +134,7 @@ actor RemoteProxyService: RemoteProxyServiceProtocol {
         return try runSSH(
             server: normalized,
             command: withRootPrivileges("journalctl -u \(shellQuote(serviceName)) -n \(count) --no-pager"),
-            timeout: 20
+            timeout: Constants.logCommandTimeout
         )
     }
 
@@ -636,7 +650,12 @@ actor RemoteProxyService: RemoteProxyServiceProtocol {
         }
     }
 
-    private func runSSH(server: RemoteServerConfig, command: String, timeout: TimeInterval = 60) throws -> String {
+    private func runSSH(
+        server: RemoteServerConfig,
+        command: String,
+        timeout: TimeInterval = Constants.defaultCommandTimeout,
+        connectTimeout: Int = Constants.defaultConnectTimeoutSeconds
+    ) throws -> String {
         var temporaryKey: URL?
         defer {
             if let temporaryKey {
@@ -670,7 +689,7 @@ actor RemoteProxyService: RemoteProxyServiceProtocol {
         args.append(contentsOf: [
             "-p", String(server.sshPort),
             "-o", "StrictHostKeyChecking=accept-new",
-            "-o", "ConnectTimeout=12",
+            "-o", "ConnectTimeout=\(connectTimeout)",
             "-o", "ServerAliveInterval=10",
             "-o", "ServerAliveCountMax=2",
         ])
@@ -690,7 +709,12 @@ actor RemoteProxyService: RemoteProxyServiceProtocol {
         return result.stdout
     }
 
-    private func runSCP(server: RemoteServerConfig, localPath: String, remotePath: String, timeout: TimeInterval = 90) throws {
+    private func runSCP(
+        server: RemoteServerConfig,
+        localPath: String,
+        remotePath: String,
+        timeout: TimeInterval = Constants.fileTransferTimeout
+    ) throws {
         var temporaryKey: URL?
         defer {
             if let temporaryKey {
@@ -836,7 +860,7 @@ private struct BuildAttempt {
     let command: [String]
 }
 #else
-actor RemoteProxyService: RemoteProxyServiceProtocol {
+final class RemoteProxyService: RemoteProxyServiceProtocol, @unchecked Sendable {
     init(repoRoot: URL?, sourceAccountStorePath: URL, sourceAuthPath: URL, fileManager: FileManager = .default) {
         _ = repoRoot
         _ = sourceAccountStorePath

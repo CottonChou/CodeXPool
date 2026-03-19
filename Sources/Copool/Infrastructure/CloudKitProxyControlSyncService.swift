@@ -23,6 +23,38 @@ actor CloudKitProxyControlSyncService: ProxyControlCloudSyncServiceProtocol {
         var snapshot: ProxyControlSnapshot
     }
 
+    private struct SnapshotSemanticState: Encodable {
+        var proxyStatus: ApiProxyStatus
+        var preferredProxyPort: Int?
+        var autoStartProxy: Bool
+        var cloudflaredStatus: CloudflaredStatus
+        var cloudflaredTunnelMode: CloudflaredTunnelMode
+        var cloudflaredNamedInput: NamedCloudflaredTunnelInput
+        var cloudflaredUseHTTP2: Bool
+        var publicAccessEnabled: Bool
+        var remoteServers: [RemoteServerConfig]
+        var remoteStatuses: [String: RemoteProxyStatus]
+        var remoteLogs: [String: String]
+        var lastHandledCommandID: String?
+        var lastCommandError: String?
+
+        init(snapshot: ProxyControlSnapshot) {
+            proxyStatus = snapshot.proxyStatus
+            preferredProxyPort = snapshot.preferredProxyPort
+            autoStartProxy = snapshot.autoStartProxy
+            cloudflaredStatus = snapshot.cloudflaredStatus
+            cloudflaredTunnelMode = snapshot.cloudflaredTunnelMode
+            cloudflaredNamedInput = snapshot.cloudflaredNamedInput
+            cloudflaredUseHTTP2 = snapshot.cloudflaredUseHTTP2
+            publicAccessEnabled = snapshot.publicAccessEnabled
+            remoteServers = snapshot.remoteServers
+            remoteStatuses = snapshot.remoteStatuses
+            remoteLogs = snapshot.remoteLogs
+            lastHandledCommandID = snapshot.lastHandledCommandID
+            lastCommandError = snapshot.lastCommandError
+        }
+    }
+
     private struct CommandPayload: Codable {
         var schemaVersion: Int
         var command: ProxyControlCommand
@@ -279,7 +311,7 @@ actor CloudKitProxyControlSyncService: ProxyControlCloudSyncServiceProtocol {
     }
 
     private func snapshotDigest(for snapshot: ProxyControlSnapshot) throws -> String {
-        try digest(for: snapshot)
+        try digest(for: SnapshotSemanticState(snapshot: snapshot))
     }
 
     private func commandDigest(for command: ProxyControlCommand) throws -> String {

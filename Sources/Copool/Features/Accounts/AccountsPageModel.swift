@@ -5,6 +5,7 @@ import Combine
 final class AccountsPageModel: ObservableObject {
     private let coordinator: AccountsCoordinator
     private let manualRefreshService: AccountsManualRefreshServiceProtocol?
+    private let localAccountsMutationSyncService: AccountsLocalMutationSyncServiceProtocol?
     private let currentAccountSelectionSyncService: CurrentAccountSelectionSyncServiceProtocol?
     private let cloudSyncAvailabilityService: CloudSyncAvailabilityServiceProtocol?
     private let onLocalAccountsChanged: (([AccountSummary]) -> Void)?
@@ -30,6 +31,7 @@ final class AccountsPageModel: ObservableObject {
     init(
         coordinator: AccountsCoordinator,
         manualRefreshService: AccountsManualRefreshServiceProtocol? = nil,
+        localAccountsMutationSyncService: AccountsLocalMutationSyncServiceProtocol? = nil,
         currentAccountSelectionSyncService: CurrentAccountSelectionSyncServiceProtocol? = nil,
         cloudSyncAvailabilityService: CloudSyncAvailabilityServiceProtocol? = nil,
         onLocalAccountsChanged: (([AccountSummary]) -> Void)? = nil,
@@ -37,6 +39,7 @@ final class AccountsPageModel: ObservableObject {
     ) {
         self.coordinator = coordinator
         self.manualRefreshService = manualRefreshService
+        self.localAccountsMutationSyncService = localAccountsMutationSyncService
         self.currentAccountSelectionSyncService = currentAccountSelectionSyncService
         self.cloudSyncAvailabilityService = cloudSyncAvailabilityService
         self.onLocalAccountsChanged = onLocalAccountsChanged
@@ -73,7 +76,7 @@ final class AccountsPageModel: ObservableObject {
             let imported = try await coordinator.importCurrentAuthAccount(customLabel: nil)
             let accounts = try await coordinator.listAccounts()
             applyAccounts(accounts)
-            publishLocalAccounts(accounts)
+            publishAndSyncLocalAccountsMutation(accounts)
             notice = NoticeMessage(style: .success, text: L10n.tr("accounts.notice.imported_format", imported.label))
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
@@ -88,7 +91,7 @@ final class AccountsPageModel: ObservableObject {
             let imported = try await coordinator.addAccountViaLogin(customLabel: nil)
             let accounts = try await coordinator.listAccounts()
             applyAccounts(accounts)
-            publishLocalAccounts(accounts)
+            publishAndSyncLocalAccountsMutation(accounts)
             notice = NoticeMessage(style: .success, text: L10n.tr("accounts.notice.imported_new_format", imported.label))
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
@@ -120,7 +123,7 @@ final class AccountsPageModel: ObservableObject {
             }
             let accounts = try await coordinator.listAccounts()
             applyAccounts(accounts)
-            publishLocalAccounts(accounts)
+            publishAndSyncLocalAccountsMutation(accounts)
             let key = setAsCurrent
                 ? "accounts.notice.imported_format"
                 : "accounts.notice.imported_new_format"
@@ -177,7 +180,7 @@ final class AccountsPageModel: ObservableObject {
             try await coordinator.deleteAccount(id: id)
             let accounts = try await coordinator.listAccounts()
             applyAccounts(accounts)
-            publishLocalAccounts(accounts)
+            publishAndSyncLocalAccountsMutation(accounts)
             notice = NoticeMessage(style: .info, text: L10n.tr("accounts.notice.account_deleted"))
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
@@ -189,7 +192,7 @@ final class AccountsPageModel: ObservableObject {
             _ = try await coordinator.updateTeamAlias(id: id, alias: alias)
             let accounts = try await coordinator.listAccounts()
             applyAccounts(accounts)
-            publishLocalAccounts(accounts)
+            publishAndSyncLocalAccountsMutation(accounts)
             notice = NoticeMessage(style: .success, text: L10n.tr("accounts.notice.team_name_updated"))
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
@@ -207,7 +210,7 @@ final class AccountsPageModel: ObservableObject {
                 throw AppError.invalidData(L10n.tr("error.accounts.account_not_found_for_switch"))
             }
             applyAccounts(accounts)
-            publishLocalAccounts(accounts)
+            publishAndSyncLocalAccountsMutation(accounts)
             syncCurrentAccountSelectionInBackground(accountID: selectedAccount.accountID)
             notice = buildSwitchNotice(execution: execution)
         } catch {
@@ -231,7 +234,7 @@ final class AccountsPageModel: ObservableObject {
             let execution = try await coordinator.switchAccountAndApplySettings(id: best.id)
             let accounts = try await coordinator.listAccounts()
             applyAccounts(accounts)
-            publishLocalAccounts(accounts)
+            publishAndSyncLocalAccountsMutation(accounts)
             syncCurrentAccountSelectionInBackground(accountID: best.accountID)
             var switchNotice = buildSwitchNotice(execution: execution)
             switchNotice.text = L10n.tr("accounts.notice.smart_switched_prefix_format", best.label, switchNotice.text)
@@ -376,6 +379,13 @@ final class AccountsPageModel: ObservableObject {
 
     private func publishLocalAccounts(_ accounts: [AccountSummary]) {
         onLocalAccountsChanged?(AccountRanking.sortForDisplay(accounts))
+    }
+
+    private func publishAndSyncLocalAccountsMutation(_ accounts: [AccountSummary]) {
+        publishLocalAccounts(accounts)
+        Task { @MainActor [weak self] in
+            await self?.localAccountsMutationSyncService?.syncLocalAccountsMutationNow()
+        }
     }
 
     var isRefreshing: Bool {

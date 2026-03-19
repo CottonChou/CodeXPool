@@ -649,6 +649,65 @@ final class AccountsCoordinatorTests: XCTestCase {
         XCTAssertFalse(model.isRefreshSpinnerActive)
         XCTAssertTrue(model.canRefreshUsageAction)
     }
+
+    @MainActor
+    func testAccountsPageModelLocalMutationTriggersImmediateCloudSync() async {
+        let now: Int64 = 1_763_216_000
+        let storeRepository = InMemoryAccountsStoreRepository(
+            store: AccountsStore(
+                accounts: [
+                    StoredAccount(
+                        id: "acct-1",
+                        label: "Primary",
+                        email: "primary@example.com",
+                        accountID: "account-1",
+                        planType: "pro",
+                        teamName: "workspace-x",
+                        teamAlias: nil,
+                        authJSON: .object([:]),
+                        addedAt: now,
+                        updatedAt: now,
+                        usage: nil,
+                        usageError: nil
+                    )
+                ]
+            )
+        )
+        let coordinator = AccountsCoordinator(
+            storeRepository: storeRepository,
+            authRepository: StubAuthRepository(),
+            usageService: CountingUsageService(
+                result: UsageSnapshot(
+                    fetchedAt: now,
+                    planType: "pro",
+                    fiveHour: nil,
+                    oneWeek: nil,
+                    credits: nil
+                )
+            ),
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService()
+        )
+        let syncSpy = SpyAccountsLocalMutationSyncService()
+        let model = AccountsPageModel(
+            coordinator: coordinator,
+            localAccountsMutationSyncService: syncSpy,
+            onLocalAccountsChanged: { accounts in
+                syncSpy.acceptLocalAccountsSnapshot(accounts)
+            }
+        )
+
+        await model.saveTeamAlias(id: "acct-1", alias: "Renamed")
+
+        for _ in 0..<10 where syncSpy.syncCallCount == 0 {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+
+        XCTAssertEqual(syncSpy.syncCallCount, 1)
+        XCTAssertEqual(syncSpy.acceptedSnapshots.last?.first?.teamAlias, "Renamed")
+    }
 }
 
 private final class InMemoryAccountsStoreRepository: AccountsStoreRepository, @unchecked Sendable {
@@ -741,6 +800,20 @@ private final class StubAccountsManualRefreshService: AccountsManualRefreshServi
     ) async throws -> [AccountSummary] {
         _ = onPartialUpdate
         return []
+    }
+}
+
+@MainActor
+private final class SpyAccountsLocalMutationSyncService: AccountsLocalMutationSyncServiceProtocol {
+    private(set) var acceptedSnapshots: [[AccountSummary]] = []
+    private(set) var syncCallCount = 0
+
+    func acceptLocalAccountsSnapshot(_ accounts: [AccountSummary]) {
+        acceptedSnapshots.append(accounts)
+    }
+
+    func syncLocalAccountsMutationNow() async {
+        syncCallCount += 1
     }
 }
 

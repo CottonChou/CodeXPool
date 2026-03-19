@@ -125,3 +125,9 @@ extension AccountsManualRefreshServiceProtocol {
         try await performManualRefresh(onPartialUpdate: { _ in })
     }
 }
+
+@MainActor
+protocol AccountsLocalMutationSyncServiceProtocol: AnyObject {
+    func acceptLocalAccountsSnapshot(_ accounts: [AccountSummary])
+    func syncLocalAccountsMutationNow() async
+}

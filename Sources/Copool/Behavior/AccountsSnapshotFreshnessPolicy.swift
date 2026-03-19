@@ -81,10 +81,6 @@ struct AccountsSyncExecutionPolicy: Sendable {
                 shouldPushLocalSnapshot: shouldRefreshByFreshness
             )
         case .pullRemoteAccounts:
-            let canBootstrapSeed = remoteSyncedAt == nil
-            if !canBootstrapSeed {
-                return .noRefreshNoPush
-            }
             return AccountsSyncExecutionDecision(
                 shouldRefreshLocalUsage: shouldRefreshByFreshness,
                 shouldPushLocalSnapshot: shouldRefreshByFreshness

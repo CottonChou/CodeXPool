@@ -235,7 +235,7 @@ struct SwitchAccountExecutionResult: Equatable {
     )
 }
 
-struct RemoteServerConfig: Codable, Equatable, Identifiable {
+struct RemoteServerConfig: Codable, Equatable, Identifiable, Sendable {
     var id: String
     var label: String
     var host: String
@@ -414,7 +414,7 @@ struct CloudflaredStatus: Codable, Equatable {
     )
 }
 
-struct RemoteProxyStatus: Codable, Equatable {
+struct RemoteProxyStatus: Codable, Equatable, Sendable {
     var installed: Bool
     var serviceInstalled: Bool
     var running: Bool
@@ -438,6 +438,7 @@ struct ProxyControlSnapshot: Codable, Equatable {
     var cloudflaredUseHTTP2: Bool
     var publicAccessEnabled: Bool
     var remoteServers: [RemoteServerConfig]
+    var remoteStatusesSyncedAt: Int64?
     var remoteStatuses: [String: RemoteProxyStatus]
     var remoteLogs: [String: String]
     var lastHandledCommandID: String?

@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-actor ProxyCoordinator {
+final class ProxyCoordinator: @unchecked Sendable {
     private let proxyService: ProxyRuntimeService
     private let cloudflaredService: CloudflaredServiceProtocol
     private let remoteService: RemoteProxyServiceProtocol
@@ -53,6 +53,22 @@ actor ProxyCoordinator {
 
     func remoteStatus(server: RemoteServerConfig) async -> RemoteProxyStatus {
         await remoteService.status(server: server)
+    }
+
+    func remoteStatuses(for servers: [RemoteServerConfig]) async -> [String: RemoteProxyStatus] {
+        await withTaskGroup(of: (String, RemoteProxyStatus).self, returning: [String: RemoteProxyStatus].self) { group in
+            for server in servers {
+                group.addTask { [remoteService] in
+                    (server.id, await remoteService.status(server: server))
+                }
+            }
+
+            var merged: [String: RemoteProxyStatus] = [:]
+            for await (serverID, status) in group {
+                merged[serverID] = status
+            }
+            return merged
+        }
     }
 
     func deployRemote(server: RemoteServerConfig) async throws -> RemoteProxyStatus {

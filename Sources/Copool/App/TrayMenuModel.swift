@@ -23,10 +23,11 @@ struct CloudPushPullRetryPolicy: Sendable {
 }
 
 @MainActor
-final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtocol {
+final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtocol, AccountsLocalMutationSyncServiceProtocol {
     struct BackgroundRefreshPolicy: Sendable {
         let initialRefreshDelay: Duration
-        let selectionRefreshInterval: Duration
+        let cloudReconciliationInterval: Duration
+        let usageRefreshInterval: Duration
         let refreshUsageOnRecurringTick: Bool
         let cloudSyncMode: AccountsCloudSyncMode
         let applyRemoteSelectionSwitchEffects: Bool
@@ -36,7 +37,8 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
             case .macOS:
                 return BackgroundRefreshPolicy(
                     initialRefreshDelay: .milliseconds(700),
-                    selectionRefreshInterval: .seconds(5),
+                    cloudReconciliationInterval: .seconds(3),
+                    usageRefreshInterval: .seconds(30),
                     refreshUsageOnRecurringTick: true,
                     cloudSyncMode: .pushLocalAccounts,
                     applyRemoteSelectionSwitchEffects: true
@@ -44,8 +46,9 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
             case .iOS:
                 return BackgroundRefreshPolicy(
                     initialRefreshDelay: .milliseconds(700),
-                    selectionRefreshInterval: .seconds(5),
-                    refreshUsageOnRecurringTick: true,
+                    cloudReconciliationInterval: .seconds(3),
+                    usageRefreshInterval: .seconds(30),
+                    refreshUsageOnRecurringTick: false,
                     cloudSyncMode: .pullRemoteAccounts,
                     applyRemoteSelectionSwitchEffects: false
                 )
@@ -61,8 +64,8 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
     private let dateProvider: DateProviding
     private let snapshotFreshnessPolicy: AccountsSnapshotFreshnessPolicy
     private let accountsSyncExecutionPolicy: AccountsSyncExecutionPolicy
-    private var refreshTask: Task<Void, Never>?
-    private var selectionRefreshTask: Task<Void, Never>?
+    private var cloudReconciliationTask: Task<Void, Never>?
+    private var usageRefreshTask: Task<Void, Never>?
     private var workspaceMetadataRefreshTask: Task<Void, Never>?
     private var accountsSnapshotPushCancellable: AnyCancellable?
     private var currentSelectionPushCancellable: AnyCancellable?
@@ -99,34 +102,34 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
     }
 
     func startBackgroundRefresh() {
-        guard refreshTask == nil else { return }
+        guard cloudReconciliationTask == nil else { return }
         configureAccountsSnapshotPushHandlingIfNeeded()
         configureCurrentSelectionPushHandlingIfNeeded()
-        refreshTask = Task { [weak self] in
+        cloudReconciliationTask = Task { [weak self] in
             guard let self else { return }
             try? await Task.sleep(for: self.backgroundRefreshPolicy.initialRefreshDelay)
-            await self.refreshNow(forceUsageRefresh: false)
+            await self.reconcileCloudStateNow()
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(30))
-                await self.refreshNow(forceUsageRefresh: self.backgroundRefreshPolicy.refreshUsageOnRecurringTick)
+                try? await Task.sleep(for: self.backgroundRefreshPolicy.cloudReconciliationInterval)
+                await self.reconcileCloudStateNow()
             }
         }
-        selectionRefreshTask = Task { [weak self] in
+        usageRefreshTask = Task { [weak self] in
             guard let self else { return }
+            guard self.backgroundRefreshPolicy.refreshUsageOnRecurringTick else { return }
             try? await Task.sleep(for: self.backgroundRefreshPolicy.initialRefreshDelay)
-            await self.refreshCurrentSelectionNow()
             while !Task.isCancelled {
-                try? await Task.sleep(for: self.backgroundRefreshPolicy.selectionRefreshInterval)
-                await self.refreshCurrentSelectionNow()
+                try? await Task.sleep(for: self.backgroundRefreshPolicy.usageRefreshInterval)
+                await self.refreshNow(forceUsageRefresh: true)
             }
         }
     }
 
     func stopBackgroundRefresh() {
-        refreshTask?.cancel()
-        refreshTask = nil
-        selectionRefreshTask?.cancel()
-        selectionRefreshTask = nil
+        cloudReconciliationTask?.cancel()
+        cloudReconciliationTask = nil
+        usageRefreshTask?.cancel()
+        usageRefreshTask = nil
         workspaceMetadataRefreshTask?.cancel()
         workspaceMetadataRefreshTask = nil
         accountsSnapshotPushCancellable = nil
@@ -134,8 +137,8 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
     }
 
     deinit {
-        refreshTask?.cancel()
-        selectionRefreshTask?.cancel()
+        cloudReconciliationTask?.cancel()
+        usageRefreshTask?.cancel()
         workspaceMetadataRefreshTask?.cancel()
     }
 
@@ -149,6 +152,16 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
             )
             accounts = latestAccounts
             scheduleWorkspaceMetadataRefresh(forceRemoteCheck: false)
+            notice = nil
+        } catch {
+            notice = error.localizedDescription
+        }
+    }
+
+    func reconcileCloudStateNow() async {
+        do {
+            let latestAccounts = try await executeCloudReconciliation(failOnCloudSyncError: false)
+            accounts = latestAccounts
             notice = nil
         } catch {
             notice = error.localizedDescription
@@ -178,7 +191,7 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
         _ = try await reconcileCurrentAccountSelection(failOnError: false)
         let syncDecision = accountsSyncExecutionPolicy.decision(
             cloudSyncMode: backgroundRefreshPolicy.cloudSyncMode,
-            forceUsageRefresh: false,
+            forceUsageRefresh: true,
             remoteSyncedAt: cloudPullResult.remoteSyncedAt,
             now: dateProvider.unixSecondsNow()
         )
@@ -205,6 +218,15 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
 
     func acceptLocalAccountsSnapshot(_ accounts: [AccountSummary]) {
         self.accounts = accounts
+    }
+
+    func syncLocalAccountsMutationNow() async {
+        do {
+            try await pushCloudAccountsIfNeeded(failOnError: false)
+            notice = nil
+        } catch {
+            notice = error.localizedDescription
+        }
     }
 
     func applySettings(_ settings: AppSettings) {
@@ -275,6 +297,21 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
         }
 
         return latestAccounts
+    }
+
+    private func executeCloudReconciliation(
+        failOnCloudSyncError: Bool
+    ) async throws -> [AccountSummary] {
+        let cloudPullResult = try await pullCloudAccountsIfNeeded(failOnError: failOnCloudSyncError)
+        let selectionPullResult = try await reconcileCurrentAccountSelection(
+            failOnError: failOnCloudSyncError
+        )
+
+        if cloudPullResult.didUpdateAccounts || selectionPullResult.didUpdateSelection {
+            return try await accountsCoordinator.listAccounts()
+        }
+
+        return accounts
     }
 
     private func refreshLocalAccounts(

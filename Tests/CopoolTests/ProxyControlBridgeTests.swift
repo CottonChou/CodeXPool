@@ -36,17 +36,50 @@ final class ProxyControlBridgeTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(metrics.pushLocalSnapshotCallCount, 1)
     }
 
+    func testStartPublishesSnapshotWithoutWaitingForSlowRemoteStatuses() async throws {
+        let cloudSyncService = SpyProxyControlCloudSyncService()
+        let slowRemoteService = SlowRemoteProxyService(delay: .milliseconds(600))
+        let bridge = makeBridge(
+            cloudSyncService: cloudSyncService,
+            runtimePlatform: .macOS,
+            remoteService: slowRemoteService,
+            store: AccountsStore(
+                settings: AppSettings(
+                    launchAtStartup: false,
+                    launchCodexAfterSwitch: true,
+                    autoSmartSwitch: false,
+                    syncOpencodeOpenaiAuth: false,
+                    restartEditorsOnSwitch: false,
+                    restartEditorTargets: [],
+                    autoStartApiProxy: false,
+                    remoteServers: [makeRemoteServer()],
+                    locale: AppLocale.systemDefault.identifier
+                )
+            )
+        )
+
+        await bridge.start()
+        try? await Task.sleep(for: .milliseconds(150))
+
+        let metrics = await cloudSyncService.readMetrics()
+        XCTAssertGreaterThanOrEqual(metrics.pushLocalSnapshotCallCount, 1)
+
+        await bridge.stop()
+    }
+
     private func makeBridge(
         cloudSyncService: ProxyControlCloudSyncServiceProtocol?,
-        runtimePlatform: RuntimePlatform
+        runtimePlatform: RuntimePlatform,
+        remoteService: RemoteProxyServiceProtocol = StubRemoteProxyService(),
+        store: AccountsStore = AccountsStore()
     ) -> ProxyControlBridge {
         let proxyCoordinator = ProxyCoordinator(
             proxyService: StubProxyRuntimeService(),
             cloudflaredService: StubCloudflaredService(),
-            remoteService: StubRemoteProxyService()
+            remoteService: remoteService
         )
         let settingsCoordinator = SettingsCoordinator(
-            storeRepository: InMemoryAccountsStoreRepository(store: AccountsStore()),
+            storeRepository: InMemoryAccountsStoreRepository(store: store),
             launchAtStartupService: StubLaunchAtStartupService()
         )
 
@@ -55,6 +88,22 @@ final class ProxyControlBridgeTests: XCTestCase {
             settingsCoordinator: settingsCoordinator,
             cloudSyncService: cloudSyncService,
             runtimePlatform: runtimePlatform
+        )
+    }
+
+    private func makeRemoteServer() -> RemoteServerConfig {
+        RemoteServerConfig(
+            id: "server-1",
+            label: "Tokyo",
+            host: "1.2.3.4",
+            sshPort: 22,
+            sshUser: "root",
+            authMode: "keyPath",
+            identityFile: "~/.ssh/id_ed25519",
+            privateKey: nil,
+            password: nil,
+            remoteDir: "/opt/codex-tools",
+            listenPort: 8787
         )
     }
 }
@@ -167,6 +216,48 @@ private struct StubRemoteProxyService: RemoteProxyServiceProtocol {
             pid: nil,
             baseURL: "",
             apiKey: nil,
+            lastError: nil
+        )
+    }
+
+    func deploy(server: RemoteServerConfig) async throws -> RemoteProxyStatus {
+        await status(server: server)
+    }
+
+    func start(server: RemoteServerConfig) async throws -> RemoteProxyStatus {
+        await status(server: server)
+    }
+
+    func stop(server: RemoteServerConfig) async throws -> RemoteProxyStatus {
+        await status(server: server)
+    }
+
+    func readLogs(server: RemoteServerConfig, lines: Int) async throws -> String {
+        _ = server
+        _ = lines
+        return ""
+    }
+}
+
+private actor SlowRemoteProxyService: RemoteProxyServiceProtocol {
+    private let delay: Duration
+
+    init(delay: Duration) {
+        self.delay = delay
+    }
+
+    func status(server: RemoteServerConfig) async -> RemoteProxyStatus {
+        _ = server
+        try? await Task.sleep(for: delay)
+        return RemoteProxyStatus(
+            installed: true,
+            serviceInstalled: true,
+            running: true,
+            enabled: true,
+            serviceName: "codex-tools-proxyd.service",
+            pid: 42,
+            baseURL: "http://1.2.3.4:8787/v1",
+            apiKey: "key",
             lastError: nil
         )
     }

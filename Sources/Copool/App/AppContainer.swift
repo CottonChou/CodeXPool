@@ -95,6 +95,7 @@ struct AppContainer {
                 accountsModel: AccountsPageModel(
                     coordinator: accountsCoordinator,
                     manualRefreshService: trayModel,
+                    localAccountsMutationSyncService: trayModel,
                     currentAccountSelectionSyncService: currentAccountSelectionSyncService,
                     cloudSyncAvailabilityService: cloudSyncAvailabilityService,
                     onLocalAccountsChanged: { accounts in
