@@ -194,7 +194,6 @@ DERIVED_DATA_PATH="${DERIVED_DATA_PATH:-$WORK_ROOT/DerivedData}"
 ARCHIVE_PATH="${ARCHIVE_PATH:-$WORK_ROOT/$SCHEME.xcarchive}"
 EXPORT_PATH="${EXPORT_PATH:-$WORK_ROOT/export}"
 EXPORT_OPTIONS_PLIST="${EXPORT_OPTIONS_PLIST:-$WORK_ROOT/ExportOptions.plist}"
-FINAL_EXPORT_PATH="$RELEASE_ROOT/export"
 
 trap cleanup_work_root EXIT
 
@@ -238,8 +237,8 @@ fi
 log "Preparing release directories"
 ensure_clean_dir "$RELEASE_ROOT"
 mkdir -p "$WORK_ROOT"
-ensure_clean_dir "$FINAL_EXPORT_PATH"
 rm -rf "$DERIVED_DATA_PATH" "$ARCHIVE_PATH" "$EXPORT_PATH"
+find "$RELEASE_ROOT" -maxdepth 1 -type d -name 'export*' -exec rm -rf {} +
 write_export_options
 
 ARCHIVE_ARGS=(
@@ -289,7 +288,8 @@ APP_NAME="$(basename "$APP_PATH" .app)"
 ZIP_NAME="${APP_NAME}-${APP_VERSION}-macOS-signed.zip"
 ZIP_PATH="$RELEASE_ROOT/$ZIP_NAME"
 SHA_PATH="$ZIP_PATH.sha256"
-FINAL_APP_PATH="$FINAL_EXPORT_PATH/${APP_NAME}.app"
+SIGNED_ZIP_PATH="$ZIP_PATH"
+SIGNED_SHA_PATH="$SHA_PATH"
 
 log "Packaging release zip"
 /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_PATH"
@@ -306,6 +306,7 @@ case "$NOTARIZATION_BACKEND" in
     SHA_PATH="$ZIP_PATH.sha256"
     /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_PATH"
     printf '  %s  %s\n' "$(shasum -a 256 "$ZIP_PATH" | awk '{print $1}')" "$(basename "$ZIP_PATH")" >"$SHA_PATH"
+    rm -f "$SIGNED_ZIP_PATH" "$SIGNED_SHA_PATH"
     ;;
   notarytool)
     log "Submitting zip for notarization with notarytool profile '$NOTARY_PROFILE'"
@@ -317,15 +318,12 @@ case "$NOTARIZATION_BACKEND" in
     SHA_PATH="$ZIP_PATH.sha256"
     /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_PATH"
     printf '  %s  %s\n' "$(shasum -a 256 "$ZIP_PATH" | awk '{print $1}')" "$(basename "$ZIP_PATH")" >"$SHA_PATH"
+    rm -f "$SIGNED_ZIP_PATH" "$SIGNED_SHA_PATH"
     ;;
   skip)
     log "Skipping notarization"
     ;;
 esac
-
-log "Copying final app bundle into release artifacts"
-rm -rf "$FINAL_APP_PATH"
-/usr/bin/ditto "$APP_PATH" "$FINAL_APP_PATH"
 
 if [[ "$CREATE_GITHUB_RELEASE" == "1" ]]; then
   require_command gh

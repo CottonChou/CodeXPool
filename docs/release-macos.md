@@ -65,7 +65,6 @@ NOTARIZE_WITH=skip ./scripts/release_macos.sh
 - `GH_RELEASE_NOTES`
 
 ## Output
-- Exported app bundle under `artifacts/macos-release/export/`
 - Signed or notarized zip under `artifacts/macos-release/`
 - SHA256 file next to the zip
 
@@ -75,6 +74,7 @@ NOTARIZE_WITH=skip ./scripts/release_macos.sh
 - Default signing mode starts as `Automatic`, but the script will promote itself to `Manual` when it finds a matching `Developer ID` provisioning profile for the bundle id.
 - Set `SIGNING_STYLE=Manual` only when you explicitly need to pair a named provisioning profile with the bundle id.
 - Set `AUTO_DETECT_PROFILE=0` if you want to disable profile auto-resolution and keep Xcode's automatic signing behavior.
+- The script keeps the exported `.app` in the temporary work root; the repo-local release artifacts intentionally contain only the distributable zip and checksum.
 - When notarization succeeds, it staples the ticket and regenerates the zip as `*-macOS-notarized.zip`.
 - When notarization is skipped, the output stays `*-macOS-signed.zip`.
 - Set `KEEP_WORK_ROOT=1` if you want to inspect the archive or export products after the script finishes.
