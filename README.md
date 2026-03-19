@@ -58,6 +58,8 @@ Open `Copool.xcodeproj` in Xcode and run `Copool` for macOS or `CopooliOS` for i
 
 - macOS release artifacts are published through GitHub Releases.
 - macOS 发布产物通过 GitHub Releases 分发。
+- See [`docs/release-macos.md`](docs/release-macos.md) for the Developer ID signing and notarization flow.
+- macOS 的 Developer ID 签名与公证流程见 `docs/release-macos.md`。
 - iOS builds are archived from the `CopooliOS` scheme and distributed through TestFlight.
 - iOS 构建通过 `CopooliOS` scheme 归档，并通过 TestFlight 分发。
 
