@@ -52,6 +52,41 @@ final class ProxyPageModelTests: XCTestCase {
         XCTAssertEqual(model.remoteLogs, snapshot.remoteLogs)
     }
 
+    func testProxyPushRetryWaitsUntilVisibleSnapshotChanges() async throws {
+        let snapshot = makeSnapshot()
+        var updatedSnapshot = snapshot
+        updatedSnapshot.remoteStatuses["server-1"] = RemoteProxyStatus(
+            installed: true,
+            serviceInstalled: true,
+            running: false,
+            enabled: true,
+            serviceName: "copool-proxy",
+            pid: nil,
+            baseURL: "http://1.2.3.4:8787",
+            apiKey: "remote-api-key-2",
+            lastError: "restarting"
+        )
+
+        let cloudSyncService = StubProxyControlCloudSyncService(
+            baseSnapshot: snapshot,
+            followUpSnapshots: [snapshot, updatedSnapshot]
+        )
+        let model = makeModel(
+            proxyControlCloudSyncService: cloudSyncService,
+            runtimePlatform: .iOS
+        )
+
+        await model.loadIfNeeded()
+        XCTAssertEqual(model.remoteStatuses, snapshot.remoteStatuses)
+
+        NotificationCenter.default.post(name: .copoolProxyControlPushDidArrive, object: nil)
+        for _ in 0..<10 where model.remoteStatuses != updatedSnapshot.remoteStatuses {
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+
+        XCTAssertEqual(model.remoteStatuses, updatedSnapshot.remoteStatuses)
+    }
+
     private func makeModel(
         proxyControlCloudSyncService: ProxyControlCloudSyncServiceProtocol? = nil,
         runtimePlatform: RuntimePlatform = .macOS
@@ -148,13 +183,18 @@ final class ProxyPageModelTests: XCTestCase {
 
 private actor StubProxyControlCloudSyncService: ProxyControlCloudSyncServiceProtocol {
     private let baseSnapshot: ProxyControlSnapshot
+    private var followUpSnapshots: [ProxyControlSnapshot]
     private var initialSnapshotPending = true
     private var acknowledgedCommandID: String?
     private(set) var ensurePushSubscriptionCallCount = 0
     private(set) var enqueuedCommandKinds: [ProxyControlCommandKind] = []
 
-    init(baseSnapshot: ProxyControlSnapshot) {
+    init(
+        baseSnapshot: ProxyControlSnapshot,
+        followUpSnapshots: [ProxyControlSnapshot] = []
+    ) {
         self.baseSnapshot = baseSnapshot
+        self.followUpSnapshots = followUpSnapshots
     }
 
     func pushLocalSnapshot(_ snapshot: ProxyControlSnapshot) async throws {
@@ -167,11 +207,18 @@ private actor StubProxyControlCloudSyncService: ProxyControlCloudSyncServiceProt
             return baseSnapshot
         }
 
-        guard let acknowledgedCommandID else { return nil }
-        var acknowledgedSnapshot = baseSnapshot
-        acknowledgedSnapshot.lastHandledCommandID = acknowledgedCommandID
-        self.acknowledgedCommandID = nil
-        return acknowledgedSnapshot
+        if let acknowledgedCommandID {
+            var acknowledgedSnapshot = baseSnapshot
+            acknowledgedSnapshot.lastHandledCommandID = acknowledgedCommandID
+            self.acknowledgedCommandID = nil
+            return acknowledgedSnapshot
+        }
+
+        if !followUpSnapshots.isEmpty {
+            return followUpSnapshots.removeFirst()
+        }
+
+        return nil
     }
 
     func enqueueCommand(_ command: ProxyControlCommand) async throws {

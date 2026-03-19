@@ -34,6 +34,21 @@ final class AccountsSyncExecutionPolicyTests: XCTestCase {
         XCTAssertTrue(decision.shouldPushLocalSnapshot)
     }
 
+    func testFollowerSkipsRefreshAndPushWhenRemoteSnapshotIsFresh() {
+        let policy = AccountsSyncExecutionPolicy(
+            snapshotFreshnessPolicy: AccountsSnapshotFreshnessPolicy(remoteSnapshotFreshnessWindowSeconds: 30)
+        )
+
+        let decision = policy.decision(
+            cloudSyncMode: .pullRemoteAccounts,
+            forceUsageRefresh: false,
+            remoteSyncedAt: 1_000,
+            now: 1_029
+        )
+
+        XCTAssertEqual(decision, .noRefreshNoPush)
+    }
+
     func testFollowerCanRefreshWhenRemoteSnapshotMissing() {
         let policy = AccountsSyncExecutionPolicy(
             snapshotFreshnessPolicy: AccountsSnapshotFreshnessPolicy(remoteSnapshotFreshnessWindowSeconds: 30)

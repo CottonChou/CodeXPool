@@ -67,6 +67,42 @@ final class ProxyControlBridgeTests: XCTestCase {
         await bridge.stop()
     }
 
+    func testRemoteStatusRefreshPublishesUpdatedSnapshotInParallel() async throws {
+        let cloudSyncService = SpyProxyControlCloudSyncService()
+        let slowRemoteService = SlowRemoteProxyService(delay: .milliseconds(300))
+        let bridge = makeBridge(
+            cloudSyncService: cloudSyncService,
+            runtimePlatform: .macOS,
+            remoteService: slowRemoteService,
+            store: AccountsStore(
+                settings: AppSettings(
+                    launchAtStartup: false,
+                    launchCodexAfterSwitch: true,
+                    autoSmartSwitch: false,
+                    syncOpencodeOpenaiAuth: false,
+                    restartEditorsOnSwitch: false,
+                    restartEditorTargets: [],
+                    autoStartApiProxy: false,
+                    remoteServers: [
+                        makeRemoteServer(id: "server-1", label: "Tokyo"),
+                        makeRemoteServer(id: "server-2", label: "Seoul"),
+                        makeRemoteServer(id: "server-3", label: "Paris"),
+                    ],
+                    locale: AppLocale.systemDefault.identifier
+                )
+            )
+        )
+
+        await bridge.start()
+        try? await Task.sleep(for: .milliseconds(550))
+
+        let metrics = await cloudSyncService.readMetrics()
+        XCTAssertGreaterThanOrEqual(metrics.pushLocalSnapshotCallCount, 2)
+        XCTAssertEqual(metrics.lastSnapshotRemoteStatusCount, 3)
+
+        await bridge.stop()
+    }
+
     private func makeBridge(
         cloudSyncService: ProxyControlCloudSyncServiceProtocol?,
         runtimePlatform: RuntimePlatform,
@@ -91,10 +127,13 @@ final class ProxyControlBridgeTests: XCTestCase {
         )
     }
 
-    private func makeRemoteServer() -> RemoteServerConfig {
+    private func makeRemoteServer(
+        id: String = "server-1",
+        label: String = "Tokyo"
+    ) -> RemoteServerConfig {
         RemoteServerConfig(
-            id: "server-1",
-            label: "Tokyo",
+            id: id,
+            label: label,
             host: "1.2.3.4",
             sshPort: 22,
             sshUser: "root",
@@ -112,16 +151,18 @@ private struct CloudSyncMetrics {
     var ensurePushSubscriptionCallCount: Int
     var pushLocalSnapshotCallCount: Int
     var pullPendingCommandCallCount: Int
+    var lastSnapshotRemoteStatusCount: Int
 }
 
 private actor SpyProxyControlCloudSyncService: ProxyControlCloudSyncServiceProtocol {
     private var ensurePushSubscriptionCallCount = 0
     private var pushLocalSnapshotCallCount = 0
     private var pullPendingCommandCallCount = 0
+    private var lastSnapshotRemoteStatusCount = 0
 
     func pushLocalSnapshot(_ snapshot: ProxyControlSnapshot) async throws {
-        _ = snapshot
         pushLocalSnapshotCallCount += 1
+        lastSnapshotRemoteStatusCount = snapshot.remoteStatuses.count
     }
 
     func pullRemoteSnapshot() async throws -> ProxyControlSnapshot? {
@@ -145,7 +186,8 @@ private actor SpyProxyControlCloudSyncService: ProxyControlCloudSyncServiceProto
         CloudSyncMetrics(
             ensurePushSubscriptionCallCount: ensurePushSubscriptionCallCount,
             pushLocalSnapshotCallCount: pushLocalSnapshotCallCount,
-            pullPendingCommandCallCount: pullPendingCommandCallCount
+            pullPendingCommandCallCount: pullPendingCommandCallCount,
+            lastSnapshotRemoteStatusCount: lastSnapshotRemoteStatusCount
         )
     }
 }
@@ -239,7 +281,7 @@ private struct StubRemoteProxyService: RemoteProxyServiceProtocol {
     }
 }
 
-private actor SlowRemoteProxyService: RemoteProxyServiceProtocol {
+private final class SlowRemoteProxyService: RemoteProxyServiceProtocol, @unchecked Sendable {
     private let delay: Duration
 
     init(delay: Duration) {

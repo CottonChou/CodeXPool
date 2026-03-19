@@ -744,8 +744,7 @@ final class ProxyPageModel: ObservableObject {
 
         do {
             if let snapshot = try await proxyControlCloudSyncService.pullRemoteSnapshot() {
-                _ = applyRemoteSnapshot(snapshot)
-                return true
+                return applyRemoteSnapshot(snapshot)
             }
         } catch {
             if showErrors {
