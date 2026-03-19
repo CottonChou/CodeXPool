@@ -28,10 +28,14 @@ final class AuthFileRepository: AuthRepository, @unchecked Sendable {
     }
 
     func writeCurrentAuth(_ auth: JSONValue) throws {
+        let normalizedAuth = try CodexCurrentAuthNormalizer.normalize(
+            auth,
+            fallbackLastRefresh: Self.makeLastRefreshTimestamp
+        )
         let parentDirectory = paths.codexAuthPath.deletingLastPathComponent()
         try fileManager.createDirectory(at: parentDirectory, withIntermediateDirectories: true)
 
-        let object = auth.toAny()
+        let object = normalizedAuth.toAny()
         guard JSONSerialization.isValidJSONObject(object) else {
             throw AppError.invalidData(L10n.tr("error.auth.auth_json_invalid_structure"))
         }
@@ -468,4 +472,120 @@ final class AuthFileRepository: AuthRepository, @unchecked Sendable {
         return ids
     }
 
+}
+
+private enum CodexCurrentAuthNormalizer {
+    private static let topLevelTokenKeys = [
+        "access_token",
+        "refresh_token",
+        "id_token",
+        "account_id"
+    ]
+
+    static func normalize(
+        _ auth: JSONValue,
+        fallbackLastRefresh: () -> String
+    ) throws -> JSONValue {
+        guard var root = auth.objectValue else {
+            throw AppError.invalidData(L10n.tr("error.auth.auth_json_invalid_structure"))
+        }
+
+        let tokens = try normalizedTokens(from: root)
+        root["auth_mode"] = .string(normalizedAuthMode(root["auth_mode"]))
+        root["tokens"] = .object(tokens)
+
+        for key in topLevelTokenKeys {
+            root.removeValue(forKey: key)
+        }
+
+        root["last_refresh"] = .string(
+            normalizedLastRefresh(root["last_refresh"], fallback: fallbackLastRefresh)
+        )
+        return .object(root)
+    }
+
+    private static func normalizedTokens(from root: [String: JSONValue]) throws -> [String: JSONValue] {
+        var tokens = root["tokens"]?.objectValue ?? [:]
+
+        if tokens.isEmpty {
+            for key in topLevelTokenKeys {
+                if let value = root[key] {
+                    tokens[key] = value
+                }
+            }
+        } else {
+            for key in topLevelTokenKeys where tokens[key] == nil {
+                if let value = root[key] {
+                    tokens[key] = value
+                }
+            }
+        }
+
+        guard tokens["access_token"]?.stringValue != nil else {
+            throw AppError.invalidData(L10n.tr("error.auth.missing_access_token"))
+        }
+        guard tokens["id_token"]?.stringValue != nil else {
+            throw AppError.invalidData(L10n.tr("error.auth.missing_id_token"))
+        }
+        return tokens
+    }
+
+    private static func normalizedAuthMode(_ value: JSONValue?) -> String {
+        let trimmed = value?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? "chatgpt" : trimmed
+    }
+
+    private static func normalizedLastRefresh(_ value: JSONValue?, fallback: () -> String) -> String {
+        guard let rawValue = value?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !rawValue.isEmpty else {
+            return fallback()
+        }
+
+        if let parsed = parseTimestamp(rawValue) {
+            return makeTimestamp(from: parsed)
+        }
+        return fallback()
+    }
+
+    private static func parseTimestamp(_ value: String) -> Date? {
+        for candidate in timestampCandidates(for: value) {
+            if let parsed = parseRFC3339(candidate) {
+                return parsed
+            }
+        }
+        return nil
+    }
+
+    private static func timestampCandidates(for value: String) -> [String] {
+        var candidates = [value]
+        if !hasExplicitTimezone(value) {
+            candidates.append("\(value)Z")
+        }
+        return candidates
+    }
+
+    private static func hasExplicitTimezone(_ value: String) -> Bool {
+        value.range(
+            of: #"(Z|[+-]\d{2}:\d{2})$"#,
+            options: .regularExpression
+        ) != nil
+    }
+
+    private static func parseRFC3339(_ value: String) -> Date? {
+        let fractionalFormatter = ISO8601DateFormatter()
+        fractionalFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let parsed = fractionalFormatter.date(from: value) {
+            return parsed
+        }
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: value)
+    }
+
+    private static func makeTimestamp(from date: Date) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.string(from: date)
+    }
 }

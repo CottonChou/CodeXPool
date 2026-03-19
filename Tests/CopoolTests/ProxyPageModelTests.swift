@@ -6,6 +6,26 @@ import Combine
 final class ProxyPageModelTests: XCTestCase {
     private var cancellables: Set<AnyCancellable> = []
 
+    func testLoadIfNeededInIOSRemoteControlModeAppliesRemoteSnapshot() async {
+        let snapshot = makeSnapshot()
+        let cloudSyncService = StubProxyControlCloudSyncService(baseSnapshot: snapshot)
+        let model = makeModel(
+            proxyControlCloudSyncService: cloudSyncService,
+            runtimePlatform: .iOS
+        )
+
+        await model.loadIfNeeded()
+
+        XCTAssertEqual(model.proxyStatus, snapshot.proxyStatus)
+        XCTAssertEqual(model.remoteServers, snapshot.remoteServers)
+        XCTAssertEqual(model.remoteStatuses, snapshot.remoteStatuses)
+        XCTAssertEqual(model.remoteLogs, snapshot.remoteLogs)
+        let ensureCount = await cloudSyncService.readEnsurePushSubscriptionCallCount()
+        let commandKinds = await cloudSyncService.readEnqueuedCommandKinds()
+        XCTAssertEqual(ensureCount, 1)
+        XCTAssertEqual(commandKinds, [.refreshStatus])
+    }
+
     func testApplyRemoteSnapshotSkipsPublishingWhenOnlyMetadataChanges() {
         let model = makeModel()
         let snapshot = makeSnapshot()
@@ -32,7 +52,10 @@ final class ProxyPageModelTests: XCTestCase {
         XCTAssertEqual(model.remoteLogs, snapshot.remoteLogs)
     }
 
-    private func makeModel() -> ProxyPageModel {
+    private func makeModel(
+        proxyControlCloudSyncService: ProxyControlCloudSyncServiceProtocol? = nil,
+        runtimePlatform: RuntimePlatform = .macOS
+    ) -> ProxyPageModel {
         let proxyCoordinator = ProxyCoordinator(
             proxyService: StubProxyRuntimeService(),
             cloudflaredService: StubCloudflaredService(),
@@ -45,7 +68,9 @@ final class ProxyPageModelTests: XCTestCase {
 
         return ProxyPageModel(
             coordinator: proxyCoordinator,
-            settingsCoordinator: settingsCoordinator
+            settingsCoordinator: settingsCoordinator,
+            proxyControlCloudSyncService: proxyControlCloudSyncService,
+            runtimePlatform: runtimePlatform
         )
     }
 
@@ -117,6 +142,56 @@ final class ProxyPageModelTests: XCTestCase {
             lastHandledCommandID: nil,
             lastCommandError: nil
         )
+    }
+}
+
+private actor StubProxyControlCloudSyncService: ProxyControlCloudSyncServiceProtocol {
+    private let baseSnapshot: ProxyControlSnapshot
+    private var initialSnapshotPending = true
+    private var acknowledgedCommandID: String?
+    private(set) var ensurePushSubscriptionCallCount = 0
+    private(set) var enqueuedCommandKinds: [ProxyControlCommandKind] = []
+
+    init(baseSnapshot: ProxyControlSnapshot) {
+        self.baseSnapshot = baseSnapshot
+    }
+
+    func pushLocalSnapshot(_ snapshot: ProxyControlSnapshot) async throws {
+        _ = snapshot
+    }
+
+    func pullRemoteSnapshot() async throws -> ProxyControlSnapshot? {
+        if initialSnapshotPending {
+            initialSnapshotPending = false
+            return baseSnapshot
+        }
+
+        guard let acknowledgedCommandID else { return nil }
+        var acknowledgedSnapshot = baseSnapshot
+        acknowledgedSnapshot.lastHandledCommandID = acknowledgedCommandID
+        self.acknowledgedCommandID = nil
+        return acknowledgedSnapshot
+    }
+
+    func enqueueCommand(_ command: ProxyControlCommand) async throws {
+        enqueuedCommandKinds.append(command.kind)
+        acknowledgedCommandID = command.id
+    }
+
+    func pullPendingCommand() async throws -> ProxyControlCommand? {
+        nil
+    }
+
+    func ensurePushSubscriptionIfNeeded() async throws {
+        ensurePushSubscriptionCallCount += 1
+    }
+
+    func readEnsurePushSubscriptionCallCount() -> Int {
+        ensurePushSubscriptionCallCount
+    }
+
+    func readEnqueuedCommandKinds() -> [ProxyControlCommandKind] {
+        enqueuedCommandKinds
     }
 }
 

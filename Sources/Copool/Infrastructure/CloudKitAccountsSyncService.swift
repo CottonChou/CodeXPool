@@ -758,7 +758,8 @@ actor CloudKitCurrentAccountSelectionSyncService: CurrentAccountSelectionSyncSer
 
     #if DEBUG
     private func debugSelectionLog(_ message: String) {
-        print("CurrentSelectionSync:", message)
+        _ = message
+        // print("CurrentSelectionSync:", message)
     }
     #endif
 

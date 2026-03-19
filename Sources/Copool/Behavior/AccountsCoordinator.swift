@@ -566,7 +566,8 @@ actor AccountsCoordinator {
 
     #if DEBUG
     private func debugLog(_ message: String) {
-        print("AccountsCoordinator:", message)
+        _ = message
+        // print("AccountsCoordinator:", message)
     }
     #endif
 

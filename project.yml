@@ -16,7 +16,6 @@ targets:
       - path: Sources/Copool/Resources
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.copool.app
         PRODUCT_NAME: Copool
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleName: Copool
@@ -24,8 +23,10 @@ targets:
         INFOPLIST_KEY_LSMinimumSystemVersion: "14.0"
         INFOPLIST_KEY_LSUIElement: YES
         CODE_SIGN_STYLE: Automatic
-        CURRENT_PROJECT_VERSION: 1
-        MARKETING_VERSION: 1.0.0
+        CURRENT_PROJECT_VERSION: 5
+        MARKETING_VERSION: 1.0.7
+        DEVELOPMENT_TEAM: KLU8GF65GP
+        PRODUCT_BUNDLE_IDENTIFIER: com.alick.copool
   CopoolTests:
     type: bundle.unit-test
     platform: macOS

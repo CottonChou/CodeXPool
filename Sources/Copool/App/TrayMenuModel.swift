@@ -316,7 +316,7 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
                 throw error
             }
             #if DEBUG
-            print("CloudKit background sync skipped:", error.localizedDescription)
+            // print("CloudKit background sync skipped:", error.localizedDescription)
             #endif
             return .noChange
         }
@@ -332,7 +332,7 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
                 throw error
             }
             #if DEBUG
-            print("CloudKit background sync skipped:", error.localizedDescription)
+            // print("CloudKit background sync skipped:", error.localizedDescription)
             #endif
         }
     }
@@ -360,7 +360,7 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
                 self.notice = nil
             } catch {
                 #if DEBUG
-                print("Workspace metadata refresh skipped:", error.localizedDescription)
+                // print("Workspace metadata refresh skipped:", error.localizedDescription)
                 #endif
             }
         }
@@ -411,7 +411,7 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
                 try await cloudSyncService?.ensurePushSubscriptionIfNeeded()
             } catch {
                 #if DEBUG
-                print("CloudKit accounts snapshot push subscription skipped:", error.localizedDescription)
+                // print("CloudKit accounts snapshot push subscription skipped:", error.localizedDescription)
                 #endif
             }
         }
@@ -435,7 +435,7 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
                 try await currentAccountSelectionSyncService?.ensurePushSubscriptionIfNeeded()
             } catch {
                 #if DEBUG
-                print("CloudKit current selection push subscription skipped:", error.localizedDescription)
+                // print("CloudKit current selection push subscription skipped:", error.localizedDescription)
                 #endif
             }
         }
@@ -466,7 +466,7 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
                 throw error
             }
             #if DEBUG
-            print("CloudKit current selection sync skipped:", error.localizedDescription)
+            // print("CloudKit current selection sync skipped:", error.localizedDescription)
             #endif
             return .noChange
         }

@@ -362,7 +362,7 @@ final class AccountsPageModel: ObservableObject {
             try await currentAccountSelectionSyncService.pushLocalSelectionIfNeeded()
         } catch {
             #if DEBUG
-            print("Current account selection sync skipped:", error.localizedDescription)
+            // print("Current account selection sync skipped:", error.localizedDescription)
             #endif
         }
     }

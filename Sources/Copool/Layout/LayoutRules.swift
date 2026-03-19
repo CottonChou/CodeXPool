@@ -1,4 +1,4 @@
-import CoreGraphics
+import SwiftUI
 
 /// Centralized layout inputs to avoid duplicated sizing logic across pages.
 enum LayoutRules {
@@ -67,5 +67,45 @@ enum LayoutRules {
 
     static func iOSAccountsContentBottomPadding(safeAreaBottom: CGFloat) -> CGFloat {
         safeAreaBottom + iOSAccountsScrollBottomPadding
+    }
+
+    static func accountsGridColumns(isOverviewMode: Bool, isCompactWidth: Bool) -> [GridItem] {
+        if isCompactWidth {
+            let columnCount = isOverviewMode
+                ? iOSAccountsCollapsedColumns
+                : iOSAccountsExpandedColumns
+            return Array(
+                repeating: GridItem(
+                    .flexible(minimum: 0, maximum: .infinity),
+                    spacing: accountsRowSpacing,
+                    alignment: .top
+                ),
+                count: columnCount
+            )
+        }
+
+        if isOverviewMode {
+            return Array(
+                repeating: GridItem(
+                    .fixed(accountsCollapsedCardWidth),
+                    spacing: accountsRowSpacing,
+                    alignment: .top
+                ),
+                count: accountsCollapsedColumns
+            )
+        }
+
+        return Array(
+            repeating: GridItem(
+                .fixed(accountsCardWidth),
+                spacing: accountsRowSpacing,
+                alignment: .top
+            ),
+            count: accountsExpandedColumns
+        )
+    }
+
+    static func accountsCardFrameWidth(isOverviewMode: Bool, isCompactWidth: Bool) -> CGFloat? {
+        isCompactWidth ? nil : (isOverviewMode ? accountsCollapsedCardWidth : accountsCardWidth)
     }
 }

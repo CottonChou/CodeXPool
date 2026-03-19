@@ -71,7 +71,8 @@ final class DefaultWorkspaceMetadataService: WorkspaceMetadataService, @unchecke
 
     #if DEBUG
     private func debugLog(_ message: String) {
-        print("WorkspaceMetadataService:", message)
+        _ = message
+        // print("WorkspaceMetadataService:", message)
     }
     #endif
 

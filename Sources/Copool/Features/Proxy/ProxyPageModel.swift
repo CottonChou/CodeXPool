@@ -52,7 +52,11 @@ private struct RemoteSnapshotPresentationState: Equatable {
 
     init(snapshot: ProxyControlSnapshot) {
         proxyStatus = snapshot.proxyStatus
-        preferredPortText = String(snapshot.preferredProxyPort ?? snapshot.proxyStatus.port ?? 8787)
+        preferredPortText = String(
+            snapshot.preferredProxyPort
+                ?? snapshot.proxyStatus.port
+                ?? RemoteServerConfiguration.defaultProxyPort
+        )
         autoStartProxy = snapshot.autoStartProxy
         cloudflaredStatus = snapshot.cloudflaredStatus
         cloudflaredTunnelMode = snapshot.cloudflaredTunnelMode
@@ -71,6 +75,7 @@ final class ProxyPageModel: ObservableObject {
     private let settingsCoordinator: SettingsCoordinator
     private let proxyControlCloudSyncService: ProxyControlCloudSyncServiceProtocol?
     private let dateProvider: DateProviding
+    private let runtimePlatform: RuntimePlatform
     private let noticeScheduler = NoticeAutoDismissScheduler()
     private var hasLoaded = false
     private var didRunLaunchBootstrap = false
@@ -85,7 +90,7 @@ final class ProxyPageModel: ObservableObject {
     @Published var remoteLogs: [String: String] = [:]
     @Published var remoteActions: [String: RemoteServerAction] = [:]
 
-    @Published var preferredPortText = "8787"
+    @Published var preferredPortText = String(RemoteServerConfiguration.defaultProxyPort)
     @Published var cloudflaredTunnelMode: CloudflaredTunnelMode = .quick
     @Published var cloudflaredNamedInput = NamedCloudflaredTunnelInput(
         apiToken: "",
@@ -113,12 +118,14 @@ final class ProxyPageModel: ObservableObject {
         coordinator: ProxyCoordinator,
         settingsCoordinator: SettingsCoordinator,
         proxyControlCloudSyncService: ProxyControlCloudSyncServiceProtocol? = nil,
-        dateProvider: DateProviding = SystemDateProvider()
+        dateProvider: DateProviding = SystemDateProvider(),
+        runtimePlatform: RuntimePlatform = PlatformCapabilities.currentPlatform
     ) {
         self.coordinator = coordinator
         self.settingsCoordinator = settingsCoordinator
         self.proxyControlCloudSyncService = proxyControlCloudSyncService
         self.dateProvider = dateProvider
+        self.runtimePlatform = runtimePlatform
     }
 
     deinit {
@@ -151,15 +158,15 @@ final class ProxyPageModel: ObservableObject {
     }
 
     var canManageRemoteServers: Bool {
-        usesRemoteMacControl || PlatformCapabilities.supportsRemoteShellManagement
+        usesRemoteMacControl || runtimePlatform == .macOS
     }
 
     var canManagePublicTunnel: Bool {
-        usesRemoteMacControl || PlatformCapabilities.supportsCloudflared
+        usesRemoteMacControl || runtimePlatform == .macOS
     }
 
     var usesRemoteMacControl: Bool {
-        PlatformCapabilities.currentPlatform == .iOS && proxyControlCloudSyncService != nil
+        runtimePlatform == .iOS && proxyControlCloudSyncService != nil
     }
 
     func dismissRemoteControlCallout() {
@@ -428,37 +435,13 @@ final class ProxyPageModel: ObservableObject {
         if usesRemoteMacControl {
             await performRemoteCommand(
                 kind: .addRemoteServer,
-                remoteServer: RemoteServerConfig(
-                    id: UUID().uuidString,
-                    label: "new-server",
-                    host: "",
-                    sshPort: 22,
-                    sshUser: "root",
-                    authMode: "keyPath",
-                    identityFile: nil,
-                    privateKey: nil,
-                    password: nil,
-                    remoteDir: "/opt/codex-tools",
-                    listenPort: 8787
-                ),
+                remoteServer: RemoteServerConfiguration.makeDraft(),
                 successNotice: L10n.tr("settings.notice.remote_servers_saved")
             )
             return
         }
         do {
-            let draft = RemoteServerConfig(
-                id: UUID().uuidString,
-                label: "new-server",
-                host: "",
-                sshPort: 22,
-                sshUser: "root",
-                authMode: "keyPath",
-                identityFile: nil,
-                privateKey: nil,
-                password: nil,
-                remoteDir: "/opt/codex-tools",
-                listenPort: 8787
-            )
+            let draft = RemoteServerConfiguration.makeDraft()
             let merged = remoteServers + [draft]
             let updated = try await settingsCoordinator.updateSettings(AppSettingsPatch(remoteServers: merged))
             remoteServers = updated.remoteServers
@@ -472,7 +455,7 @@ final class ProxyPageModel: ObservableObject {
         if usesRemoteMacControl {
             await performRemoteCommand(
                 kind: .saveRemoteServer,
-                remoteServer: normalizeRemoteServer(server),
+                remoteServer: RemoteServerConfiguration.normalize(server),
                 successNotice: L10n.tr("settings.notice.remote_servers_saved")
             )
             return
@@ -480,13 +463,7 @@ final class ProxyPageModel: ObservableObject {
         remoteActions[server.id] = .save
         defer { remoteActions.removeValue(forKey: server.id) }
         do {
-            let normalized = normalizeRemoteServer(server)
-            var merged = remoteServers
-            if let index = merged.firstIndex(where: { $0.id == normalized.id }) {
-                merged[index] = normalized
-            } else {
-                merged.append(normalized)
-            }
+            let merged = RemoteServerConfiguration.upsert(server, into: remoteServers)
             let updated = try await settingsCoordinator.updateSettings(AppSettingsPatch(remoteServers: merged))
             remoteServers = updated.remoteServers
             notice = NoticeMessage(style: .success, text: L10n.tr("settings.notice.remote_servers_saved"))
@@ -704,22 +681,6 @@ final class ProxyPageModel: ObservableObject {
         )
     }
 
-    private func normalizeRemoteServer(_ server: RemoteServerConfig) -> RemoteServerConfig {
-        var value = server
-        value.id = value.id.trimmingCharacters(in: .whitespacesAndNewlines)
-        if value.id.isEmpty {
-            value.id = UUID().uuidString
-        }
-        value.label = value.label.trimmingCharacters(in: .whitespacesAndNewlines)
-        value.host = value.host.trimmingCharacters(in: .whitespacesAndNewlines)
-        value.sshUser = value.sshUser.trimmingCharacters(in: .whitespacesAndNewlines)
-        value.remoteDir = value.remoteDir.trimmingCharacters(in: .whitespacesAndNewlines)
-        value.identityFile = value.identityFile?.trimmingCharacters(in: .whitespacesAndNewlines)
-        value.privateKey = value.privateKey?.trimmingCharacters(in: .whitespacesAndNewlines)
-        value.password = value.password?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return value
-    }
-
     private func startRemoteSnapshotSyncIfNeeded() {
         guard usesRemoteMacControl else { return }
         guard remoteSnapshotTask == nil else { return }
@@ -757,7 +718,7 @@ final class ProxyPageModel: ObservableObject {
             try await proxyControlCloudSyncService.ensurePushSubscriptionIfNeeded()
         } catch {
             #if DEBUG
-            print("CloudKit proxy push subscription skipped:", error.localizedDescription)
+            // print("CloudKit proxy push subscription skipped:", error.localizedDescription)
             #endif
         }
     }

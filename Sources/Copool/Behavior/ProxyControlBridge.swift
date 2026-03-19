@@ -4,7 +4,6 @@ import Combine
 actor ProxyControlBridge {
     private enum Constants {
         static let syncInterval: Duration = .seconds(2)
-        static let defaultProxyPort = 8787
     }
 
     private let proxyCoordinator: ProxyCoordinator
@@ -41,7 +40,7 @@ actor ProxyControlBridge {
                 try await cloudSyncService?.ensurePushSubscriptionIfNeeded()
             } catch {
                 #if DEBUG
-                print("CloudKit proxy push subscription skipped:", error.localizedDescription)
+                // print("CloudKit proxy push subscription skipped:", error.localizedDescription)
                 #endif
             }
         }
@@ -63,7 +62,7 @@ actor ProxyControlBridge {
             try await publishSnapshot()
         } catch {
             #if DEBUG
-            print("Proxy control push handling skipped:", error.localizedDescription)
+            // print("Proxy control push handling skipped:", error.localizedDescription)
             #endif
         }
     }
@@ -75,7 +74,7 @@ actor ProxyControlBridge {
                 try await publishSnapshot()
             } catch {
                 #if DEBUG
-                print("Proxy control bridge skipped:", error.localizedDescription)
+                // print("Proxy control bridge skipped:", error.localizedDescription)
                 #endif
             }
 
@@ -134,7 +133,7 @@ actor ProxyControlBridge {
             syncedAt: dateProvider.unixMillisecondsNow(),
             sourceDeviceID: sourceDeviceID,
             proxyStatus: proxyStatus,
-            preferredProxyPort: proxyStatus.port ?? Constants.defaultProxyPort,
+            preferredProxyPort: proxyStatus.port ?? RemoteServerConfiguration.defaultProxyPort,
             autoStartProxy: settings.autoStartApiProxy,
             cloudflaredStatus: cloudflaredStatus,
             cloudflaredTunnelMode: cloudflaredStatus.tunnelMode ?? .quick,
@@ -180,35 +179,19 @@ actor ProxyControlBridge {
         case .refreshCloudflared:
             _ = await proxyCoordinator.refreshCloudflared()
         case .addRemoteServer:
-            let draft = command.remoteServer ?? RemoteServerConfig(
-                id: UUID().uuidString,
-                label: "new-server",
-                host: "",
-                sshPort: 22,
-                sshUser: "root",
-                authMode: "keyPath",
-                identityFile: nil,
-                privateKey: nil,
-                password: nil,
-                remoteDir: "/opt/codex-tools",
-                listenPort: Constants.defaultProxyPort
-            )
+            let draft = command.remoteServer ?? RemoteServerConfiguration.makeDraft()
             let settings = try await settingsCoordinator.currentSettings()
             _ = try await settingsCoordinator.updateSettings(
-                AppSettingsPatch(remoteServers: settings.remoteServers + [normalizeRemoteServer(draft)])
+                AppSettingsPatch(
+                    remoteServers: settings.remoteServers + [RemoteServerConfiguration.normalize(draft)]
+                )
             )
         case .saveRemoteServer:
             guard let remoteServer = command.remoteServer else {
                 throw AppError.invalidData("Missing remote server payload.")
             }
-            let normalized = normalizeRemoteServer(remoteServer)
             let settings = try await settingsCoordinator.currentSettings()
-            var merged = settings.remoteServers
-            if let index = merged.firstIndex(where: { $0.id == normalized.id }) {
-                merged[index] = normalized
-            } else {
-                merged.append(normalized)
-            }
+            let merged = RemoteServerConfiguration.upsert(remoteServer, into: settings.remoteServers)
             _ = try await settingsCoordinator.updateSettings(
                 AppSettingsPatch(remoteServers: merged)
             )
@@ -250,21 +233,5 @@ actor ProxyControlBridge {
         }
         let settings = try await settingsCoordinator.currentSettings()
         return settings.remoteServers.first(where: { $0.id == id })
-    }
-
-    private func normalizeRemoteServer(_ server: RemoteServerConfig) -> RemoteServerConfig {
-        var value = server
-        value.id = value.id.trimmingCharacters(in: .whitespacesAndNewlines)
-        if value.id.isEmpty {
-            value.id = UUID().uuidString
-        }
-        value.label = value.label.trimmingCharacters(in: .whitespacesAndNewlines)
-        value.host = value.host.trimmingCharacters(in: .whitespacesAndNewlines)
-        value.sshUser = value.sshUser.trimmingCharacters(in: .whitespacesAndNewlines)
-        value.remoteDir = value.remoteDir.trimmingCharacters(in: .whitespacesAndNewlines)
-        value.identityFile = value.identityFile?.trimmingCharacters(in: .whitespacesAndNewlines)
-        value.privateKey = value.privateKey?.trimmingCharacters(in: .whitespacesAndNewlines)
-        value.password = value.password?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return value
     }
 }

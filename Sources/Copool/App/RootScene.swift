@@ -57,13 +57,6 @@ struct RootScene: View {
         .onChange(of: settingsModel.settings.locale) { _, value in
             L10n.setLocale(identifier: value)
         }
-        .onChange(of: selectedTab) { _, tab in
-            if tab == .proxy {
-                Task {
-                    await proxyModel.loadIfNeeded()
-                }
-            }
-        }
         .onReceive(trayModel.$accounts.removeDuplicates()) { accounts in
             accountsModel.syncFromBackgroundRefresh(accounts)
         }
@@ -72,9 +65,7 @@ struct RootScene: View {
         }
         .task {
             await settingsModel.loadIfNeeded()
-            #if os(macOS)
             await proxyModel.bootstrapOnAppLaunch(using: settingsModel.settings)
-            #endif
         }
         #if os(iOS)
         .animation(.easeInOut(duration: 0.2), value: currentNotice)

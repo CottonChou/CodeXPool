@@ -3,7 +3,7 @@ import OSLog
 
 #if os(macOS)
 actor RemoteProxyService: RemoteProxyServiceProtocol {
-    private let logger = Logger(subsystem: "Copool", category: "RemoteProxyService")
+    // private let logger = Logger(subsystem: "Copool", category: "RemoteProxyService")
     private let repoRoot: URL?
     private let sourceAccountStorePath: URL
     private let sourceAuthPath: URL
@@ -248,7 +248,7 @@ actor RemoteProxyService: RemoteProxyServiceProtocol {
                 loadDiagnostics.append("\(path.path): total=\(store.accounts.count), usable=\(usable)")
             } catch {
                 loadDiagnostics.append("\(path.path): decode_failed=\(error.localizedDescription)")
-                logger.error("Failed to decode account store for remote deploy at \(path.path, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                // logger.error("Failed to decode account store for remote deploy at \(path.path, privacy: .public): \(error.localizedDescription, privacy: .public)")
             }
         }
 
@@ -269,9 +269,9 @@ actor RemoteProxyService: RemoteProxyServiceProtocol {
             throw AppError.invalidData("\(L10n.tr("error.remote.no_usable_accounts_for_deploy"))\(details)")
         }
 
-        logger.info(
-            "Prepared remote accounts for deploy. source=\(self.sourceAccountStorePath.path, privacy: .public), merged_total=\(mergedStore.accounts.count), usable=\(usableAccounts.count)"
-        )
+        // logger.info(
+        //     "Prepared remote accounts for deploy. source=\(self.sourceAccountStorePath.path, privacy: .public), merged_total=\(mergedStore.accounts.count), usable=\(usableAccounts.count)"
+        // )
 
         return try encodeRemoteCompatibleStore(mergedStore)
     }
