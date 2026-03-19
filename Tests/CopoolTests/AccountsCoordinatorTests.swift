@@ -564,7 +564,7 @@ final class AccountsCoordinatorTests: XCTestCase {
     }
 
     @MainActor
-    func testAccountsPageModelRefreshStateTracksRemoteUsageWithoutDisablingManualAction() {
+    func testAccountsPageModelRemoteRefreshActivityDoesNotDriveToolbarSpinner() {
         let coordinator = AccountsCoordinator(
             storeRepository: InMemoryAccountsStoreRepository(store: AccountsStore()),
             authRepository: StubAuthRepository(),
@@ -591,7 +591,7 @@ final class AccountsCoordinatorTests: XCTestCase {
         XCTAssertTrue(model.canRefreshUsageAction)
 
         model.syncRemoteUsageRefreshActivity(isRefreshing: true)
-        XCTAssertTrue(model.isRefreshSpinnerActive)
+        XCTAssertFalse(model.isRefreshSpinnerActive)
         XCTAssertTrue(model.canRefreshUsageAction)
 
         model.syncRemoteUsageRefreshActivity(isRefreshing: false)
@@ -621,10 +621,12 @@ final class AccountsCoordinatorTests: XCTestCase {
 
         let started = expectation(description: "manual refresh started")
         let gate = ManualRefreshGate()
+        let callCounter = ManualRefreshCallCounter()
         let model = AccountsPageModel(
             coordinator: coordinator,
             manualRefreshService: BlockingAccountsManualRefreshService(
                 gate: gate,
+                callCounter: callCounter,
                 onStart: { started.fulfill() }
             )
         )
@@ -633,7 +635,13 @@ final class AccountsCoordinatorTests: XCTestCase {
         await fulfillment(of: [started], timeout: 1.0)
 
         XCTAssertTrue(model.isRefreshSpinnerActive)
-        XCTAssertFalse(model.canRefreshUsageAction)
+        XCTAssertTrue(model.canRefreshUsageAction)
+
+        // Toolbar button stays tappable while a refresh is in progress,
+        // but refresh action is guarded against concurrent re-entry.
+        await model.refreshUsage()
+        let callCountDuringRefresh = await callCounter.value
+        XCTAssertEqual(callCountDuringRefresh, 1)
 
         await gate.open()
         _ = await refreshTask.result
@@ -751,12 +759,26 @@ private actor ManualRefreshGate {
     }
 }
 
+private actor ManualRefreshCallCounter {
+    private(set) var value = 0
+
+    func increment() {
+        value += 1
+    }
+}
+
 private final class BlockingAccountsManualRefreshService: AccountsManualRefreshServiceProtocol, @unchecked Sendable {
     private let gate: ManualRefreshGate
+    private let callCounter: ManualRefreshCallCounter
     private let onStart: @Sendable () -> Void
 
-    init(gate: ManualRefreshGate, onStart: @escaping @Sendable () -> Void) {
+    init(
+        gate: ManualRefreshGate,
+        callCounter: ManualRefreshCallCounter,
+        onStart: @escaping @Sendable () -> Void
+    ) {
         self.gate = gate
+        self.callCounter = callCounter
         self.onStart = onStart
     }
 
@@ -764,6 +786,7 @@ private final class BlockingAccountsManualRefreshService: AccountsManualRefreshS
         onPartialUpdate: @escaping @MainActor ([AccountSummary]) -> Void
     ) async throws -> [AccountSummary] {
         _ = onPartialUpdate
+        await callCounter.increment()
         onStart()
         await gate.wait()
         return []
