@@ -1128,6 +1128,8 @@ struct FrostedCapsuleButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
+        let isEffectivelyPressed = isEnabled && configuration.isPressed
+
         configuration.label
             .font(font)
             .padding(.horizontal, horizontalPadding)
@@ -1140,8 +1142,8 @@ struct FrostedCapsuleButtonStyle: ButtonStyle {
                     .strokeBorder(separatorColor, lineWidth: 1)
             }
             .opacity(isEnabled ? 1 : 0.45)
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .scaleEffect(isEffectivelyPressed ? 0.97 : 1)
+            .animation(.easeOut(duration: 0.12), value: isEffectivelyPressed)
     }
 
     @ViewBuilder
