@@ -24,17 +24,11 @@ struct CloudPushPullRetryPolicy: Sendable {
 
 @MainActor
 final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtocol {
-    enum CloudSyncMode: Sendable {
-        case disabled
-        case pushLocalAccounts
-        case pullRemoteAccounts
-    }
-
     struct BackgroundRefreshPolicy: Sendable {
         let initialRefreshDelay: Duration
         let selectionRefreshInterval: Duration
         let refreshUsageOnRecurringTick: Bool
-        let cloudSyncMode: CloudSyncMode
+        let cloudSyncMode: AccountsCloudSyncMode
         let applyRemoteSelectionSwitchEffects: Bool
 
         static func forPlatform(_ platform: RuntimePlatform) -> BackgroundRefreshPolicy {
@@ -66,6 +60,7 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
     private let backgroundRefreshPolicy: BackgroundRefreshPolicy
     private let dateProvider: DateProviding
     private let snapshotFreshnessPolicy: AccountsSnapshotFreshnessPolicy
+    private let accountsSyncExecutionPolicy: AccountsSyncExecutionPolicy
     private var refreshTask: Task<Void, Never>?
     private var selectionRefreshTask: Task<Void, Never>?
     private var workspaceMetadataRefreshTask: Task<Void, Never>?
@@ -97,6 +92,9 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
         self.backgroundRefreshPolicy = backgroundRefreshPolicy
         self.dateProvider = dateProvider
         self.snapshotFreshnessPolicy = snapshotFreshnessPolicy
+        self.accountsSyncExecutionPolicy = AccountsSyncExecutionPolicy(
+            snapshotFreshnessPolicy: snapshotFreshnessPolicy
+        )
         self.accounts = initialAccounts
     }
 
@@ -178,21 +176,22 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
 
         let cloudPullResult = try await pullCloudAccountsIfNeeded(failOnError: false)
         _ = try await reconcileCurrentAccountSelection(failOnError: false)
-        let shouldRefreshUsage = snapshotFreshnessPolicy.shouldRefreshUsage(
-            forceRefresh: false,
+        let syncDecision = accountsSyncExecutionPolicy.decision(
+            cloudSyncMode: backgroundRefreshPolicy.cloudSyncMode,
+            forceUsageRefresh: false,
             remoteSyncedAt: cloudPullResult.remoteSyncedAt,
             now: dateProvider.unixSecondsNow()
         )
 
         let prefersSerialUsageRefresh = backgroundRefreshPolicy.cloudSyncMode == .pullRemoteAccounts
         var latestAccounts = try await refreshLocalAccounts(
-            forceUsageRefresh: shouldRefreshUsage,
+            forceUsageRefresh: syncDecision.shouldRefreshLocalUsage,
             prefersSerialUsageRefresh: prefersSerialUsageRefresh,
-            bypassUsageThrottle: shouldRefreshUsage,
+            bypassUsageThrottle: syncDecision.shouldRefreshLocalUsage,
             onPartialUpdate: onPartialUpdate
         )
 
-        if shouldRefreshUsage {
+        if syncDecision.shouldPushLocalSnapshot {
             try await pushCloudAccountsIfNeeded(failOnError: false)
         }
         _ = try await reconcileCurrentAccountSelection(failOnError: false)
@@ -248,13 +247,14 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
 
         let cloudPullResult = try await pullCloudAccountsIfNeeded(failOnError: failOnCloudSyncError)
         let prefersSerialUsageRefresh = backgroundRefreshPolicy.cloudSyncMode == .pullRemoteAccounts
-        let shouldRefreshUsage = snapshotFreshnessPolicy.shouldRefreshUsage(
-            forceRefresh: forceUsageRefresh,
+        let syncDecision = accountsSyncExecutionPolicy.decision(
+            cloudSyncMode: backgroundRefreshPolicy.cloudSyncMode,
+            forceUsageRefresh: forceUsageRefresh,
             remoteSyncedAt: cloudPullResult.remoteSyncedAt,
             now: dateProvider.unixSecondsNow()
         )
         var latestAccounts = try await refreshLocalAccounts(
-            forceUsageRefresh: shouldRefreshUsage,
+            forceUsageRefresh: syncDecision.shouldRefreshLocalUsage,
             prefersSerialUsageRefresh: prefersSerialUsageRefresh,
             bypassUsageThrottle: false,
             onPartialUpdate: nil
@@ -264,7 +264,7 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
             latestAccounts = try await accountsCoordinator.listAccounts()
         }
 
-        if shouldRefreshUsage {
+        if syncDecision.shouldPushLocalSnapshot {
             try await pushCloudAccountsIfNeeded(failOnError: failOnCloudSyncError)
         }
 
@@ -369,7 +369,9 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
                     forceRemoteCheck: forceRemoteCheck
                 )
                 guard !Task.isCancelled else { return }
-                try await self.pushCloudAccountsIfNeeded(failOnError: false)
+                if self.backgroundRefreshPolicy.cloudSyncMode == .pushLocalAccounts {
+                    try await self.pushCloudAccountsIfNeeded(failOnError: false)
+                }
                 guard !Task.isCancelled else { return }
                 self.accounts = latestAccounts
                 self.notice = nil
