@@ -305,10 +305,14 @@ struct LiquidProgressBar: View {
     let progress: Double
     let tint: Color
 
+    private var clampedProgress: Double {
+        max(0, min(1, progress))
+    }
+
     var body: some View {
         GeometryReader { geometry in
             let metrics = LiquidProgressMetrics(
-                progress: progress,
+                progress: clampedProgress,
                 totalWidth: geometry.size.width
             )
 
@@ -326,6 +330,10 @@ struct LiquidProgressBar: View {
             }
         }
         .frame(height: LayoutRules.liquidProgressHeight)
+        .animation(
+            ProgressAnimationTokens.barSpring,
+            value: clampedProgress
+        )
     }
 }
 
@@ -333,6 +341,10 @@ struct LiquidProgressRing: View {
     let progress: Double
     let tint: Color
     let lineWidth: CGFloat
+
+    private var clampedProgress: Double {
+        max(0, min(1, progress))
+    }
 
     var body: some View {
         let metrics = progressMetrics
@@ -348,11 +360,28 @@ struct LiquidProgressRing: View {
                 )
             }
         }
+        .animation(
+            ProgressAnimationTokens.ringSpring,
+            value: clampedProgress
+        )
     }
 
     private var progressMetrics: LiquidRingMetrics {
-        LiquidRingMetrics(progress: progress, lineWidth: lineWidth)
+        LiquidRingMetrics(progress: clampedProgress, lineWidth: lineWidth)
     }
+}
+
+private enum ProgressAnimationTokens {
+    static let barSpring: Animation = .spring(
+        response: 0.34,
+        dampingFraction: 0.86,
+        blendDuration: 0.1
+    )
+    static let ringSpring: Animation = .spring(
+        response: 0.32,
+        dampingFraction: 0.88,
+        blendDuration: 0.08
+    )
 }
 
 struct LiquidProgressMetrics {
