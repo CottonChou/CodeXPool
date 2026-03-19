@@ -12,6 +12,26 @@ final class AccountRankingTests: XCTestCase {
         XCTAssertEqual(picked?.id, best.id)
     }
 
+    func testSortForDisplayPinsCurrentAccountFirst() {
+        let current = makeAccount(id: "current", weekUsed: 95, hourUsed: 95, isCurrent: true)
+        let best = makeAccount(id: "best", weekUsed: 10, hourUsed: 10)
+        let medium = makeAccount(id: "medium", weekUsed: 40, hourUsed: 40)
+
+        let sorted = AccountRanking.sortForDisplay([medium, best, current])
+
+        XCTAssertEqual(sorted.map(\.id), ["current", "best", "medium"])
+    }
+
+    func testSortForDisplayKeepsBestRemainingOrderForNonCurrentAccounts() {
+        let current = makeAccount(id: "current", weekUsed: 20, hourUsed: 20, isCurrent: true)
+        let best = makeAccount(id: "best", weekUsed: 10, hourUsed: 10)
+        let worst = makeAccount(id: "worst", weekUsed: 90, hourUsed: 90)
+
+        let sorted = AccountRanking.sortForDisplay([worst, current, best])
+
+        XCTAssertEqual(sorted.map(\.id), ["current", "best", "worst"])
+    }
+
     func testAutoSwitchTargetIsNilWhenCurrentAccountNotExhausted() {
         let current = makeAccount(id: "current", weekUsed: 60, hourUsed: 70, isCurrent: true)
         let better = makeAccount(id: "better", weekUsed: 10, hourUsed: 15)

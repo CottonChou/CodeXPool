@@ -108,7 +108,7 @@ struct AccountsPageView: View {
             } label: {
                 ToolbarIconLabel(
                     systemImage: "arrow.trianglehead.clockwise.rotate.90",
-                    isSpinning: model.isRefreshing,
+                    isSpinning: model.isRefreshSpinnerActive,
                     opticalScale: LayoutRules.toolbarRefreshIconOpticalScale
                 )
             }
@@ -173,7 +173,7 @@ struct AccountsPageView: View {
                     } label: {
                         ToolbarIconLabel(
                             systemImage: "arrow.trianglehead.clockwise.rotate.90",
-                            isSpinning: model.isRefreshing,
+                            isSpinning: model.isRefreshSpinnerActive,
                             opticalScale: LayoutRules.toolbarRefreshIconOpticalScale
                         )
                     }
@@ -235,6 +235,10 @@ struct AccountsPageView: View {
                     #endif
                 }
             }
+            .animation(
+                .spring(response: 0.36, dampingFraction: 0.84),
+                value: accounts.map(\.id)
+            )
             .padding(.horizontal, LayoutRules.pagePadding)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -545,19 +549,11 @@ private struct AccountCardView: View {
     }
 
     private var planLabel: String {
-        let normalized = (account.planType ?? account.usage?.planType ?? "team").lowercased()
-        switch normalized {
-        case "free": return "FREE"
-        case "plus": return "PLUS"
-        case "pro": return "PRO"
-        case "enterprise": return "ENTERPRISE"
-        case "business": return "BUSINESS"
-        default: return "TEAM"
-        }
+        account.normalizedPlanLabel
     }
 
     private var teamNameTag: String? {
-        guard planLabel == "TEAM" else { return nil }
+        guard account.shouldDisplayWorkspaceTag else { return nil }
         return account.displayTeamName
     }
 

@@ -188,6 +188,52 @@ final class StoreFileRepositoryTests: XCTestCase {
         XCTAssertEqual(merged.accounts.map(\.accountID), ["remote-account", "local-account"])
     }
 
+    func testCloudKitAccountsStoreMergePreservesLocalWorkspaceMetadataWhenRemoteValueIsEmpty() {
+        let localAccount = StoredAccount(
+            id: "local-id",
+            label: "Local",
+            email: "local@example.com",
+            accountID: "account-1",
+            planType: "team",
+            teamName: "workspace-a",
+            teamAlias: "Alias A",
+            authJSON: .object([:]),
+            addedAt: 1,
+            updatedAt: 100,
+            usage: nil,
+            usageError: nil
+        )
+        let remoteAccount = StoredAccount(
+            id: "remote-id",
+            label: "Remote",
+            email: "remote@example.com",
+            accountID: "account-1",
+            planType: "team",
+            teamName: nil,
+            teamAlias: "   ",
+            authJSON: .object([:]),
+            addedAt: 1,
+            updatedAt: 200,
+            usage: nil,
+            usageError: nil
+        )
+
+        let merged = CloudKitAccountsStoreMerge.applyingRemoteSnapshot(
+            [remoteAccount],
+            remoteSyncedAt: 200,
+            to: AccountsStore(
+                version: 1,
+                accounts: [localAccount],
+                currentSelection: nil,
+                settings: .defaultValue
+            )
+        )
+
+        XCTAssertEqual(merged.accounts.count, 1)
+        XCTAssertEqual(merged.accounts[0].teamName, "workspace-a")
+        XCTAssertEqual(merged.accounts[0].teamAlias, "Alias A")
+    }
+
     func testCloudKitSelectionMergeUsesDeterministicTieBreak() {
         let local = CurrentAccountSelection(
             accountID: "account-a",

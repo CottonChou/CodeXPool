@@ -22,9 +22,6 @@ struct ProxyPageView: View {
             .padding(LayoutRules.pagePadding)
         }
         .scrollIndicators(.hidden)
-        .task {
-            await model.load()
-        }
     }
 
     private var remoteControlCalloutSection: some View {

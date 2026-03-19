@@ -128,7 +128,9 @@ actor AccountsCoordinator {
             existing.label = account.label
             existing.email = account.email
             existing.planType = account.planType
-            existing.teamName = account.teamName
+            if let teamName = Self.normalizedTeamName(account.teamName) {
+                existing.teamName = teamName
+            }
             existing.authJSON = account.authJSON
             existing.updatedAt = now
             existing.usage = usage ?? existing.usage
@@ -210,31 +212,49 @@ actor AccountsCoordinator {
     }
 
     func refreshAllUsage() async throws -> [AccountSummary] {
-        try await refreshAllUsage(using: .parallel, force: false)
+        try await refreshAllUsage(using: .parallel, force: false, onPartialUpdate: nil)
     }
 
     func refreshAllUsageSerially() async throws -> [AccountSummary] {
-        try await refreshAllUsage(using: .serial, force: false)
+        try await refreshAllUsage(using: .serial, force: false, onPartialUpdate: nil)
     }
 
     func refreshAllUsage(force: Bool) async throws -> [AccountSummary] {
-        try await refreshAllUsage(using: .parallel, force: force)
+        try await refreshAllUsage(using: .parallel, force: force, onPartialUpdate: nil)
     }
 
     func refreshAllUsageSerially(force: Bool) async throws -> [AccountSummary] {
-        try await refreshAllUsage(using: .serial, force: force)
+        try await refreshAllUsage(using: .serial, force: force, onPartialUpdate: nil)
     }
 
-    private func refreshAllUsage(using mode: UsageRefreshExecutionMode, force: Bool) async throws -> [AccountSummary] {
+    func refreshAllUsage(
+        force: Bool,
+        onPartialUpdate: @escaping @Sendable ([AccountSummary]) async -> Void
+    ) async throws -> [AccountSummary] {
+        try await refreshAllUsage(using: .parallel, force: force, onPartialUpdate: onPartialUpdate)
+    }
+
+    func refreshAllUsageSerially(
+        force: Bool,
+        onPartialUpdate: @escaping @Sendable ([AccountSummary]) async -> Void
+    ) async throws -> [AccountSummary] {
+        try await refreshAllUsage(using: .serial, force: force, onPartialUpdate: onPartialUpdate)
+    }
+
+    private func refreshAllUsage(
+        using mode: UsageRefreshExecutionMode,
+        force: Bool,
+        onPartialUpdate: (@Sendable ([AccountSummary]) async -> Void)?
+    ) async throws -> [AccountSummary] {
         let now = dateProvider.unixSecondsNow()
         let snapshot = try storeRepository.loadStore()
         let authRepository = self.authRepository
         let usageService = self.usageService
 
-        let refreshedAccounts: [StoredAccount]
+        var latest = snapshot
         switch mode {
         case .parallel:
-            refreshedAccounts = await withTaskGroup(of: StoredAccount.self, returning: [StoredAccount].self) { group in
+            try await withThrowingTaskGroup(of: StoredAccount.self, returning: Void.self) { group in
                 for account in snapshot.accounts {
                     group.addTask {
                         await Self.refreshAccount(
@@ -246,17 +266,17 @@ actor AccountsCoordinator {
                         )
                     }
                 }
-
-                var refreshedAccounts: [StoredAccount] = []
-                refreshedAccounts.reserveCapacity(snapshot.accounts.count)
-                for await account in group {
-                    refreshedAccounts.append(account)
+                for try await refreshed in group {
+                    latest = Self.mergeRefreshedAccount(refreshed, into: latest)
+                    try storeRepository.saveStore(latest)
+                    if let onPartialUpdate {
+                        await onPartialUpdate(
+                            latest.accountSummaries(currentAccountID: authRepository.currentAuthAccountID())
+                        )
+                    }
                 }
-                return refreshedAccounts
             }
         case .serial:
-            var sequentialAccounts: [StoredAccount] = []
-            sequentialAccounts.reserveCapacity(snapshot.accounts.count)
             for account in snapshot.accounts {
                 let refreshed = await Self.refreshAccount(
                     account,
@@ -265,16 +285,26 @@ actor AccountsCoordinator {
                     authRepository: authRepository,
                     usageService: usageService
                 )
-                sequentialAccounts.append(refreshed)
+                latest = Self.mergeRefreshedAccount(refreshed, into: latest)
+                try storeRepository.saveStore(latest)
+                if let onPartialUpdate {
+                    await onPartialUpdate(
+                        latest.accountSummaries(currentAccountID: authRepository.currentAuthAccountID())
+                    )
+                }
             }
-            refreshedAccounts = sequentialAccounts
         }
 
-        var latest = try storeRepository.loadStore()
-        let refreshedByAccountID = Dictionary(uniqueKeysWithValues: refreshedAccounts.map { ($0.accountID, $0) })
+        return latest.accountSummaries(currentAccountID: authRepository.currentAuthAccountID())
+    }
 
-        latest.accounts = latest.accounts.map { existing in
-            guard let refreshed = refreshedByAccountID[existing.accountID] else {
+    private static func mergeRefreshedAccount(
+        _ refreshed: StoredAccount,
+        into store: AccountsStore
+    ) -> AccountsStore {
+        var store = store
+        store.accounts = store.accounts.map { existing in
+            guard existing.accountID == refreshed.accountID else {
                 return existing
             }
             var merged = existing
@@ -289,11 +319,19 @@ actor AccountsCoordinator {
             merged.usageError = refreshed.usageError
             return merged
         }
+        return store
+    }
 
-        _ = await enrichStoredWorkspaceMetadataIfNeeded(in: &latest, forceRemoteCheck: force)
-        try storeRepository.saveStore(latest)
-
-        return latest.accountSummaries(currentAccountID: authRepository.currentAuthAccountID())
+    func refreshWorkspaceMetadata(forceRemoteCheck: Bool) async throws -> [AccountSummary] {
+        var store = try storeRepository.loadStore()
+        let didChange = await enrichStoredWorkspaceMetadataIfNeeded(
+            in: &store,
+            forceRemoteCheck: forceRemoteCheck
+        )
+        if didChange {
+            try storeRepository.saveStore(store)
+        }
+        return store.accountSummaries(currentAccountID: authRepository.currentAuthAccountID())
     }
 
     private static func refreshAccount(
@@ -317,7 +355,9 @@ actor AccountsCoordinator {
             account.usage = usage
             account.usageError = nil
             account.planType = extracted.planType ?? account.planType
-            account.teamName = extracted.teamName
+            if let teamName = normalizedTeamName(extracted.teamName) {
+                account.teamName = teamName
+            }
             account.email = extracted.email ?? account.email
         } catch {
             account.usageError = error.localizedDescription
@@ -349,8 +389,10 @@ actor AccountsCoordinator {
                 didChange = true
             }
 
-            if store.accounts[index].teamName != reconciled.teamName {
-                store.accounts[index].teamName = reconciled.teamName
+            let reconciledTeamName = normalizedTeamName(reconciled.teamName)
+            let storedTeamName = normalizedTeamName(store.accounts[index].teamName)
+            if let reconciledTeamName, storedTeamName != reconciledTeamName {
+                store.accounts[index].teamName = reconciledTeamName
                 didChange = true
             }
         }
@@ -370,6 +412,9 @@ actor AccountsCoordinator {
         for index in store.accounts.indices {
             let storedAccount = store.accounts[index]
             guard let extracted = try? authRepository.extractAuth(from: storedAccount.authJSON) else {
+                #if DEBUG
+                debugLog("workspace metadata lookup skipped for stored account \(storedAccount.id): failed to extract auth")
+                #endif
                 continue
             }
             guard shouldLookupRemoteWorkspaceName(
@@ -377,19 +422,33 @@ actor AccountsCoordinator {
                 extracted: extracted,
                 forceRemoteCheck: forceRemoteCheck
             ) else {
+                #if DEBUG
+                debugLog(
+                    "workspace metadata lookup skipped for accountID=\(storedAccount.accountID); plan=\(extracted.planType ?? "<nil>"); storedTeamName=\(storedAccount.teamName ?? "<nil>"); forceRemoteCheck=\(forceRemoteCheck)"
+                )
+                #endif
                 continue
             }
 
             let directory: [WorkspaceMetadata]
             if let cached = cachedDirectories[extracted.accessToken] {
+                #if DEBUG
+                debugLog("workspace metadata lookup reused cached directory for accountID=\(extracted.accountID); items=\(cached.count)")
+                #endif
                 directory = cached
             } else {
                 guard let fetched = try? await workspaceMetadataService.fetchWorkspaceMetadata(
                     accessToken: extracted.accessToken
                 ) else {
+                    #if DEBUG
+                    debugLog("workspace metadata fetch failed for accountID=\(extracted.accountID)")
+                    #endif
                     continue
                 }
                 cachedDirectories[extracted.accessToken] = fetched
+                #if DEBUG
+                debugLog("workspace metadata fetched for accountID=\(extracted.accountID); items=\(fetched.count)")
+                #endif
                 directory = fetched
             }
 
@@ -397,12 +456,22 @@ actor AccountsCoordinator {
                 for: extracted.accountID,
                 in: directory
             ) else {
+                #if DEBUG
+                debugLog("workspace metadata returned no matching non-personal workspace for accountID=\(extracted.accountID)")
+                #endif
                 continue
             }
 
             if store.accounts[index].teamName != remoteWorkspaceName {
                 store.accounts[index].teamName = remoteWorkspaceName
                 didChange = true
+                #if DEBUG
+                debugLog("workspace metadata updated accountID=\(extracted.accountID) teamName=\(remoteWorkspaceName)")
+                #endif
+            } else {
+                #if DEBUG
+                debugLog("workspace metadata matched accountID=\(extracted.accountID) but teamName already up to date: \(remoteWorkspaceName)")
+                #endif
             }
         }
 
@@ -438,10 +507,10 @@ actor AccountsCoordinator {
         guard normalizedPlan == "team" || normalizedPlan == "business" || normalizedPlan == "enterprise" else {
             return false
         }
-        return forceRemoteCheck || normalizedTeamName(storedTeamName) == nil
+        return forceRemoteCheck || Self.normalizedTeamName(storedTeamName) == nil
     }
 
-    private func normalizedTeamName(_ value: String?) -> String? {
+    private static func normalizedTeamName(_ value: String?) -> String? {
         guard let value else { return nil }
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
@@ -494,6 +563,12 @@ actor AccountsCoordinator {
         let trimmed = alias.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }
+
+    #if DEBUG
+    private func debugLog(_ message: String) {
+        print("AccountsCoordinator:", message)
+    }
+    #endif
 
     private func applySwitchSideEffects(
         for account: StoredAccount,

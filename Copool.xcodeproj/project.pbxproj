@@ -24,6 +24,7 @@
 		137936A0518C78C5549E919E /* AccountsPageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B90210EB2AAD603950A607C /* AccountsPageView.swift */; };
 		16AF52DED4DD5AE588B64368 /* usage.rs in Resources */ = {isa = PBXBuildFile; fileRef = 2A597D670A72CDE27C08D586 /* usage.rs */; };
 		17D19163BCCA0B5770E5BDE0 /* LayoutRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECE624821FB137E8DB3711AD /* LayoutRules.swift */; };
+		17F4E9A12A114B1AA9D0E110 /* AccountsSnapshotFreshnessPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17F4E9A12A114B1AA9D0E111 /* AccountsSnapshotFreshnessPolicy.swift */; };
 		17EFD9B9B9CF5294FD765876 /* RemoteProxyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36D2D735CB5E1753FB0DE639 /* RemoteProxyService.swift */; };
 		1856A9A4C1A74A8AA16A8B01 /* ChatGPTBaseOriginResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1856A9A4C1A74A8AA16A8B11 /* ChatGPTBaseOriginResolver.swift */; };
 		183F30DA3314F21DE014B4DA /* Protocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42479015F84989E486D80B6E /* Protocols.swift */; };
@@ -34,6 +35,7 @@
 		2261720D489C2F04D3AF5EFE /* ProxyControlBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3393D58FCF12CF53134D80E6 /* ProxyControlBridge.swift */; };
 		24AFC15BDC3390134F86990A /* ProxyControlBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3393D58FCF12CF53134D80E6 /* ProxyControlBridge.swift */; };
 		267F23472E977B357C72D227 /* EditorAppService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5358263820EB410620C79AB /* EditorAppService.swift */; };
+		26C8D1A13F4D46AAB7E2A111 /* EndpointRequestCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26C8D1A13F4D46AAB7E2A110 /* EndpointRequestCoordinator.swift */; };
 		28464FC2C552B7CB68639A06 /* DefaultUsageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DD2673A9712C55D302564FA /* DefaultUsageService.swift */; };
 		2CA3BD709672017E7414EF48 /* SettingsCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBC562226CDA114F63F5E91A /* SettingsCoordinator.swift */; };
 		341FC56FB803E4544D4928E3 /* CodexCLIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EB01EB2A0408FB4CA84CDEE /* CodexCLIService.swift */; };
@@ -51,6 +53,7 @@
 		4C2E52A903F7EAFC222BAA3B /* ProxyRuntimeLimits.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4B63498B5FFF2C0A83946BF /* ProxyRuntimeLimits.swift */; };
 		4EECC683E393FA990DC947CB /* SectionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54944E5E848D062E524900CF /* SectionCard.swift */; };
 		50922F8C48CF01B728AD262F /* LiquidProgressMetricsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6318743D5B32C4FA1244FAD /* LiquidProgressMetricsTests.swift */; };
+		50A1E15C1EDB4A5C9E8D1120 /* AccountsSnapshotFreshnessPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50A1E15C1EDB4A5C9E8D1121 /* AccountsSnapshotFreshnessPolicyTests.swift */; };
 		53243CFFBC40F306DCE9ED45 /* AuthFileRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7296C82EB9955D9DB121C940 /* AuthFileRepository.swift */; };
 		54F5A32512F8226641F0655E /* AccountsPageModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6649CF1B9E1CA80D5522A9A6 /* AccountsPageModel.swift */; };
 		6272A24532F9E90032CC99C0 /* TrayMenuModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88EA6ECB13116EC2FBC3C384 /* TrayMenuModel.swift */; };
@@ -140,6 +143,7 @@
 		F635C2F6E45001C58269D204 /* UpdateCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D3340D9F24E63B0B31749E2 /* UpdateCoordinator.swift */; };
 		FA624CCECA28D7F68B1C0FF8 /* DefaultUsageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DD2673A9712C55D302564FA /* DefaultUsageService.swift */; };
 		FA8F4B3E19ED4AA8B7740F31 /* DefaultWorkspaceMetadataService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95E85D9244A64A8BB6AB5F11 /* DefaultWorkspaceMetadataService.swift */; };
+		FA8F4B3E19ED4AA8B7740F32 /* EndpointRequestCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26C8D1A13F4D46AAB7E2A110 /* EndpointRequestCoordinator.swift */; };
 		FA836AB28B6E7F72C253A49F /* AppVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38BD5BE0A332BCE32A46A463 /* AppVersion.swift */; };
 		FAF80D77474CF43421294E86 /* OpenAIChatGPTOAuthLoginService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4F7246044D6E322F548D954 /* OpenAIChatGPTOAuthLoginService.swift */; };
 		FBB66ADD684E1C948FB611E4 /* AccountsCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 975800F0AD21824941F02AD3 /* AccountsCoordinator.swift */; };
@@ -176,9 +180,11 @@
 		1D7A8A652AC27A5594E0C9A7 /* Cargo.lock */ = {isa = PBXFileReference; lastKnownFileType = text; path = Cargo.lock; sourceTree = "<group>"; };
 		1E9DBE99B4528C42CED746B8 /* SimpleHTTPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimpleHTTPServer.swift; sourceTree = "<group>"; };
 		251BC10FF4D8538941CDC174 /* LocalizationConsistencyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationConsistencyTests.swift; sourceTree = "<group>"; };
+		26C8D1A13F4D46AAB7E2A110 /* EndpointRequestCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EndpointRequestCoordinator.swift; sourceTree = "<group>"; };
 		2843DB9CB43284AFB2E5A459 /* ProxyCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyCoordinator.swift; sourceTree = "<group>"; };
 		28E2CF5AE0B544874B721FCC /* AppLocale.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLocale.swift; sourceTree = "<group>"; };
 		95E85D9244A64A8BB6AB5F11 /* DefaultWorkspaceMetadataService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultWorkspaceMetadataService.swift; sourceTree = "<group>"; };
+		17F4E9A12A114B1AA9D0E111 /* AccountsSnapshotFreshnessPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsSnapshotFreshnessPolicy.swift; sourceTree = "<group>"; };
 		2A597D670A72CDE27C08D586 /* usage.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = usage.rs; sourceTree = "<group>"; };
 		2D0007E157CB217C0A6DD1E7 /* StoreFileRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreFileRepository.swift; sourceTree = "<group>"; };
 		2DD2673A9712C55D302564FA /* DefaultUsageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultUsageService.swift; sourceTree = "<group>"; };
@@ -194,6 +200,7 @@
 		42479015F84989E486D80B6E /* Protocols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Protocols.swift; sourceTree = "<group>"; };
 		4DEC342D5FDC9541EA737668 /* AppContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppContainer.swift; sourceTree = "<group>"; };
 		4FA2F993C0E37A53483FA175 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/Localizable.strings; sourceTree = "<group>"; };
+		50A1E15C1EDB4A5C9E8D1121 /* AccountsSnapshotFreshnessPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsSnapshotFreshnessPolicyTests.swift; sourceTree = "<group>"; };
 		5000155760C69A6117DF5E08 /* JSONValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONValue.swift; sourceTree = "<group>"; };
 		54944E5E848D062E524900CF /* SectionCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionCard.swift; sourceTree = "<group>"; };
 		54BDCA2C85944483297EEA6B /* VersionComparatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersionComparatorTests.swift; sourceTree = "<group>"; };
@@ -279,6 +286,7 @@
 				3EB01EB2A0408FB4CA84CDEE /* CodexCLIService.swift */,
 				2DD2673A9712C55D302564FA /* DefaultUsageService.swift */,
 				95E85D9244A64A8BB6AB5F11 /* DefaultWorkspaceMetadataService.swift */,
+				26C8D1A13F4D46AAB7E2A110 /* EndpointRequestCoordinator.swift */,
 				C5358263820EB410620C79AB /* EditorAppService.swift */,
 				1D518BC8C9103B4FD9C16B27 /* FileSystemPaths.swift */,
 				2E875E904D3ADACBDBF66C1D /* GitHubUpdateService.swift */,
@@ -301,6 +309,7 @@
 			children = (
 				0FBDA86A5354BD9FDCE671A2 /* AccountRanking.swift */,
 				975800F0AD21824941F02AD3 /* AccountsCoordinator.swift */,
+				17F4E9A12A114B1AA9D0E111 /* AccountsSnapshotFreshnessPolicy.swift */,
 				3393D58FCF12CF53134D80E6 /* ProxyControlBridge.swift */,
 				2843DB9CB43284AFB2E5A459 /* ProxyCoordinator.swift */,
 				EBC562226CDA114F63F5E91A /* SettingsCoordinator.swift */,
@@ -485,6 +494,7 @@
 			children = (
 				96C85B608B5A700CC8557EC2 /* AccountRankingTests.swift */,
 				85BEA62E5EB96361AD117627 /* AccountsCoordinatorTests.swift */,
+				50A1E15C1EDB4A5C9E8D1121 /* AccountsSnapshotFreshnessPolicyTests.swift */,
 				A146C7576AB39EFCD658BFED /* AppLocaleTests.swift */,
 				615AE055972ED222439110F8 /* AppSettingsCodableTests.swift */,
 				1659877DCD8B9150D665ED12 /* AuthFileRepositoryTests.swift */,
@@ -671,6 +681,7 @@
 			files = (
 				8E18C167F43FC9E6CC80A82A /* AccountRanking.swift in Sources */,
 				FBB66ADD684E1C948FB611E4 /* AccountsCoordinator.swift in Sources */,
+				17F4E9A12A114B1AA9D0E110 /* AccountsSnapshotFreshnessPolicy.swift in Sources */,
 				D39533CAD4CEB5C27EFDC236 /* AccountsPageModel.swift in Sources */,
 				FCB8E6490AA6D2891320E69F /* AccountsPageView.swift in Sources */,
 				92D4545930140988AE210FB7 /* AppContainer.swift in Sources */,
@@ -686,6 +697,7 @@
 				7E44D47F24B62A4A64EC484A /* CopoolApp.swift in Sources */,
 				28464FC2C552B7CB68639A06 /* DefaultUsageService.swift in Sources */,
 				95E85D9244A64A8BB6AB5F21 /* DefaultWorkspaceMetadataService.swift in Sources */,
+				26C8D1A13F4D46AAB7E2A111 /* EndpointRequestCoordinator.swift in Sources */,
 				267F23472E977B357C72D227 /* EditorAppService.swift in Sources */,
 				A238A15D23DD7B2C487395E8 /* EmptyStateView.swift in Sources */,
 				019AD726EBC45FE0E21B4AAF /* FileSystemPaths.swift in Sources */,
@@ -731,6 +743,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				062663E216F4946D6600D1CE /* AccountRankingTests.swift in Sources */,
+				50A1E15C1EDB4A5C9E8D1120 /* AccountsSnapshotFreshnessPolicyTests.swift in Sources */,
 				C1689CF8BC0D6EBC84B515ED /* AccountsCoordinatorTests.swift in Sources */,
 				0797784F1F471715624CA9CD /* AppLocaleTests.swift in Sources */,
 				B02FB96AC2AA18DA0EE1FE21 /* AppSettingsCodableTests.swift in Sources */,
@@ -752,6 +765,7 @@
 			files = (
 				DCD28B83E4C2D0294C831627 /* AccountRanking.swift in Sources */,
 				08E6BB21C1E6371C4D7C56A9 /* AccountsCoordinator.swift in Sources */,
+				17F4E9A12A114B1AA9D0E110 /* AccountsSnapshotFreshnessPolicy.swift in Sources */,
 				54F5A32512F8226641F0655E /* AccountsPageModel.swift in Sources */,
 				137936A0518C78C5549E919E /* AccountsPageView.swift in Sources */,
 				A39DE0252B7DE1B089DB14D1 /* AppContainer.swift in Sources */,
@@ -767,6 +781,7 @@
 				39796A30063610AC0A5579C5 /* CopoolApp.swift in Sources */,
 				FA624CCECA28D7F68B1C0FF8 /* DefaultUsageService.swift in Sources */,
 				FA8F4B3E19ED4AA8B7740F31 /* DefaultWorkspaceMetadataService.swift in Sources */,
+				FA8F4B3E19ED4AA8B7740F32 /* EndpointRequestCoordinator.swift in Sources */,
 				CA37BD95DACA443113BF6EC6 /* EditorAppService.swift in Sources */,
 				C0040E924E495A9B4DCF7EBE /* EmptyStateView.swift in Sources */,
 				D0D721335F066D21AAAD652D /* FileSystemPaths.swift in Sources */,

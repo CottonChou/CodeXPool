@@ -86,7 +86,11 @@ protocol LaunchAtStartupServiceProtocol: Sendable {
 
 protocol AccountsCloudSyncServiceProtocol: Sendable {
     func pushLocalAccountsIfNeeded() async throws
-    func pullRemoteAccountsIfNeeded() async throws -> Bool
+    func pullRemoteAccountsIfNeeded(
+        currentTime: Int64,
+        maximumSnapshotAgeSeconds: Int64
+    ) async throws -> AccountsCloudSyncPullResult
+    func ensurePushSubscriptionIfNeeded() async throws
 }
 
 protocol CloudSyncAvailabilityServiceProtocol: Sendable {
@@ -111,4 +115,13 @@ protocol CurrentAccountSelectionSyncServiceProtocol: Sendable {
 @MainActor
 protocol AccountsManualRefreshServiceProtocol: AnyObject {
     func performManualRefresh() async throws -> [AccountSummary]
+    func performManualRefresh(
+        onPartialUpdate: @escaping @MainActor ([AccountSummary]) -> Void
+    ) async throws -> [AccountSummary]
+}
+
+extension AccountsManualRefreshServiceProtocol {
+    func performManualRefresh() async throws -> [AccountSummary] {
+        try await performManualRefresh(onPartialUpdate: { _ in })
+    }
 }

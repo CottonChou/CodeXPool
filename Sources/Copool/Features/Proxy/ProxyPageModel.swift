@@ -72,6 +72,7 @@ final class ProxyPageModel: ObservableObject {
     private let proxyControlCloudSyncService: ProxyControlCloudSyncServiceProtocol?
     private let dateProvider: DateProviding
     private let noticeScheduler = NoticeAutoDismissScheduler()
+    private var hasLoaded = false
     private var didRunLaunchBootstrap = false
     private var remoteSnapshotTask: Task<Void, Never>?
     private var lastRemoteCommandID: String?
@@ -192,6 +193,14 @@ final class ProxyPageModel: ObservableObject {
         }
     }
 
+    func loadIfNeeded() async {
+        if !hasLoaded {
+            await load()
+        } else {
+            await refreshForTabEntry()
+        }
+    }
+
     func refreshForTabEntry() async {
         if usesRemoteMacControl {
             await refreshRemoteSnapshot(showErrors: false)
@@ -221,6 +230,7 @@ final class ProxyPageModel: ObservableObject {
                 await refreshStatusOnly()
                 await refreshAllRemoteStatuses()
             }
+            hasLoaded = true
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
         }

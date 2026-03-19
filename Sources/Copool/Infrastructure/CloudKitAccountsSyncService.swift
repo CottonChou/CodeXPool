@@ -52,7 +52,8 @@ actor CloudKitAccountsSyncService: AccountsCloudSyncServiceProtocol {
     private enum Constants {
         static let containerIdentifier = "iCloud.com.alick.copool"
         static let recordType = "AccountsSnapshot"
-        static let recordName = "primary"
+        static let recordName = "accounts-snapshot.primary"
+        static let subscriptionID = "accounts-snapshot.primary.push"
         static let payloadKey = "payload"
         static let syncedAtKey = "syncedAt"
         static let schemaVersion = 1
@@ -69,6 +70,7 @@ actor CloudKitAccountsSyncService: AccountsCloudSyncServiceProtocol {
     private let dateProvider: DateProviding
     private var lastUploadedDigest: String?
     private var lastAppliedDigest: String?
+    private var pushSubscriptionEnsured = false
 
     init(
         storeRepository: AccountsStoreRepository,
@@ -94,10 +96,37 @@ actor CloudKitAccountsSyncService: AccountsCloudSyncServiceProtocol {
         lastUploadedDigest = try digest(for: savedPayload.accounts)
     }
 
-    func pullRemoteAccountsIfNeeded() async throws -> Bool {
-        guard database != nil else { return false }
+    func ensurePushSubscriptionIfNeeded() async throws {
+        guard let database else { return }
+        guard !pushSubscriptionEnsured else { return }
+
+        let subscription = CKDatabaseSubscription(subscriptionID: Self.pushSubscriptionID)
+        let notificationInfo = CKSubscription.NotificationInfo()
+        notificationInfo.shouldSendContentAvailable = true
+        subscription.notificationInfo = notificationInfo
+
+        let results = try await database.modifySubscriptions(
+            saving: [subscription],
+            deleting: []
+        )
+        guard let saveResult = results.saveResults[Self.pushSubscriptionID] else {
+            throw AppError.io("CloudKit did not report a result for the accounts snapshot push subscription.")
+        }
+        switch saveResult {
+        case .success:
+            pushSubscriptionEnsured = true
+        case .failure(let error):
+            throw error
+        }
+    }
+
+    func pullRemoteAccountsIfNeeded(
+        currentTime: Int64,
+        maximumSnapshotAgeSeconds: Int64
+    ) async throws -> AccountsCloudSyncPullResult {
+        guard database != nil else { return .noChange }
         guard let record = try await fetchRecordIfExists() else {
-            return false
+            return .noChange
         }
 
         let localStore = try storeRepository.loadStore()
@@ -107,24 +136,41 @@ actor CloudKitAccountsSyncService: AccountsCloudSyncServiceProtocol {
             lastAppliedDigest = nil
             lastUploadedDigest = nil
             try await recoverInvalidRemoteSnapshotIfPossible(using: localStore)
-            return false
+            return .noChange
         }
+
+        if currentTime - payload.syncedAt > maximumSnapshotAgeSeconds {
+            return AccountsCloudSyncPullResult(
+                didUpdateAccounts: false,
+                remoteSyncedAt: payload.syncedAt
+            )
+        }
+
         let remoteDigest = try digest(for: payload.accounts)
         if remoteDigest == lastAppliedDigest {
-            return false
+            return AccountsCloudSyncPullResult(
+                didUpdateAccounts: false,
+                remoteSyncedAt: payload.syncedAt
+            )
         }
 
         let localDigest = try digest(for: localStore.accounts)
         if remoteDigest == localDigest {
             lastAppliedDigest = remoteDigest
-            return false
+            return AccountsCloudSyncPullResult(
+                didUpdateAccounts: false,
+                remoteSyncedAt: payload.syncedAt
+            )
         }
 
         var latestStore = try storeRepository.loadStore()
         let latestDigest = try digest(for: latestStore.accounts)
         if latestDigest == remoteDigest {
             lastAppliedDigest = remoteDigest
-            return false
+            return AccountsCloudSyncPullResult(
+                didUpdateAccounts: false,
+                remoteSyncedAt: payload.syncedAt
+            )
         }
 
         let mergedStore = CloudKitAccountsStoreMerge.applyingRemoteSnapshot(
@@ -134,17 +180,27 @@ actor CloudKitAccountsSyncService: AccountsCloudSyncServiceProtocol {
         )
         guard mergedStore != latestStore else {
             lastAppliedDigest = remoteDigest
-            return false
+            return AccountsCloudSyncPullResult(
+                didUpdateAccounts: false,
+                remoteSyncedAt: payload.syncedAt
+            )
         }
 
         latestStore = mergedStore
         try storeRepository.saveStore(latestStore)
         lastAppliedDigest = remoteDigest
-        return true
+        return AccountsCloudSyncPullResult(
+            didUpdateAccounts: true,
+            remoteSyncedAt: payload.syncedAt
+        )
     }
 
     private var recordID: CKRecord.ID {
         CKRecord.ID(recordName: Constants.recordName)
+    }
+
+    nonisolated static var pushSubscriptionID: String {
+        Constants.subscriptionID
     }
 
     private func fetchRecordIfExists() async throws -> CKRecord? {
@@ -319,7 +375,7 @@ actor CloudKitCurrentAccountSelectionSyncService: CurrentAccountSelectionSyncSer
     private enum Constants {
         static let containerIdentifier = "iCloud.com.alick.copool"
         static let recordType = "CurrentAccountSelection"
-        static let recordName = "primary"
+        static let recordName = "current-account-selection.primary"
         static let subscriptionID = "current-account-selection.primary.push"
         static let payloadKey = "payload"
         static let selectedAtKey = "selectedAt"
@@ -368,6 +424,9 @@ actor CloudKitCurrentAccountSelectionSyncService: CurrentAccountSelectionSyncSer
             sourceDeviceID: deviceID
         )
         try saveCurrentSelection(selection)
+        #if DEBUG
+        debugSelectionLog("recorded local selection accountID=\(accountID) selectedAt=\(selection.selectedAt) sourceDeviceID=\(selection.sourceDeviceID)")
+        #endif
     }
 
     func pushLocalSelectionIfNeeded() async throws {
@@ -375,13 +434,27 @@ actor CloudKitCurrentAccountSelectionSyncService: CurrentAccountSelectionSyncSer
         guard let selection = try synchronizeLocalSelectionMetadata() else { return }
 
         let selectionDigest = try digest(for: selection)
-        guard selectionDigest != lastUploadedDigest else { return }
+        guard selectionDigest != lastUploadedDigest else {
+            #if DEBUG
+            debugSelectionLog("push skipped; local selection digest already uploaded for accountID=\(selection.accountID)")
+            #endif
+            return
+        }
 
         let pushedSelection = try await saveSelectionRecord(selection)
         let pushedDigest = try digest(for: pushedSelection)
         lastUploadedDigest = pushedDigest
         if pushedSelection == selection {
             lastAppliedDigest = pushedDigest
+            #if DEBUG
+            debugSelectionLog("push succeeded for accountID=\(selection.accountID) selectedAt=\(selection.selectedAt)")
+            #endif
+        } else {
+            #if DEBUG
+            debugSelectionLog(
+                "push resolved to server selection accountID=\(pushedSelection.accountID) selectedAt=\(pushedSelection.selectedAt) sourceDeviceID=\(pushedSelection.sourceDeviceID)"
+            )
+            #endif
         }
     }
 
@@ -416,22 +489,34 @@ actor CloudKitCurrentAccountSelectionSyncService: CurrentAccountSelectionSyncSer
     func pullRemoteSelectionIfNeeded() async throws -> CurrentAccountSelectionPullResult {
         guard database != nil else { return .noChange }
         guard let record = try await fetchRecordIfExists() else {
+            #if DEBUG
+            debugSelectionLog("pull skipped; no remote selection record")
+            #endif
             return .noChange
         }
 
         guard let payloadData = record[Constants.payloadKey] as? Data else {
             lastAppliedDigest = nil
             lastUploadedDigest = nil
+            #if DEBUG
+            debugSelectionLog("pull skipped; remote selection record missing payload")
+            #endif
             return .noChange
         }
 
         guard let remoteSelection = decodeSelectionIfValid(from: payloadData)?.selection else {
             lastAppliedDigest = nil
             lastUploadedDigest = nil
+            #if DEBUG
+            debugSelectionLog("pull skipped; remote selection payload invalid")
+            #endif
             return .noChange
         }
         let remoteDigest = try digest(for: remoteSelection)
         if remoteDigest == lastAppliedDigest {
+            #if DEBUG
+            debugSelectionLog("pull skipped; remote selection already applied for accountID=\(remoteSelection.accountID)")
+            #endif
             return .noChange
         }
 
@@ -445,10 +530,20 @@ actor CloudKitCurrentAccountSelectionSyncService: CurrentAccountSelectionSyncSer
                 lastAppliedDigest = remoteDigest
                 lastUploadedDigest = remoteDigest
             }
+            #if DEBUG
+            debugSelectionLog(
+                "pull ignored; local selection wins over remote accountID=\(remoteSelection.accountID) selectedAt=\(remoteSelection.selectedAt)"
+            )
+            #endif
             return .noChange
         }
 
         guard let matchingAccount = store.accounts.first(where: { $0.accountID == remoteSelection.accountID }) else {
+            #if DEBUG
+            debugSelectionLog(
+                "pull ignored; remote selected accountID=\(remoteSelection.accountID) not found in local store"
+            )
+            #endif
             return .noChange
         }
 
@@ -461,6 +556,11 @@ actor CloudKitCurrentAccountSelectionSyncService: CurrentAccountSelectionSyncSer
         try saveCurrentSelection(remoteSelection)
         lastAppliedDigest = remoteDigest
         lastUploadedDigest = remoteDigest
+        #if DEBUG
+        debugSelectionLog(
+            "pull applied remote selection accountID=\(remoteSelection.accountID) changedCurrentAccount=\(changedCurrentAccount) previousAccountID=\(previousSelection?.accountID ?? "<nil>")"
+        )
+        #endif
         return CurrentAccountSelectionPullResult(
             didUpdateSelection: changedCurrentAccount || previousSelection != remoteSelection,
             changedCurrentAccount: changedCurrentAccount,
@@ -480,6 +580,9 @@ actor CloudKitCurrentAccountSelectionSyncService: CurrentAccountSelectionSyncSer
         let store = try storeRepository.loadStore()
         if let existing = store.currentSelection,
            store.accounts.contains(where: { $0.accountID == existing.accountID }) {
+            #if DEBUG
+            debugSelectionLog("using stored local selection accountID=\(existing.accountID) selectedAt=\(existing.selectedAt)")
+            #endif
             return existing
         }
 
@@ -495,6 +598,9 @@ actor CloudKitCurrentAccountSelectionSyncService: CurrentAccountSelectionSyncSer
             sourceDeviceID: deviceID
         )
         try saveCurrentSelection(inferred)
+        #if DEBUG
+        debugSelectionLog("inferred local selection from auth accountID=\(currentAccountID)")
+        #endif
         return inferred
     }
 
@@ -650,6 +756,12 @@ actor CloudKitCurrentAccountSelectionSyncService: CurrentAccountSelectionSyncSer
         return ckError.localizedDescription.localizedCaseInsensitiveContains("oplock")
     }
 
+    #if DEBUG
+    private func debugSelectionLog(_ message: String) {
+        print("CurrentSelectionSync:", message)
+    }
+    #endif
+
     private static func resolveDeviceID() -> String {
         let defaults = UserDefaults.standard
         if let existing = defaults.string(forKey: Constants.deviceIDDefaultsKey), !existing.isEmpty {
@@ -741,15 +853,37 @@ enum CloudKitAccountsStoreMerge {
     }
 
     private static func mergeMatchedAccount(local: StoredAccount, remote: StoredAccount) -> StoredAccount {
-        let metadataWinner = remote.updatedAt >= local.updatedAt ? remote : local
+        let remoteMetadataWins = remote.updatedAt >= local.updatedAt
+        let metadataWinner = remoteMetadataWins ? remote : local
         let usageWinner = preferredUsageSource(local: local, remote: remote)
 
         var merged = metadataWinner
         merged.id = local.id
+        merged.teamName = preferredMetadataValue(
+            primary: metadataWinner.teamName,
+            fallback: remoteMetadataWins ? local.teamName : remote.teamName
+        )
+        merged.teamAlias = preferredMetadataValue(
+            primary: metadataWinner.teamAlias,
+            fallback: remoteMetadataWins ? local.teamAlias : remote.teamAlias
+        )
         merged.usage = usageWinner.usage
         merged.usageError = usageWinner.usageError
         merged.updatedAt = max(local.updatedAt, remote.updatedAt)
         return merged
+    }
+
+    private static func preferredMetadataValue(primary: String?, fallback: String?) -> String? {
+        if let primary = normalizedMetadataValue(primary) {
+            return primary
+        }
+        return normalizedMetadataValue(fallback)
+    }
+
+    private static func normalizedMetadataValue(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     private static func preferredUsageSource(local: StoredAccount, remote: StoredAccount) -> StoredAccount {

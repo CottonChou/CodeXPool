@@ -1,60 +1,79 @@
 import Foundation
 
 final class DefaultWorkspaceMetadataService: WorkspaceMetadataService, @unchecked Sendable {
+    private enum RequestPolicy {
+        static let timeout: TimeInterval = 5
+        static let scope = "workspace-metadata"
+    }
+
     private let session: URLSession
     private let configPath: URL
+    private let endpointCoordinator: EndpointRequestCoordinator
 
-    init(session: URLSession = .shared, configPath: URL) {
+    init(
+        session: URLSession = .shared,
+        configPath: URL,
+        endpointPreferenceStore: EndpointPreferenceStore = .shared
+    ) {
         self.session = session
         self.configPath = configPath
+        self.endpointCoordinator = EndpointRequestCoordinator(
+            session: session,
+            preferenceStore: endpointPreferenceStore
+        )
     }
 
     func fetchWorkspaceMetadata(accessToken: String) async throws -> [WorkspaceMetadata] {
-        var errors: [String] = []
-
-        for url in resolveAccountURLs() {
-            guard let endpoint = URL(string: url) else { continue }
-            var request = URLRequest(url: endpoint)
-            request.timeoutInterval = 18
-            request.httpMethod = "GET"
-            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-            request.setValue("application/json", forHTTPHeaderField: "Accept")
-            request.setValue("codex-tools-swift/0.1", forHTTPHeaderField: "User-Agent")
-
-            do {
-                let (data, response) = try await session.data(for: request)
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    errors.append("\(url) -> \(L10n.tr("error.usage.invalid_response"))")
-                    continue
-                }
-
-                guard (200..<300).contains(httpResponse.statusCode) else {
-                    let body = String(data: data, encoding: .utf8) ?? ""
-                    let snippet = String(body.prefix(140))
-                    errors.append("\(url) -> \(httpResponse.statusCode): \(snippet)")
-                    continue
-                }
-
-                let decoder = JSONDecoder()
-                let payload = try decoder.decode(WorkspaceAccountsResponse.self, from: data)
-                return payload.items.map {
-                    WorkspaceMetadata(
-                        accountID: $0.id,
-                        workspaceName: $0.name,
-                        structure: $0.structure
-                    )
-                }
-            } catch {
-                errors.append("\(url) -> \(error.localizedDescription)")
+        #if DEBUG
+        debugLog("starting workspace metadata fetch with \(resolveAccountURLs().count) candidate endpoints")
+        #endif
+        do {
+            let result = try await endpointCoordinator.fetchFirstSuccessful(
+                scope: RequestPolicy.scope,
+                candidateURLs: resolveAccountURLs()
+            ) { endpoint in
+                var request = URLRequest(url: endpoint)
+                request.timeoutInterval = RequestPolicy.timeout
+                request.httpMethod = "GET"
+                request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+                request.setValue("application/json", forHTTPHeaderField: "Accept")
+                request.setValue("codex-tools-swift/0.1", forHTTPHeaderField: "User-Agent")
+                return request
             }
+            let payload = try JSONDecoder().decode(WorkspaceAccountsResponse.self, from: result.data)
+            let metadata = payload.items.map {
+                WorkspaceMetadata(
+                    accountID: $0.id,
+                    workspaceName: $0.name,
+                    structure: $0.structure
+                )
+            }
+            #if DEBUG
+            let preview = metadata.prefix(3).map {
+                "\($0.accountID):\($0.workspaceName ?? "<nil>"):\($0.structure ?? "<nil>")"
+            }.joined(separator: ", ")
+            debugLog(
+                "workspace metadata fetch succeeded via \(result.endpoint); items=\(metadata.count); preview=[\(preview)]"
+            )
+            #endif
+            return metadata
+        } catch EndpointRequestError.allRequestsFailed(let errors) {
+            #if DEBUG
+            debugLog("workspace metadata fetch failed across all endpoints: \(errors.joined(separator: " | "))")
+            #endif
+            let preview = errors.prefix(2).joined(separator: " | ")
+            if errors.count > 2 {
+                throw AppError.network(L10n.tr("error.usage.request_failed_with_more_format", preview, String(errors.count - 2)))
+            }
+            throw AppError.network(L10n.tr("error.usage.request_failed_format", preview))
         }
-
-        let preview = errors.prefix(2).joined(separator: " | ")
-        if errors.count > 2 {
-            throw AppError.network(L10n.tr("error.usage.request_failed_with_more_format", preview, String(errors.count - 2)))
-        }
-        throw AppError.network(L10n.tr("error.usage.request_failed_format", preview))
     }
+
+    #if DEBUG
+    private func debugLog(_ message: String) {
+        print("WorkspaceMetadataService:", message)
+    }
+    #endif
 
     private func resolveAccountURLs() -> [String] {
         let baseOrigin = ChatGPTBaseOriginResolver.resolve(configPath: configPath)

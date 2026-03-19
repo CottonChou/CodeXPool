@@ -20,7 +20,8 @@ final class AccountsPageModel: ObservableObject {
             }
         }
     }
-    @Published var isRefreshing = false
+    @Published private var isManualRefreshing = false
+    @Published private(set) var isRemoteUsageRefreshing = false
     @Published var isImporting = false
     @Published var isAdding = false
     @Published var switchingAccountID: String?
@@ -53,8 +54,9 @@ final class AccountsPageModel: ObservableObject {
     func load() async {
         async let cloudSyncAvailableTask = cloudSyncAvailabilityService?.isICloudAvailable() ?? true
         do {
-            isCloudSyncAvailable = await cloudSyncAvailableTask
             let accounts = try await coordinator.listAccounts()
+            applyAccounts(accounts)
+            isCloudSyncAvailable = await cloudSyncAvailableTask
             applyAccounts(accounts)
             hasLoaded = true
         } catch {
@@ -133,15 +135,30 @@ final class AccountsPageModel: ObservableObject {
     }
 
     func refreshUsage() async {
-        isRefreshing = true
-        defer { isRefreshing = false }
+        isManualRefreshing = true
+        defer { isManualRefreshing = false }
 
         do {
             let accounts: [AccountSummary]
             if let manualRefreshService {
-                accounts = try await manualRefreshService.performManualRefresh()
+                accounts = try await manualRefreshService.performManualRefresh(
+                    onPartialUpdate: { [weak self] accounts in
+                        guard let self else { return }
+                        self.applyAccounts(accounts)
+                        self.publishLocalAccounts(accounts)
+                    }
+                )
             } else {
-                accounts = try await coordinator.refreshAllUsage(force: true)
+                accounts = try await coordinator.refreshAllUsage(
+                    force: true,
+                    onPartialUpdate: { [weak self] accounts in
+                        guard let self else { return }
+                        await MainActor.run {
+                            self.applyAccounts(accounts)
+                            self.publishLocalAccounts(accounts)
+                        }
+                    }
+                )
             }
             applyAccounts(accounts)
             publishLocalAccounts(accounts)
@@ -273,11 +290,16 @@ final class AccountsPageModel: ObservableObject {
         applyAccounts(accounts)
     }
 
+    func syncRemoteUsageRefreshActivity(isRefreshing: Bool) {
+        guard isRemoteUsageRefreshing != isRefreshing else { return }
+        isRemoteUsageRefreshing = isRefreshing
+    }
+
     static func makeViewState(
         accounts: [AccountSummary],
         cloudSyncAvailable: Bool
     ) -> ViewState<[AccountSummary]> {
-        let sorted = AccountRanking.sortByRemaining(accounts)
+        let sorted = AccountRanking.sortForDisplay(accounts)
         if sorted.isEmpty {
             let messageKey = cloudSyncAvailable
                 ? "accounts.empty.message.no_accounts"
@@ -317,7 +339,7 @@ final class AccountsPageModel: ObservableObject {
     }
 
     private func applyAccounts(_ accounts: [AccountSummary]) {
-        let sorted = AccountRanking.sortByRemaining(accounts)
+        let sorted = AccountRanking.sortForDisplay(accounts)
         let availableIDs = Set(sorted.map(\.id))
         let nextCollapsed = collapsedAccountIDs.intersection(availableIDs)
         if nextCollapsed != collapsedAccountIDs {
@@ -352,6 +374,17 @@ final class AccountsPageModel: ObservableObject {
     }
 
     private func publishLocalAccounts(_ accounts: [AccountSummary]) {
-        onLocalAccountsChanged?(AccountRanking.sortByRemaining(accounts))
+        onLocalAccountsChanged?(AccountRanking.sortForDisplay(accounts))
+    }
+
+    var isRefreshing: Bool {
+        isManualRefreshing || isRemoteUsageRefreshing
+    }
+
+    var isRefreshSpinnerActive: Bool {
+        if manualRefreshService == nil {
+            return isManualRefreshing
+        }
+        return isRemoteUsageRefreshing
     }
 }

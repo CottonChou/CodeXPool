@@ -1,57 +1,55 @@
 import Foundation
 
 final class DefaultUsageService: UsageService, @unchecked Sendable {
+    private enum RequestPolicy {
+        static let timeout: TimeInterval = 5
+        static let scope = "usage"
+    }
+
     private let session: URLSession
     private let configPath: URL
     private let dateProvider: DateProviding
+    private let endpointCoordinator: EndpointRequestCoordinator
 
-    init(session: URLSession = .shared, configPath: URL, dateProvider: DateProviding = SystemDateProvider()) {
+    init(
+        session: URLSession = .shared,
+        configPath: URL,
+        dateProvider: DateProviding = SystemDateProvider(),
+        endpointPreferenceStore: EndpointPreferenceStore = .shared
+    ) {
         self.session = session
         self.configPath = configPath
         self.dateProvider = dateProvider
+        self.endpointCoordinator = EndpointRequestCoordinator(
+            session: session,
+            preferenceStore: endpointPreferenceStore
+        )
     }
 
     func fetchUsage(accessToken: String, accountID: String) async throws -> UsageSnapshot {
-        let urls = resolveUsageURLs()
-        var errors: [String] = []
-
-        for url in urls {
-            guard let endpoint = URL(string: url) else { continue }
-            var request = URLRequest(url: endpoint)
-            request.timeoutInterval = 18
-            request.httpMethod = "GET"
-            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-            request.setValue(accountID, forHTTPHeaderField: "ChatGPT-Account-Id")
-            request.setValue("application/json", forHTTPHeaderField: "Accept")
-            request.setValue("codex-tools-swift/0.1", forHTTPHeaderField: "User-Agent")
-
-            do {
-                let (data, response) = try await session.data(for: request)
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    errors.append("\(url) -> \(L10n.tr("error.usage.invalid_response"))")
-                    continue
-                }
-
-                guard (200..<300).contains(httpResponse.statusCode) else {
-                    let body = String(data: data, encoding: .utf8) ?? ""
-                    let snippet = String(body.prefix(140))
-                    errors.append("\(url) -> \(httpResponse.statusCode): \(snippet)")
-                    continue
-                }
-
-                let decoder = JSONDecoder()
-                let payload = try decoder.decode(UsageAPIResponse.self, from: data)
-                return mapPayload(payload)
-            } catch {
-                errors.append("\(url) -> \(error.localizedDescription)")
+        do {
+            let result = try await endpointCoordinator.fetchFirstSuccessful(
+                scope: RequestPolicy.scope,
+                candidateURLs: resolveUsageURLs()
+            ) { endpoint in
+                var request = URLRequest(url: endpoint)
+                request.timeoutInterval = RequestPolicy.timeout
+                request.httpMethod = "GET"
+                request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+                request.setValue(accountID, forHTTPHeaderField: "ChatGPT-Account-Id")
+                request.setValue("application/json", forHTTPHeaderField: "Accept")
+                request.setValue("codex-tools-swift/0.1", forHTTPHeaderField: "User-Agent")
+                return request
             }
+            let payload = try JSONDecoder().decode(UsageAPIResponse.self, from: result.data)
+            return mapPayload(payload)
+        } catch EndpointRequestError.allRequestsFailed(let errors) {
+            let preview = errors.prefix(2).joined(separator: " | ")
+            if errors.count > 2 {
+                throw AppError.network(L10n.tr("error.usage.request_failed_with_more_format", preview, String(errors.count - 2)))
+            }
+            throw AppError.network(L10n.tr("error.usage.request_failed_format", preview))
         }
-
-        let preview = errors.prefix(2).joined(separator: " | ")
-        if errors.count > 2 {
-            throw AppError.network(L10n.tr("error.usage.request_failed_with_more_format", preview, String(errors.count - 2)))
-        }
-        throw AppError.network(L10n.tr("error.usage.request_failed_format", preview))
     }
 
     private func resolveUsageURLs() -> [String] {

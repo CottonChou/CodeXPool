@@ -2,6 +2,7 @@ import Foundation
 import Combine
 
 extension Notification.Name {
+    static let copoolAccountsSnapshotPushDidArrive = Notification.Name("copool.accounts-snapshot.push")
     static let copoolCurrentAccountSelectionPushDidArrive = Notification.Name("copool.current-account-selection.push")
     static let copoolProxyControlPushDidArrive = Notification.Name("copool.proxy-control.push")
 }
@@ -48,13 +49,21 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
     private let cloudSyncService: AccountsCloudSyncServiceProtocol?
     private let currentAccountSelectionSyncService: CurrentAccountSelectionSyncServiceProtocol?
     private let backgroundRefreshPolicy: BackgroundRefreshPolicy
+    private let dateProvider: DateProviding
+    private let snapshotFreshnessPolicy: AccountsSnapshotFreshnessPolicy
     private var refreshTask: Task<Void, Never>?
     private var selectionRefreshTask: Task<Void, Never>?
+    private var workspaceMetadataRefreshTask: Task<Void, Never>?
+    private var accountsSnapshotPushCancellable: AnyCancellable?
     private var currentSelectionPushCancellable: AnyCancellable?
     private var autoSmartSwitchEnabled = false
+    private var accountsRefreshActivityCount = 0
+    private var remoteUsageRefreshActivityCount = 0
 
     @Published var accounts: [AccountSummary] = []
     @Published var notice: String?
+    @Published private(set) var isRefreshingAccounts = false
+    @Published private(set) var isFetchingRemoteUsage = false
 
     init(
         accountsCoordinator: AccountsCoordinator,
@@ -62,6 +71,8 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
         cloudSyncService: AccountsCloudSyncServiceProtocol?,
         currentAccountSelectionSyncService: CurrentAccountSelectionSyncServiceProtocol?,
         backgroundRefreshPolicy: BackgroundRefreshPolicy,
+        dateProvider: DateProviding = SystemDateProvider(),
+        snapshotFreshnessPolicy: AccountsSnapshotFreshnessPolicy = AccountsSnapshotFreshnessPolicy(),
         initialAccounts: [AccountSummary] = []
     ) {
         self.accountsCoordinator = accountsCoordinator
@@ -69,11 +80,14 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
         self.cloudSyncService = cloudSyncService
         self.currentAccountSelectionSyncService = currentAccountSelectionSyncService
         self.backgroundRefreshPolicy = backgroundRefreshPolicy
+        self.dateProvider = dateProvider
+        self.snapshotFreshnessPolicy = snapshotFreshnessPolicy
         self.accounts = initialAccounts
     }
 
     func startBackgroundRefresh() {
         guard refreshTask == nil else { return }
+        configureAccountsSnapshotPushHandlingIfNeeded()
         configureCurrentSelectionPushHandlingIfNeeded()
         refreshTask = Task { [weak self] in
             guard let self else { return }
@@ -100,20 +114,28 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
         refreshTask = nil
         selectionRefreshTask?.cancel()
         selectionRefreshTask = nil
+        workspaceMetadataRefreshTask?.cancel()
+        workspaceMetadataRefreshTask = nil
+        accountsSnapshotPushCancellable = nil
+        currentSelectionPushCancellable = nil
     }
 
     deinit {
         refreshTask?.cancel()
         selectionRefreshTask?.cancel()
+        workspaceMetadataRefreshTask?.cancel()
     }
 
     func refreshNow(forceUsageRefresh: Bool) async {
+        beginAccountsRefreshActivity()
+        defer { endAccountsRefreshActivity() }
         do {
             let latestAccounts = try await executeRefresh(
                 forceUsageRefresh: forceUsageRefresh,
                 failOnCloudSyncError: false
             )
             accounts = latestAccounts
+            scheduleWorkspaceMetadataRefresh(forceRemoteCheck: false)
             notice = nil
         } catch {
             notice = error.localizedDescription
@@ -131,31 +153,38 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
         }
     }
 
-    func performManualRefresh() async throws -> [AccountSummary] {
+    func performManualRefresh(
+        onPartialUpdate: @escaping @MainActor ([AccountSummary]) -> Void
+    ) async throws -> [AccountSummary] {
+        beginAccountsRefreshActivity()
+        defer { endAccountsRefreshActivity() }
         let settings = try await settingsCoordinator.currentSettings()
         applySettings(settings)
 
-        // On manual refresh, prefer live usage data. Pull remote accounts first on iOS,
-        // then refresh usage directly, and finally push the fresh snapshot back to CloudKit.
-        if backgroundRefreshPolicy.cloudSyncMode == .pullRemoteAccounts {
-            _ = try await performCloudSync(mode: .pullRemoteAccounts, failOnError: false)
-            _ = try await reconcileCurrentAccountSelection(failOnError: false)
-        }
+        let cloudPullResult = try await pullCloudAccountsIfNeeded(failOnError: false)
+        _ = try await reconcileCurrentAccountSelection(failOnError: false)
+        let shouldRefreshUsage = snapshotFreshnessPolicy.shouldRefreshUsage(
+            forceRefresh: false,
+            remoteSyncedAt: cloudPullResult.remoteSyncedAt,
+            now: dateProvider.unixSecondsNow()
+        )
 
         let prefersSerialUsageRefresh = backgroundRefreshPolicy.cloudSyncMode == .pullRemoteAccounts
         var latestAccounts = try await refreshLocalAccounts(
-            forceUsageRefresh: true,
+            forceUsageRefresh: shouldRefreshUsage,
             prefersSerialUsageRefresh: prefersSerialUsageRefresh,
-            bypassUsageThrottle: true
+            bypassUsageThrottle: shouldRefreshUsage,
+            onPartialUpdate: onPartialUpdate
         )
 
-        if backgroundRefreshPolicy.cloudSyncMode != .disabled {
-            _ = try await performCloudSync(mode: .pushLocalAccounts, failOnError: false)
-            _ = try await reconcileCurrentAccountSelection(failOnError: false)
-            latestAccounts = try await accountsCoordinator.listAccounts()
+        if shouldRefreshUsage {
+            try await pushCloudAccountsIfNeeded(failOnError: false)
         }
+        _ = try await reconcileCurrentAccountSelection(failOnError: false)
+        latestAccounts = try await accountsCoordinator.listAccounts()
 
         accounts = latestAccounts
+        scheduleWorkspaceMetadataRefresh(forceRemoteCheck: true)
         notice = nil
         return latestAccounts
     }
@@ -202,15 +231,26 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
         let settings = try await settingsCoordinator.currentSettings()
         applySettings(settings)
 
+        let cloudPullResult = try await pullCloudAccountsIfNeeded(failOnError: failOnCloudSyncError)
         let prefersSerialUsageRefresh = backgroundRefreshPolicy.cloudSyncMode == .pullRemoteAccounts
+        let shouldRefreshUsage = snapshotFreshnessPolicy.shouldRefreshUsage(
+            forceRefresh: forceUsageRefresh,
+            remoteSyncedAt: cloudPullResult.remoteSyncedAt,
+            now: dateProvider.unixSecondsNow()
+        )
         var latestAccounts = try await refreshLocalAccounts(
-            forceUsageRefresh: forceUsageRefresh,
+            forceUsageRefresh: shouldRefreshUsage,
             prefersSerialUsageRefresh: prefersSerialUsageRefresh,
-            bypassUsageThrottle: false
+            bypassUsageThrottle: false,
+            onPartialUpdate: nil
         )
 
-        if try await performCloudSync(mode: backgroundRefreshPolicy.cloudSyncMode, failOnError: failOnCloudSyncError) {
+        if cloudPullResult.didUpdateAccounts {
             latestAccounts = try await accountsCoordinator.listAccounts()
+        }
+
+        if shouldRefreshUsage {
+            try await pushCloudAccountsIfNeeded(failOnError: failOnCloudSyncError)
         }
 
         if try await reconcileCurrentAccountSelection(
@@ -225,13 +265,33 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
     private func refreshLocalAccounts(
         forceUsageRefresh: Bool,
         prefersSerialUsageRefresh: Bool,
-        bypassUsageThrottle: Bool
+        bypassUsageThrottle: Bool,
+        onPartialUpdate: (@MainActor ([AccountSummary]) -> Void)?
     ) async throws -> [AccountSummary] {
         if forceUsageRefresh {
+            beginRemoteUsageRefreshActivity()
+            defer { endRemoteUsageRefreshActivity() }
+
             if prefersSerialUsageRefresh {
-                _ = try await accountsCoordinator.refreshAllUsageSerially(force: bypassUsageThrottle)
+                _ = try await accountsCoordinator.refreshAllUsageSerially(
+                    force: bypassUsageThrottle,
+                    onPartialUpdate: { accounts in
+                        guard let onPartialUpdate else { return }
+                        await MainActor.run {
+                            onPartialUpdate(accounts)
+                        }
+                    }
+                )
             } else {
-                _ = try await accountsCoordinator.refreshAllUsage(force: bypassUsageThrottle)
+                _ = try await accountsCoordinator.refreshAllUsage(
+                    force: bypassUsageThrottle,
+                    onPartialUpdate: { accounts in
+                        guard let onPartialUpdate else { return }
+                        await MainActor.run {
+                            onPartialUpdate(accounts)
+                        }
+                    }
+                )
             }
             if autoSmartSwitchEnabled {
                 _ = try await accountsCoordinator.autoSmartSwitchIfNeeded()
@@ -240,19 +300,17 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
         return try await accountsCoordinator.listAccounts()
     }
 
-    private func performCloudSync(mode: CloudSyncMode, failOnError: Bool) async throws -> Bool {
-        guard let cloudSyncService else { return false }
+    private func pullCloudAccountsIfNeeded(
+        failOnError: Bool
+    ) async throws -> AccountsCloudSyncPullResult {
+        guard let cloudSyncService else { return .noChange }
 
         do {
-            switch mode {
-            case .disabled:
-                return false
-            case .pushLocalAccounts:
-                try await cloudSyncService.pushLocalAccountsIfNeeded()
-                return false
-            case .pullRemoteAccounts:
-                return try await cloudSyncService.pullRemoteAccountsIfNeeded()
-            }
+            let now = dateProvider.unixSecondsNow()
+            return try await cloudSyncService.pullRemoteAccountsIfNeeded(
+                currentTime: now,
+                maximumSnapshotAgeSeconds: snapshotFreshnessPolicy.remoteSnapshotFreshnessWindowSeconds
+            )
         } catch {
             if failOnError {
                 throw error
@@ -260,7 +318,102 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
             #if DEBUG
             print("CloudKit background sync skipped:", error.localizedDescription)
             #endif
-            return false
+            return .noChange
+        }
+    }
+
+    private func pushCloudAccountsIfNeeded(failOnError: Bool) async throws {
+        guard let cloudSyncService else { return }
+
+        do {
+            try await cloudSyncService.pushLocalAccountsIfNeeded()
+        } catch {
+            if failOnError {
+                throw error
+            }
+            #if DEBUG
+            print("CloudKit background sync skipped:", error.localizedDescription)
+            #endif
+        }
+    }
+
+    private func scheduleWorkspaceMetadataRefresh(forceRemoteCheck: Bool) {
+        workspaceMetadataRefreshTask?.cancel()
+        workspaceMetadataRefreshTask = Task { [weak self] in
+            guard let self else { return }
+            await MainActor.run {
+                self.beginAccountsRefreshActivity()
+            }
+            defer {
+                Task { @MainActor [weak self] in
+                    self?.endAccountsRefreshActivity()
+                }
+            }
+            do {
+                let latestAccounts = try await self.accountsCoordinator.refreshWorkspaceMetadata(
+                    forceRemoteCheck: forceRemoteCheck
+                )
+                guard !Task.isCancelled else { return }
+                try await self.pushCloudAccountsIfNeeded(failOnError: false)
+                guard !Task.isCancelled else { return }
+                self.accounts = latestAccounts
+                self.notice = nil
+            } catch {
+                #if DEBUG
+                print("Workspace metadata refresh skipped:", error.localizedDescription)
+                #endif
+            }
+        }
+    }
+
+    private func beginAccountsRefreshActivity() {
+        accountsRefreshActivityCount += 1
+        if !isRefreshingAccounts {
+            isRefreshingAccounts = true
+        }
+    }
+
+    private func endAccountsRefreshActivity() {
+        accountsRefreshActivityCount = max(0, accountsRefreshActivityCount - 1)
+        if accountsRefreshActivityCount == 0, isRefreshingAccounts {
+            isRefreshingAccounts = false
+        }
+    }
+
+    private func beginRemoteUsageRefreshActivity() {
+        remoteUsageRefreshActivityCount += 1
+        if !isFetchingRemoteUsage {
+            isFetchingRemoteUsage = true
+        }
+    }
+
+    private func endRemoteUsageRefreshActivity() {
+        remoteUsageRefreshActivityCount = max(0, remoteUsageRefreshActivityCount - 1)
+        if remoteUsageRefreshActivityCount == 0, isFetchingRemoteUsage {
+            isFetchingRemoteUsage = false
+        }
+    }
+
+    private func configureAccountsSnapshotPushHandlingIfNeeded() {
+        guard accountsSnapshotPushCancellable == nil else { return }
+
+        accountsSnapshotPushCancellable = NotificationCenter.default
+            .publisher(for: .copoolAccountsSnapshotPushDidArrive)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                Task { @MainActor in
+                    await self.handleAccountsSnapshotPushNotification()
+                }
+            }
+
+        Task {
+            do {
+                try await cloudSyncService?.ensurePushSubscriptionIfNeeded()
+            } catch {
+                #if DEBUG
+                print("CloudKit accounts snapshot push subscription skipped:", error.localizedDescription)
+                #endif
+            }
         }
     }
 
@@ -316,6 +469,17 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
             print("CloudKit current selection sync skipped:", error.localizedDescription)
             #endif
             return .noChange
+        }
+    }
+
+    private func handleAccountsSnapshotPushNotification() async {
+        do {
+            let pullResult = try await pullCloudAccountsIfNeeded(failOnError: false)
+            guard pullResult.didUpdateAccounts else { return }
+            accounts = try await accountsCoordinator.listAccounts()
+            notice = nil
+        } catch {
+            notice = error.localizedDescription
         }
     }
 

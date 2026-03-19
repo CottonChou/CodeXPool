@@ -60,16 +60,21 @@ struct RootScene: View {
         .onChange(of: selectedTab) { _, tab in
             if tab == .proxy {
                 Task {
-                    await proxyModel.refreshForTabEntry()
+                    await proxyModel.loadIfNeeded()
                 }
             }
         }
         .onReceive(trayModel.$accounts.removeDuplicates()) { accounts in
             accountsModel.syncFromBackgroundRefresh(accounts)
         }
+        .onReceive(trayModel.$isFetchingRemoteUsage.removeDuplicates()) { isRefreshing in
+            accountsModel.syncRemoteUsageRefreshActivity(isRefreshing: isRefreshing)
+        }
         .task {
             await settingsModel.loadIfNeeded()
+            #if os(macOS)
             await proxyModel.bootstrapOnAppLaunch(using: settingsModel.settings)
+            #endif
         }
         #if os(iOS)
         .animation(.easeInOut(duration: 0.2), value: currentNotice)

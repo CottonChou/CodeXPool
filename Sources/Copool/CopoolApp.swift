@@ -165,6 +165,11 @@ private func handleRemoteNotification(_ userInfo: [AnyHashable: Any]) -> Bool {
         return true
     }
 
+    if notification.subscriptionID == CloudKitAccountsSyncService.pushSubscriptionID {
+        NotificationCenter.default.post(name: .copoolAccountsSnapshotPushDidArrive, object: nil)
+        return true
+    }
+
     if notification.subscriptionID == CloudKitProxyControlSyncService.pushSubscriptionID {
         NotificationCenter.default.post(name: .copoolProxyControlPushDidArrive, object: nil)
         return true

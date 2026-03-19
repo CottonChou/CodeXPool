@@ -33,6 +33,16 @@ struct CurrentAccountSelectionPullResult: Equatable, Sendable {
     )
 }
 
+struct AccountsCloudSyncPullResult: Equatable, Sendable {
+    var didUpdateAccounts: Bool
+    var remoteSyncedAt: Int64?
+
+    static let noChange = AccountsCloudSyncPullResult(
+        didUpdateAccounts: false,
+        remoteSyncedAt: nil
+    )
+}
+
 struct StoredAccount: Codable, Equatable, Identifiable {
     var id: String
     var label: String
@@ -77,6 +87,27 @@ struct AccountSummary: Equatable, Identifiable {
     var usageError: String?
     var isCurrent: Bool
 
+    var normalizedPlanLabel: String {
+        let normalized = (planType ?? usage?.planType ?? "team")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+
+        switch normalized {
+        case "free":
+            return "FREE"
+        case "plus":
+            return "PLUS"
+        case "pro":
+            return "PRO"
+        case "enterprise":
+            return "ENTERPRISE"
+        case "business":
+            return "BUSINESS"
+        default:
+            return "TEAM"
+        }
+    }
+
     var displayTeamName: String? {
         if let alias = teamAlias?.trimmingCharacters(in: .whitespacesAndNewlines),
            !alias.isEmpty {
@@ -87,6 +118,15 @@ struct AccountSummary: Equatable, Identifiable {
             return teamName
         }
         return nil
+    }
+
+    var shouldDisplayWorkspaceTag: Bool {
+        switch normalizedPlanLabel {
+        case "TEAM", "BUSINESS", "ENTERPRISE":
+            return displayTeamName != nil
+        default:
+            return false
+        }
     }
 }
 
