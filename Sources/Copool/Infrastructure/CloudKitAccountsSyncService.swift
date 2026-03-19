@@ -121,8 +121,8 @@ actor CloudKitAccountsSyncService: AccountsCloudSyncServiceProtocol {
     }
 
     func pullRemoteAccountsIfNeeded(
-        currentTime: Int64,
-        maximumSnapshotAgeSeconds: Int64
+        currentTime _: Int64,
+        maximumSnapshotAgeSeconds _: Int64
     ) async throws -> AccountsCloudSyncPullResult {
         guard database != nil else { return .noChange }
         guard let record = try await fetchRecordIfExists() else {
@@ -137,13 +137,6 @@ actor CloudKitAccountsSyncService: AccountsCloudSyncServiceProtocol {
             lastUploadedDigest = nil
             try await recoverInvalidRemoteSnapshotIfPossible(using: localStore)
             return .noChange
-        }
-
-        if currentTime - payload.syncedAt > maximumSnapshotAgeSeconds {
-            return AccountsCloudSyncPullResult(
-                didUpdateAccounts: false,
-                remoteSyncedAt: payload.syncedAt
-            )
         }
 
         let remoteDigest = try digest(for: payload.accounts)
