@@ -95,8 +95,9 @@
 		92F681D52C5A373D81950C05 /* AuthFileRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1659877DCD8B9150D665ED12 /* AuthFileRepositoryTests.swift */; };
 		93F291DBC9FD57E847EB6519 /* AppLocale.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E2CF5AE0B544874B721FCC /* AppLocale.swift */; };
 		95E85D9244A64A8BB6AB5F21 /* DefaultWorkspaceMetadataService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95E85D9244A64A8BB6AB5F11 /* DefaultWorkspaceMetadataService.swift */; };
-		98E465C8F8BAA05142221C0D /* ProxyPageModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5B56AEDF3689EA6421720B2 /* ProxyPageModelTests.swift */; };
-		9BE1D9951912C722CF37BC67 /* SettingsPageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7B61BD243C65F84D47C5E07 /* SettingsPageView.swift */; };
+			98E465C8F8BAA05142221C0D /* ProxyPageModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5B56AEDF3689EA6421720B2 /* ProxyPageModelTests.swift */; };
+			C4AEB739AA9D4A84ABBB9E21 /* ProxyControlBridgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10B6B54D0E14B9CB2CB0A71 /* ProxyControlBridgeTests.swift */; };
+			9BE1D9951912C722CF37BC67 /* SettingsPageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7B61BD243C65F84D47C5E07 /* SettingsPageView.swift */; };
 		9D0B3515E30738EDF7632D4C /* CloudflaredService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C139AC44A9986277E75FA765 /* CloudflaredService.swift */; };
 		9ED52999272DAB575FAD8157 /* auth.rs in Resources */ = {isa = PBXBuildFile; fileRef = D16220C69646464B343B782F /* auth.rs */; };
 		9F3B31646881F65BD82BC5C9 /* UpdateCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D3340D9F24E63B0B31749E2 /* UpdateCoordinator.swift */; };
@@ -248,8 +249,9 @@
 		A105A105A105A105A105A105 /* PlatformClipboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformClipboard.swift; sourceTree = "<group>"; };
 		A106A106A106A106A106A106 /* RemoteServerConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteServerConfiguration.swift; sourceTree = "<group>"; };
 		A107A107A107A107A107A107 /* AccountCardPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountCardPresentationTests.swift; sourceTree = "<group>"; };
-		A108A108A108A108A108A108 /* RemoteServerConfigurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteServerConfigurationTests.swift; sourceTree = "<group>"; };
-		A146C7576AB39EFCD658BFED /* AppLocaleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLocaleTests.swift; sourceTree = "<group>"; };
+			A108A108A108A108A108A108 /* RemoteServerConfigurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteServerConfigurationTests.swift; sourceTree = "<group>"; };
+			A10B6B54D0E14B9CB2CB0A71 /* ProxyControlBridgeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyControlBridgeTests.swift; sourceTree = "<group>"; };
+			A146C7576AB39EFCD658BFED /* AppLocaleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLocaleTests.swift; sourceTree = "<group>"; };
 		A1DA670CD43B2B655D3DEE57 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/Localizable.strings; sourceTree = "<group>"; };
 		A4646C4F038F28A5B638A6FB /* Copool.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Copool.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AB56BDF9685A258D5CD4C18A /* OpencodeAuthSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpencodeAuthSyncService.swift; sourceTree = "<group>"; };
@@ -529,10 +531,11 @@
 				1659877DCD8B9150D665ED12 /* AuthFileRepositoryTests.swift */,
 				0D1996F591AEC73ED65ED1F9 /* CommandRunnerTimeoutTests.swift */,
 				E6318743D5B32C4FA1244FAD /* LiquidProgressMetricsTests.swift */,
-				251BC10FF4D8538941CDC174 /* LocalizationConsistencyTests.swift */,
-				F5B56AEDF3689EA6421720B2 /* ProxyPageModelTests.swift */,
-				A108A108A108A108A108A108 /* RemoteServerConfigurationTests.swift */,
-				DF11B93A2C05CC3B851D671A /* StoreFileRepositoryTests.swift */,
+					251BC10FF4D8538941CDC174 /* LocalizationConsistencyTests.swift */,
+					F5B56AEDF3689EA6421720B2 /* ProxyPageModelTests.swift */,
+					A10B6B54D0E14B9CB2CB0A71 /* ProxyControlBridgeTests.swift */,
+					A108A108A108A108A108A108 /* RemoteServerConfigurationTests.swift */,
+					DF11B93A2C05CC3B851D671A /* StoreFileRepositoryTests.swift */,
 				1302CF1943B5AEB08D667C6E /* SwiftNativeProxyRuntimeServiceTests.swift */,
 				C10E7339F7656FE20240B3B8 /* UsageWindowSelectorTests.swift */,
 				54BDCA2C85944483297EEA6B /* VersionComparatorTests.swift */,
@@ -786,10 +789,11 @@
 				B02FB96AC2AA18DA0EE1FE21 /* AppSettingsCodableTests.swift in Sources */,
 				92F681D52C5A373D81950C05 /* AuthFileRepositoryTests.swift in Sources */,
 				BAC63D41038D37A503641728 /* CommandRunnerTimeoutTests.swift in Sources */,
-				50922F8C48CF01B728AD262F /* LiquidProgressMetricsTests.swift in Sources */,
-				4353553A171096B9C9653258 /* LocalizationConsistencyTests.swift in Sources */,
-				98E465C8F8BAA05142221C0D /* ProxyPageModelTests.swift in Sources */,
-				137463A0132E4160501DD2AE /* RemoteServerConfigurationTests.swift in Sources */,
+					50922F8C48CF01B728AD262F /* LiquidProgressMetricsTests.swift in Sources */,
+					4353553A171096B9C9653258 /* LocalizationConsistencyTests.swift in Sources */,
+					98E465C8F8BAA05142221C0D /* ProxyPageModelTests.swift in Sources */,
+					C4AEB739AA9D4A84ABBB9E21 /* ProxyControlBridgeTests.swift in Sources */,
+					137463A0132E4160501DD2AE /* RemoteServerConfigurationTests.swift in Sources */,
 				137463A0132E4160501DD2AC /* StoreFileRepositoryTests.swift in Sources */,
 				634D954799F1968A5D418EA2 /* SwiftNativeProxyRuntimeServiceTests.swift in Sources */,
 				E11DCC850FA489BD46094EE0 /* UsageWindowSelectorTests.swift in Sources */,

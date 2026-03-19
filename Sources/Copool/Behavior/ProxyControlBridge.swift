@@ -10,6 +10,7 @@ actor ProxyControlBridge {
     private let settingsCoordinator: SettingsCoordinator
     private let cloudSyncService: ProxyControlCloudSyncServiceProtocol?
     private let dateProvider: DateProviding
+    private let runtimePlatform: RuntimePlatform
     private let sourceDeviceID: String
 
     private var loopTask: Task<Void, Never>?
@@ -23,16 +24,19 @@ actor ProxyControlBridge {
         settingsCoordinator: SettingsCoordinator,
         cloudSyncService: ProxyControlCloudSyncServiceProtocol?,
         dateProvider: DateProviding = SystemDateProvider(),
+        runtimePlatform: RuntimePlatform = PlatformCapabilities.currentPlatform,
         sourceDeviceID: String = "macos-proxy-bridge"
     ) {
         self.proxyCoordinator = proxyCoordinator
         self.settingsCoordinator = settingsCoordinator
         self.cloudSyncService = cloudSyncService
         self.dateProvider = dateProvider
+        self.runtimePlatform = runtimePlatform
         self.sourceDeviceID = sourceDeviceID
     }
 
     func start() {
+        guard runtimePlatform == .macOS else { return }
         guard loopTask == nil else { return }
         configurePushHandlingIfNeeded()
         Task {
@@ -57,6 +61,7 @@ actor ProxyControlBridge {
     }
 
     func handlePushNotification() async {
+        guard runtimePlatform == .macOS else { return }
         do {
             try await processPendingCommandIfNeeded()
             try await publishSnapshot()
