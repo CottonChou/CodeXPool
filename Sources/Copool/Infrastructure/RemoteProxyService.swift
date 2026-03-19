@@ -37,7 +37,7 @@ actor RemoteProxyService: RemoteProxyServiceProtocol {
             printf 'installed=%s\\nservice_installed=%s\\nrunning=%s\\nenabled=%s\\npid=%s\\napi_key=%s\\n' "$INSTALLED" "$SERVICE_INSTALLED" "$RUNNING" "$ENABLED" "$PID" "$API_KEY"
             """
 
-            let output = try runSSH(server: normalized, command: command)
+            let output = try runSSH(server: normalized, command: command, timeout: 20)
             return parseStatusOutput(output, serviceName: serviceName, host: normalized.host, listenPort: normalized.listenPort)
         } catch {
             return RemoteProxyStatus(

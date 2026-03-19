@@ -3,7 +3,15 @@ import Combine
 
 actor ProxyControlBridge {
     private enum Constants {
-        static let syncInterval: Duration = .seconds(2)
+        static let syncInterval: Duration = .seconds(1)
+        static let remoteStatusRefreshIntervalMilliseconds: Int64 = 8_000
+    }
+
+    private struct CommandExecutionResult {
+        let forceRemoteStatusRefresh: Bool
+
+        static let noRemoteStatusRefresh = CommandExecutionResult(forceRemoteStatusRefresh: false)
+        static let forceRemoteStatusRefresh = CommandExecutionResult(forceRemoteStatusRefresh: true)
     }
 
     private let proxyCoordinator: ProxyCoordinator
@@ -17,6 +25,8 @@ actor ProxyControlBridge {
     private var lastHandledCommandID: String?
     private var lastCommandError: String?
     private var remoteLogs: [String: String] = [:]
+    private var cachedRemoteStatuses: [String: RemoteProxyStatus] = [:]
+    private var lastRemoteStatusRefreshAt: Int64?
     private var pushCancellable: AnyCancellable?
 
     init(
@@ -63,8 +73,10 @@ actor ProxyControlBridge {
     func handlePushNotification() async {
         guard runtimePlatform == .macOS else { return }
         do {
-            try await processPendingCommandIfNeeded()
-            try await publishSnapshot()
+            let didHandleCommand = try await processPendingCommandIfNeeded()
+            if !didHandleCommand {
+                try await publishSnapshot()
+            }
         } catch {
             #if DEBUG
             // print("Proxy control push handling skipped:", error.localizedDescription)
@@ -75,8 +87,10 @@ actor ProxyControlBridge {
     private func runLoop() async {
         while !Task.isCancelled {
             do {
-                try await processPendingCommandIfNeeded()
-                try await publishSnapshot()
+                let didHandleCommand = try await processPendingCommandIfNeeded()
+                if !didHandleCommand {
+                    try await publishSnapshot()
+                }
             } catch {
                 #if DEBUG
                 // print("Proxy control bridge skipped:", error.localizedDescription)
@@ -101,18 +115,25 @@ actor ProxyControlBridge {
     }
 
     private func publishSnapshot() async throws {
+        try await publishSnapshot(forceRemoteStatusRefresh: false)
+    }
+
+    private func publishSnapshot(forceRemoteStatusRefresh: Bool) async throws {
         guard let cloudSyncService else { return }
-        let snapshot = try await buildSnapshot()
+        let snapshot = try await buildSnapshot(forceRemoteStatusRefresh: forceRemoteStatusRefresh)
         try await cloudSyncService.pushLocalSnapshot(snapshot)
     }
 
-    private func processPendingCommandIfNeeded() async throws {
-        guard let cloudSyncService else { return }
-        guard let command = try await cloudSyncService.pullPendingCommand() else { return }
-        guard command.id != lastHandledCommandID else { return }
+    @discardableResult
+    private func processPendingCommandIfNeeded() async throws -> Bool {
+        guard let cloudSyncService else { return false }
+        guard let command = try await cloudSyncService.pullPendingCommand() else { return false }
+        guard command.id != lastHandledCommandID else { return false }
+
+        var executionResult = CommandExecutionResult.noRemoteStatusRefresh
 
         do {
-            try await execute(command)
+            executionResult = try await execute(command)
             lastHandledCommandID = command.id
             lastCommandError = nil
         } catch {
@@ -120,19 +141,19 @@ actor ProxyControlBridge {
             lastCommandError = error.localizedDescription
         }
 
-        try await publishSnapshot()
+        try await publishSnapshot(forceRemoteStatusRefresh: executionResult.forceRemoteStatusRefresh)
+        return true
     }
 
-    private func buildSnapshot() async throws -> ProxyControlSnapshot {
+    private func buildSnapshot(forceRemoteStatusRefresh: Bool) async throws -> ProxyControlSnapshot {
         let settings = try await settingsCoordinator.currentSettings()
+        let remoteStatuses = await resolveRemoteStatuses(
+            for: settings.remoteServers,
+            forceRefresh: forceRemoteStatusRefresh
+        )
         let pair = await proxyCoordinator.loadStatus()
         let proxyStatus = pair.0
         let cloudflaredStatus = pair.1
-
-        var remoteStatuses: [String: RemoteProxyStatus] = [:]
-        for server in settings.remoteServers {
-            remoteStatuses[server.id] = await proxyCoordinator.remoteStatus(server: server)
-        }
 
         return ProxyControlSnapshot(
             syncedAt: dateProvider.unixMillisecondsNow(),
@@ -158,31 +179,76 @@ actor ProxyControlBridge {
         )
     }
 
-    private func execute(_ command: ProxyControlCommand) async throws {
+    private func resolveRemoteStatuses(
+        for remoteServers: [RemoteServerConfig],
+        forceRefresh: Bool
+    ) async -> [String: RemoteProxyStatus] {
+        let serverIDs = Set(remoteServers.map(\.id))
+        cachedRemoteStatuses = cachedRemoteStatuses.filter { serverIDs.contains($0.key) }
+
+        let now = dateProvider.unixMillisecondsNow()
+        let refreshDue: Bool
+        if let lastRemoteStatusRefreshAt {
+            refreshDue = now - lastRemoteStatusRefreshAt >= Constants.remoteStatusRefreshIntervalMilliseconds
+        } else {
+            refreshDue = true
+        }
+
+        let shouldRefreshAll = forceRefresh || refreshDue
+        if shouldRefreshAll {
+            for server in remoteServers {
+                cachedRemoteStatuses[server.id] = await proxyCoordinator.remoteStatus(server: server)
+            }
+            lastRemoteStatusRefreshAt = now
+            return cachedRemoteStatuses
+        }
+
+        var hasMissingStatus = false
+        for server in remoteServers where cachedRemoteStatuses[server.id] == nil {
+            cachedRemoteStatuses[server.id] = await proxyCoordinator.remoteStatus(server: server)
+            hasMissingStatus = true
+        }
+
+        if hasMissingStatus {
+            lastRemoteStatusRefreshAt = now
+        }
+
+        return cachedRemoteStatuses
+    }
+
+    private func execute(_ command: ProxyControlCommand) async throws -> CommandExecutionResult {
         switch command.kind {
         case .refreshStatus:
-            return
+            return .forceRemoteStatusRefresh
         case .startProxy:
             _ = try await proxyCoordinator.startProxy(preferredPort: command.preferredProxyPort)
+            return .noRemoteStatusRefresh
         case .stopProxy:
             _ = await proxyCoordinator.stopProxy()
+            return .noRemoteStatusRefresh
         case .refreshAPIKey:
             _ = try await proxyCoordinator.refreshAPIKey()
+            return .noRemoteStatusRefresh
         case .setAutoStartProxy:
             _ = try await settingsCoordinator.updateSettings(
                 AppSettingsPatch(autoStartApiProxy: command.autoStartProxy ?? false)
             )
+            return .noRemoteStatusRefresh
         case .installCloudflared:
             _ = try await proxyCoordinator.installCloudflared()
+            return .noRemoteStatusRefresh
         case .startCloudflared:
             guard let input = command.cloudflaredInput else {
                 throw AppError.invalidData("Missing cloudflared input.")
             }
             _ = try await proxyCoordinator.startCloudflared(input: input)
+            return .noRemoteStatusRefresh
         case .stopCloudflared:
             _ = await proxyCoordinator.stopCloudflared()
+            return .noRemoteStatusRefresh
         case .refreshCloudflared:
             _ = await proxyCoordinator.refreshCloudflared()
+            return .noRemoteStatusRefresh
         case .addRemoteServer:
             let draft = command.remoteServer ?? RemoteServerConfiguration.makeDraft()
             let settings = try await settingsCoordinator.currentSettings()
@@ -191,6 +257,7 @@ actor ProxyControlBridge {
                     remoteServers: settings.remoteServers + [RemoteServerConfiguration.normalize(draft)]
                 )
             )
+            return .forceRemoteStatusRefresh
         case .saveRemoteServer:
             guard let remoteServer = command.remoteServer else {
                 throw AppError.invalidData("Missing remote server payload.")
@@ -200,6 +267,7 @@ actor ProxyControlBridge {
             _ = try await settingsCoordinator.updateSettings(
                 AppSettingsPatch(remoteServers: merged)
             )
+            return .forceRemoteStatusRefresh
         case .removeRemoteServer:
             guard let id = command.remoteServerID else {
                 throw AppError.invalidData("Missing remote server id.")
@@ -210,25 +278,36 @@ actor ProxyControlBridge {
                 AppSettingsPatch(remoteServers: merged)
             )
             remoteLogs.removeValue(forKey: id)
+            cachedRemoteStatuses.removeValue(forKey: id)
+            return .noRemoteStatusRefresh
         case .refreshRemote:
-            guard let server = try await serverForCommand(command) else { return }
-            _ = await proxyCoordinator.remoteStatus(server: server)
+            guard let server = try await serverForCommand(command) else { return .noRemoteStatusRefresh }
+            cachedRemoteStatuses[server.id] = await proxyCoordinator.remoteStatus(server: server)
+            lastRemoteStatusRefreshAt = dateProvider.unixMillisecondsNow()
+            return .noRemoteStatusRefresh
         case .deployRemote:
-            guard let server = try await serverForCommand(command) else { return }
-            _ = try await proxyCoordinator.deployRemote(server: server)
+            guard let server = try await serverForCommand(command) else { return .noRemoteStatusRefresh }
+            cachedRemoteStatuses[server.id] = try await proxyCoordinator.deployRemote(server: server)
+            lastRemoteStatusRefreshAt = dateProvider.unixMillisecondsNow()
+            return .noRemoteStatusRefresh
         case .startRemote:
-            guard let server = try await serverForCommand(command) else { return }
-            _ = try await proxyCoordinator.startRemote(server: server)
+            guard let server = try await serverForCommand(command) else { return .noRemoteStatusRefresh }
+            cachedRemoteStatuses[server.id] = try await proxyCoordinator.startRemote(server: server)
+            lastRemoteStatusRefreshAt = dateProvider.unixMillisecondsNow()
+            return .noRemoteStatusRefresh
         case .stopRemote:
-            guard let server = try await serverForCommand(command) else { return }
-            _ = try await proxyCoordinator.stopRemote(server: server)
+            guard let server = try await serverForCommand(command) else { return .noRemoteStatusRefresh }
+            cachedRemoteStatuses[server.id] = try await proxyCoordinator.stopRemote(server: server)
+            lastRemoteStatusRefreshAt = dateProvider.unixMillisecondsNow()
+            return .noRemoteStatusRefresh
         case .readRemoteLogs:
-            guard let server = try await serverForCommand(command) else { return }
+            guard let server = try await serverForCommand(command) else { return .noRemoteStatusRefresh }
             let logs = try await proxyCoordinator.readRemoteLogs(
                 server: server,
                 lines: command.logLines ?? 120
             )
             remoteLogs[server.id] = logs
+            return .noRemoteStatusRefresh
         }
     }
 

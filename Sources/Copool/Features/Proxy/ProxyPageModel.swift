@@ -71,6 +71,14 @@ private struct RemoteSnapshotPresentationState: Equatable {
 
 @MainActor
 final class ProxyPageModel: ObservableObject {
+    private enum RemoteControlPolling {
+        static let snapshotSyncInterval: Duration = .seconds(1)
+        static let commandAckPollLimit = 24
+        static let commandAckPollInterval: Duration = .milliseconds(250)
+        static let logAckPollLimit = 36
+        static let logAckPollInterval: Duration = .milliseconds(250)
+    }
+
     private let coordinator: ProxyCoordinator
     private let settingsCoordinator: SettingsCoordinator
     private let proxyControlCloudSyncService: ProxyControlCloudSyncServiceProtocol?
@@ -688,7 +696,7 @@ final class ProxyPageModel: ObservableObject {
         remoteSnapshotTask = Task { [weak self] in
             guard let self else { return }
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(2))
+                try? await Task.sleep(for: RemoteControlPolling.snapshotSyncInterval)
                 await self.refreshRemoteSnapshot(showErrors: false)
             }
         }
@@ -923,8 +931,8 @@ final class ProxyPageModel: ObservableObject {
 
             if let acknowledgedSnapshot = try await waitForRemoteCommandAck(
                 command.id,
-                pollLimit: 60,
-                pollInterval: .milliseconds(500),
+                pollLimit: RemoteControlPolling.logAckPollLimit,
+                pollInterval: RemoteControlPolling.logAckPollInterval,
                 acceptance: { snapshot in
                     if snapshot.lastHandledCommandID == command.id {
                         return true
@@ -951,8 +959,8 @@ final class ProxyPageModel: ObservableObject {
 
     private func waitForRemoteCommandAck(
         _ commandID: String,
-        pollLimit: Int = 16,
-        pollInterval: Duration = .milliseconds(500),
+        pollLimit: Int = RemoteControlPolling.commandAckPollLimit,
+        pollInterval: Duration = RemoteControlPolling.commandAckPollInterval,
         acceptance: ((ProxyControlSnapshot) -> Bool)? = nil
     ) async throws -> ProxyControlSnapshot? {
         guard let proxyControlCloudSyncService else { return nil }
