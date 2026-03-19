@@ -707,7 +707,7 @@ final class ProxyPageModel: ObservableObject {
             .sink { [weak self] _ in
                 guard let self else { return }
                 Task { @MainActor in
-                    await self.refreshRemoteSnapshot(showErrors: false)
+                    await self.refreshRemoteSnapshotAfterPush()
                 }
             }
     }
@@ -723,17 +723,37 @@ final class ProxyPageModel: ObservableObject {
         }
     }
 
-    private func refreshRemoteSnapshot(showErrors: Bool) async {
-        guard let proxyControlCloudSyncService else { return }
+    @discardableResult
+    private func refreshRemoteSnapshot(showErrors: Bool) async -> Bool {
+        guard let proxyControlCloudSyncService else { return false }
 
         do {
             if let snapshot = try await proxyControlCloudSyncService.pullRemoteSnapshot() {
-                applyRemoteSnapshot(snapshot)
+                _ = applyRemoteSnapshot(snapshot)
+                return true
             }
         } catch {
             if showErrors {
                 notice = NoticeMessage(style: .error, text: error.localizedDescription)
             }
+        }
+
+        return false
+    }
+
+    private func refreshRemoteSnapshotAfterPush() async {
+        let policy = CloudPushPullRetryPolicy.nearRealtime
+
+        for attempt in 0..<policy.maxAttempts {
+            let didPullSnapshot = await refreshRemoteSnapshot(showErrors: false)
+            if didPullSnapshot {
+                return
+            }
+
+            guard attempt + 1 < policy.maxAttempts else {
+                return
+            }
+            try? await Task.sleep(for: policy.retryInterval)
         }
     }
 

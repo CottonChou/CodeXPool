@@ -7,6 +7,21 @@ extension Notification.Name {
     static let copoolProxyControlPushDidArrive = Notification.Name("copool.proxy-control.push")
 }
 
+struct CloudPushPullRetryPolicy: Sendable {
+    let maxAttempts: Int
+    let retryInterval: Duration
+
+    init(maxAttempts: Int, retryInterval: Duration) {
+        self.maxAttempts = max(1, maxAttempts)
+        self.retryInterval = retryInterval
+    }
+
+    static let nearRealtime = CloudPushPullRetryPolicy(
+        maxAttempts: 12,
+        retryInterval: .milliseconds(250)
+    )
+}
+
 @MainActor
 final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtocol {
     enum CloudSyncMode: Sendable {
@@ -474,7 +489,7 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
 
     private func handleAccountsSnapshotPushNotification() async {
         do {
-            let pullResult = try await pullCloudAccountsIfNeeded(failOnError: false)
+            let pullResult = try await pullCloudAccountsForPushNotification()
             guard pullResult.didUpdateAccounts else { return }
             accounts = try await accountsCoordinator.listAccounts()
             notice = nil
@@ -491,12 +506,72 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
 
     private func handleCurrentSelectionPushNotification() async {
         do {
-            let result = try await reconcileCurrentAccountSelection(failOnError: false)
+            let result = try await pullCurrentSelectionForPushNotification()
             guard result.didUpdateSelection else { return }
             accounts = try await accountsCoordinator.listAccounts()
             notice = nil
         } catch {
             notice = error.localizedDescription
         }
+    }
+
+    private func pullCloudAccountsForPushNotification() async throws -> AccountsCloudSyncPullResult {
+        try await retryPullAfterPush(
+            policy: .nearRealtime,
+            operation: {
+                try await pullCloudAccountsIfNeeded(failOnError: false)
+            },
+            stopWhen: { $0.didUpdateAccounts }
+        )
+    }
+
+    private func pullCurrentSelectionForPushNotification() async throws -> CurrentAccountSelectionPullResult {
+        guard let currentAccountSelectionSyncService else {
+            return .noChange
+        }
+
+        let result = try await retryPullAfterPush(
+            policy: .nearRealtime,
+            operation: {
+                try await currentAccountSelectionSyncService.pullRemoteSelectionIfNeeded()
+            },
+            stopWhen: { $0.didUpdateSelection }
+        )
+
+        if result.changedCurrentAccount,
+           backgroundRefreshPolicy.applyRemoteSelectionSwitchEffects,
+           let remoteAccountID = result.accountID {
+            try await applyRemoteSelectionSwitchEffects(accountID: remoteAccountID)
+        }
+
+        return result
+    }
+
+    private func retryPullAfterPush<Result>(
+        policy: CloudPushPullRetryPolicy,
+        operation: () async throws -> Result,
+        stopWhen: (Result) -> Bool
+    ) async throws -> Result {
+        var latest = try await operation()
+        if stopWhen(latest) {
+            return latest
+        }
+
+        guard policy.maxAttempts > 1 else {
+            return latest
+        }
+
+        for _ in 1..<policy.maxAttempts {
+            if Task.isCancelled {
+                break
+            }
+            try? await Task.sleep(for: policy.retryInterval)
+            latest = try await operation()
+            if stopWhen(latest) {
+                break
+            }
+        }
+
+        return latest
     }
 }
