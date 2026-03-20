@@ -87,6 +87,59 @@ final class ProxyPageModelTests: XCTestCase {
         XCTAssertEqual(model.remoteStatuses, updatedSnapshot.remoteStatuses)
     }
 
+    func testWaitForRemoteCommandAckReturnsAlreadyAppliedMetadataOnlyAckSnapshot() async throws {
+        let snapshot = makeSnapshot()
+        let cloudSyncService = StubProxyControlCloudSyncService(baseSnapshot: snapshot)
+        let model = makeModel(
+            proxyControlCloudSyncService: cloudSyncService,
+            runtimePlatform: .iOS
+        )
+
+        XCTAssertTrue(model.applyRemoteSnapshot(snapshot))
+
+        var acknowledgedSnapshot = snapshot
+        acknowledgedSnapshot.syncedAt += 1_000
+        acknowledgedSnapshot.lastHandledCommandID = "command-1"
+        acknowledgedSnapshot.lastCommandError = "handled"
+
+        XCTAssertFalse(model.applyRemoteSnapshot(acknowledgedSnapshot))
+
+        let result = try await model.waitForRemoteCommandAck(
+            "command-1",
+            pollLimit: 1,
+            pollInterval: .milliseconds(10)
+        )
+
+        XCTAssertEqual(result?.lastHandledCommandID, "command-1")
+        XCTAssertEqual(result?.lastCommandError, "handled")
+    }
+
+    func testWaitForRemoteCommandAckEvaluatesCustomAcceptanceAgainstAlreadyAppliedSnapshot() async throws {
+        let snapshot = makeSnapshot()
+        let cloudSyncService = StubProxyControlCloudSyncService(baseSnapshot: snapshot)
+        let model = makeModel(
+            proxyControlCloudSyncService: cloudSyncService,
+            runtimePlatform: .iOS
+        )
+
+        XCTAssertTrue(model.applyRemoteSnapshot(snapshot))
+
+        var updatedSnapshot = snapshot
+        updatedSnapshot.syncedAt += 1_000
+        updatedSnapshot.remoteLogs["server-1"] = "updated logs"
+
+        XCTAssertTrue(model.applyRemoteSnapshot(updatedSnapshot))
+
+        let result = try await model.waitForRemoteCommandAck(
+            "command-2",
+            pollLimit: 1,
+            pollInterval: .milliseconds(10),
+            acceptance: { $0.remoteLogs["server-1"] == "updated logs" }
+        )
+
+        XCTAssertEqual(result?.remoteLogs["server-1"], "updated logs")
+    }
+
     func testMacOSModelAppliesLocalSnapshotBroadcastWithoutPageReload() async throws {
         let model = makeModel(runtimePlatform: .macOS)
         let runningSnapshot = makeSnapshot()

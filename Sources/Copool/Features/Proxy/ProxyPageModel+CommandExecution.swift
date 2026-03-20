@@ -107,12 +107,19 @@ extension ProxyPageModel {
         guard let proxyControlCloudSyncService else { return nil }
 
         for _ in 0..<pollLimit {
+            if let acknowledgedSnapshot = acceptedAppliedRemoteSnapshot(
+                for: commandID,
+                acceptance: acceptance
+            ) {
+                return acknowledgedSnapshot
+            }
+
             if let snapshot = try await proxyControlCloudSyncService.pullRemoteSnapshot() {
                 let isAccepted = acceptance?(snapshot) ?? (snapshot.lastHandledCommandID == commandID)
+                applyRemoteSnapshot(snapshot)
                 if isAccepted {
                     return snapshot
                 }
-                applyRemoteSnapshot(snapshot)
             }
             try? await Task.sleep(for: pollInterval)
         }

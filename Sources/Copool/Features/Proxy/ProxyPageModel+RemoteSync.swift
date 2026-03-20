@@ -77,6 +77,9 @@ extension ProxyPageModel {
 
     @discardableResult
     func applyRemoteSnapshot(_ snapshot: ProxyControlSnapshot) -> Bool {
+        lastAppliedRemoteSnapshot = snapshot
+        lastHandledRemoteCommandID = snapshot.lastHandledCommandID
+        lastRemoteCommandError = snapshot.lastCommandError
         lastAppliedRemoteSnapshotSyncedAt = snapshot.syncedAt
         lastAppliedRemoteStatusesSyncedAt = snapshot.remoteStatusesSyncedAt
         let nextState = ProxyRemoteSnapshotPresentationState(snapshot: snapshot)
@@ -99,6 +102,15 @@ extension ProxyPageModel {
         }
         lastSyncedProxyConfiguration = currentProxyConfiguration
         return true
+    }
+
+    func acceptedAppliedRemoteSnapshot(
+        for commandID: String,
+        acceptance: ((ProxyControlSnapshot) -> Bool)? = nil
+    ) -> ProxyControlSnapshot? {
+        guard let snapshot = lastAppliedRemoteSnapshot else { return nil }
+        let isAccepted = acceptance?(snapshot) ?? (snapshot.lastHandledCommandID == commandID)
+        return isAccepted ? snapshot : nil
     }
 
     func shouldRequestRemoteSnapshotRefresh() -> Bool {

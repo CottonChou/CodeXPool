@@ -16,6 +16,9 @@ final class ProxyPageModel: ObservableObject {
     var didRunLaunchBootstrap = false
     var remoteSnapshotTask: Task<Void, Never>?
     var lastRemoteCommandID: String?
+    var lastHandledRemoteCommandID: String?
+    var lastRemoteCommandError: String?
+    var lastAppliedRemoteSnapshot: ProxyControlSnapshot?
     var lastAppliedRemoteSnapshotSyncedAt: Int64?
     var lastAppliedRemoteStatusesSyncedAt: Int64?
     var proxyPushCancellable: AnyCancellable?
