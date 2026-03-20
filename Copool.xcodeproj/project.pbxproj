@@ -49,6 +49,25 @@
 		A830A830A830A830A830A830 /* AccountsPageModel+State.swift in Sources */ = {isa = PBXBuildFile; fileRef = A710A710A710A710A710A710 /* AccountsPageModel+State.swift */; };
 		A841A841A841A841A841A841 /* AccountsActionPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A711A711A711A711A711A711 /* AccountsActionPresentationTests.swift */; };
 		A842A842A842A842A842A842 /* AccountCardInteractionPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A712A712A712A712A712A712 /* AccountCardInteractionPresentationTests.swift */; };
+		C201C201C201C201C201C201 /* SettingsControlPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B201B201B201B201B201B201 /* SettingsControlPresentation.swift */; };
+		C202C202C202C202C202C202 /* SettingsControlPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = B202B202B202B202B202B202 /* SettingsControlPrimitives.swift */; };
+		C203C203C203C203C203C203 /* SettingsPageModel+Lifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B203B203B203B203B203B203 /* SettingsPageModel+Lifecycle.swift */; };
+		C204C204C204C204C204C204 /* SettingsPageModel+Mutations.swift in Sources */ = {isa = PBXBuildFile; fileRef = B204B204B204B204B204B204 /* SettingsPageModel+Mutations.swift */; };
+		C205C205C205C205C205C205 /* SettingsPageModel+Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B205B205B205B205B205B205 /* SettingsPageModel+Presentation.swift */; };
+		C206C206C206C206C206C206 /* PublicAccessSectionPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B206B206B206B206B206B206 /* PublicAccessSectionPresentation.swift */; };
+		C207C207C207C207C207C207 /* RemoteServerCardPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B207B207B207B207B207B207 /* RemoteServerCardPresentation.swift */; };
+		C208C208C208C208C208C208 /* RemoteServerCardPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = B208B208B208B208B208B208 /* RemoteServerCardPrimitives.swift */; };
+		C221C221C221C221C221C221 /* SettingsControlPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B201B201B201B201B201B201 /* SettingsControlPresentation.swift */; };
+		C222C222C222C222C222C222 /* SettingsControlPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = B202B202B202B202B202B202 /* SettingsControlPrimitives.swift */; };
+		C223C223C223C223C223C223 /* SettingsPageModel+Lifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B203B203B203B203B203B203 /* SettingsPageModel+Lifecycle.swift */; };
+		C224C224C224C224C224C224 /* SettingsPageModel+Mutations.swift in Sources */ = {isa = PBXBuildFile; fileRef = B204B204B204B204B204B204 /* SettingsPageModel+Mutations.swift */; };
+		C225C225C225C225C225C225 /* SettingsPageModel+Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B205B205B205B205B205B205 /* SettingsPageModel+Presentation.swift */; };
+		C226C226C226C226C226C226 /* PublicAccessSectionPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B206B206B206B206B206B206 /* PublicAccessSectionPresentation.swift */; };
+		C227C227C227C227C227C227 /* RemoteServerCardPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B207B207B207B207B207B207 /* RemoteServerCardPresentation.swift */; };
+		C228C228C228C228C228C228 /* RemoteServerCardPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = B208B208B208B208B208B208 /* RemoteServerCardPrimitives.swift */; };
+		C241C241C241C241C241C241 /* SettingsControlPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B209B209B209B209B209B209 /* SettingsControlPresentationTests.swift */; };
+		C242C242C242C242C242C242 /* PublicAccessSectionPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B210B210B210B210B210B210 /* PublicAccessSectionPresentationTests.swift */; };
+		C243C243C243C243C243C243 /* RemoteServerCardPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B211B211B211B211B211B211 /* RemoteServerCardPresentationTests.swift */; };
 		02824E5ABDF8A2C228BC1B03 /* ShellCommandRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00E0EE08E1645AD783C2DED1 /* ShellCommandRunner.swift */; };
 		0291143814388B4D29DCB163 /* SettingsPageModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBF9C8262357FD7DC9AA4855 /* SettingsPageModel.swift */; };
 		037DB8B9A2A1E5FA00C16E1E /* proxy_daemon.rs in Resources */ = {isa = PBXBuildFile; fileRef = 3E013D6F6786AE2EA7E9AF59 /* proxy_daemon.rs */; };
@@ -314,6 +333,17 @@
 		A710A710A710A710A710A710 /* AccountsPageModel+State.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AccountsPageModel+State.swift"; sourceTree = "<group>"; };
 		A711A711A711A711A711A711 /* AccountsActionPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsActionPresentationTests.swift; sourceTree = "<group>"; };
 		A712A712A712A712A712A712 /* AccountCardInteractionPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountCardInteractionPresentationTests.swift; sourceTree = "<group>"; };
+		B201B201B201B201B201B201 /* SettingsControlPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsControlPresentation.swift; sourceTree = "<group>"; };
+		B202B202B202B202B202B202 /* SettingsControlPrimitives.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsControlPrimitives.swift; sourceTree = "<group>"; };
+		B203B203B203B203B203B203 /* SettingsPageModel+Lifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsPageModel+Lifecycle.swift"; sourceTree = "<group>"; };
+		B204B204B204B204B204B204 /* SettingsPageModel+Mutations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsPageModel+Mutations.swift"; sourceTree = "<group>"; };
+		B205B205B205B205B205B205 /* SettingsPageModel+Presentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsPageModel+Presentation.swift"; sourceTree = "<group>"; };
+		B206B206B206B206B206B206 /* PublicAccessSectionPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublicAccessSectionPresentation.swift; sourceTree = "<group>"; };
+		B207B207B207B207B207B207 /* RemoteServerCardPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteServerCardPresentation.swift; sourceTree = "<group>"; };
+		B208B208B208B208B208B208 /* RemoteServerCardPrimitives.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteServerCardPrimitives.swift; sourceTree = "<group>"; };
+		B209B209B209B209B209B209 /* SettingsControlPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsControlPresentationTests.swift; sourceTree = "<group>"; };
+		B210B210B210B210B210B210 /* PublicAccessSectionPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublicAccessSectionPresentationTests.swift; sourceTree = "<group>"; };
+		B211B211B211B211B211B211 /* RemoteServerCardPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteServerCardPresentationTests.swift; sourceTree = "<group>"; };
 			A201A201A201A201A201A201 /* ProxyActionPrimitives.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyActionPrimitives.swift; sourceTree = "<group>"; };
 			A202A202A202A202A202A202 /* ProxyInfoPrimitives.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyInfoPrimitives.swift; sourceTree = "<group>"; };
 			A203A203A203A203A203A203 /* RemoteServerCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteServerCardView.swift; sourceTree = "<group>"; };
@@ -477,7 +507,12 @@
 		596621B3395F4D9CF54DC584 /* Settings */ = {
 			isa = PBXGroup;
 			children = (
+				B201B201B201B201B201B201 /* SettingsControlPresentation.swift */,
+				B202B202B202B202B202B202 /* SettingsControlPrimitives.swift */,
 				DBF9C8262357FD7DC9AA4855 /* SettingsPageModel.swift */,
+				B203B203B203B203B203B203 /* SettingsPageModel+Lifecycle.swift */,
+				B204B204B204B204B204B204 /* SettingsPageModel+Mutations.swift */,
+				B205B205B205B205B205B205 /* SettingsPageModel+Presentation.swift */,
 				A206A206A206A206A206A206 /* SettingsPageSections.swift */,
 				B7B61BD243C65F84D47C5E07 /* SettingsPageView.swift */,
 			);
@@ -578,6 +613,7 @@
 					A401A401A401A401A401A401 /* RemoteServerAction.swift */,
 					A402A402A402A402A402A402 /* ProxySyncPolicy.swift */,
 					A403A403A403A403A403A403 /* ProxyRemoteSnapshotPresentationState.swift */,
+					B207B207B207B207B207B207 /* RemoteServerCardPresentation.swift */,
 					D42AE96D25E97F39B6AAB9A8 /* ProxyPageModel.swift */,
 					A404A404A404A404A404A404 /* ProxyPageModel+Lifecycle.swift */,
 					A405A405A405A405A405A405 /* ProxyPageModel+APIProxyActions.swift */,
@@ -590,8 +626,10 @@
 					A201A201A201A201A201A201 /* ProxyActionPrimitives.swift */,
 					A202A202A202A202A202A202 /* ProxyInfoPrimitives.swift */,
 				A104A104A104A104A104A104 /* ProxySectionViews.swift */,
+				B206B206B206B206B206B206 /* PublicAccessSectionPresentation.swift */,
 				0830DA51B1BE82286FA407AB /* PublicAccessSection.swift */,
 				A204A204A204A204A204A204 /* PublicAccessPrimitives.swift */,
+				B208B208B208B208B208B208 /* RemoteServerCardPrimitives.swift */,
 				A203A203A203A203A203A203 /* RemoteServerCardView.swift */,
 			);
 			path = Proxy;
@@ -642,9 +680,12 @@
 				0D1996F591AEC73ED65ED1F9 /* CommandRunnerTimeoutTests.swift */,
 				E6318743D5B32C4FA1244FAD /* LiquidProgressMetricsTests.swift */,
 					251BC10FF4D8538941CDC174 /* LocalizationConsistencyTests.swift */,
+					B210B210B210B210B210B210 /* PublicAccessSectionPresentationTests.swift */,
 					F5B56AEDF3689EA6421720B2 /* ProxyPageModelTests.swift */,
 					A10B6B54D0E14B9CB2CB0A71 /* ProxyControlBridgeTests.swift */,
+					B211B211B211B211B211B211 /* RemoteServerCardPresentationTests.swift */,
 					A108A108A108A108A108A108 /* RemoteServerConfigurationTests.swift */,
+					B209B209B209B209B209B209 /* SettingsControlPresentationTests.swift */,
 					DF11B93A2C05CC3B851D671A /* StoreFileRepositoryTests.swift */,
 				1302CF1943B5AEB08D667C6E /* SwiftNativeProxyRuntimeServiceTests.swift */,
 				C10E7339F7656FE20240B3B8 /* UsageWindowSelectorTests.swift */,
@@ -886,10 +927,13 @@
 					A302A302A302A302A302A302 /* ProxyInfoPrimitives.swift in Sources */,
 					02089089DAC781CC160D2E46 /* ProxySectionViews.swift in Sources */,
 					7CE1C8E16058C777BD2728A4 /* ProxyRuntimeLimits.swift in Sources */,
+				C206C206C206C206C206C206 /* PublicAccessSectionPresentation.swift in Sources */,
 				EC207C19839E278B3188700C /* PublicAccessSection.swift in Sources */,
 					A304A304A304A304A304A304 /* PublicAccessPrimitives.swift in Sources */,
 					D02B7B4BFDBDD89A002B4ED5 /* RemoteProxyService.swift in Sources */,
 					A501A501A501A501A501A501 /* RemoteServerAction.swift in Sources */,
+					C207C207C207C207C207C207 /* RemoteServerCardPresentation.swift in Sources */,
+					C208C208C208C208C208C208 /* RemoteServerCardPrimitives.swift in Sources */,
 					A502A502A502A502A502A502 /* ProxySyncPolicy.swift in Sources */,
 					A503A503A503A503A503A503 /* ProxyRemoteSnapshotPresentationState.swift in Sources */,
 					A303A303A303A303A303A303 /* RemoteServerCardView.swift in Sources */,
@@ -898,7 +942,12 @@
 				B375C045386BB145C4A50B01 /* RootScene.swift in Sources */,
 				4EECC683E393FA990DC947CB /* SectionCard.swift in Sources */,
 				D6B28C895504B86652D80D9B /* SettingsCoordinator.swift in Sources */,
+				C201C201C201C201C201C201 /* SettingsControlPresentation.swift in Sources */,
+				C202C202C202C202C202C202 /* SettingsControlPrimitives.swift in Sources */,
 				0291143814388B4D29DCB163 /* SettingsPageModel.swift in Sources */,
+				C203C203C203C203C203C203 /* SettingsPageModel+Lifecycle.swift in Sources */,
+				C204C204C204C204C204C204 /* SettingsPageModel+Mutations.swift in Sources */,
+				C205C205C205C205C205C205 /* SettingsPageModel+Presentation.swift in Sources */,
 				A306A306A306A306A306A306 /* SettingsPageSections.swift in Sources */,
 				F5BD595D78268D1FF9460210 /* SettingsPageView.swift in Sources */,
 				02824E5ABDF8A2C228BC1B03 /* ShellCommandRunner.swift in Sources */,
@@ -929,9 +978,12 @@
 				BAC63D41038D37A503641728 /* CommandRunnerTimeoutTests.swift in Sources */,
 					50922F8C48CF01B728AD262F /* LiquidProgressMetricsTests.swift in Sources */,
 					4353553A171096B9C9653258 /* LocalizationConsistencyTests.swift in Sources */,
+					C242C242C242C242C242C242 /* PublicAccessSectionPresentationTests.swift in Sources */,
 					98E465C8F8BAA05142221C0D /* ProxyPageModelTests.swift in Sources */,
 					C4AEB739AA9D4A84ABBB9E21 /* ProxyControlBridgeTests.swift in Sources */,
+					C243C243C243C243C243C243 /* RemoteServerCardPresentationTests.swift in Sources */,
 					137463A0132E4160501DD2AE /* RemoteServerConfigurationTests.swift in Sources */,
+				C241C241C241C241C241C241 /* SettingsControlPresentationTests.swift in Sources */,
 				137463A0132E4160501DD2AC /* StoreFileRepositoryTests.swift in Sources */,
 				634D954799F1968A5D418EA2 /* SwiftNativeProxyRuntimeServiceTests.swift in Sources */,
 				E11DCC850FA489BD46094EE0 /* UsageWindowSelectorTests.swift in Sources */,
@@ -1006,11 +1058,14 @@
 					A312A312A312A312A312A312 /* ProxyInfoPrimitives.swift in Sources */,
 					AEEEE6E52FAC04AFF97354C2 /* ProxySectionViews.swift in Sources */,
 					4C2E52A903F7EAFC222BAA3B /* ProxyRuntimeLimits.swift in Sources */,
+				C226C226C226C226C226C226 /* PublicAccessSectionPresentation.swift in Sources */,
 				F4A2F9DC97CF53F2649C2F64 /* PublicAccessSection.swift in Sources */,
 					A314A314A314A314A314A314 /* PublicAccessPrimitives.swift in Sources */,
 					D0611DC1C82F7B37B8D91041 /* PlatformClipboard.swift in Sources */,
 					17EFD9B9B9CF5294FD765876 /* RemoteProxyService.swift in Sources */,
 					A511A511A511A511A511A511 /* RemoteServerAction.swift in Sources */,
+					C227C227C227C227C227C227 /* RemoteServerCardPresentation.swift in Sources */,
+					C228C228C228C228C228C228 /* RemoteServerCardPrimitives.swift in Sources */,
 					A512A512A512A512A512A512 /* ProxySyncPolicy.swift in Sources */,
 					A513A513A513A513A513A513 /* ProxyRemoteSnapshotPresentationState.swift in Sources */,
 					A313A313A313A313A313A313 /* RemoteServerCardView.swift in Sources */,
@@ -1019,7 +1074,12 @@
 				08342AB5B372E5D6B5F1B73F /* RootScene.swift in Sources */,
 				D6276568AD61117EBF6A0BDF /* SectionCard.swift in Sources */,
 				2CA3BD709672017E7414EF48 /* SettingsCoordinator.swift in Sources */,
+				C221C221C221C221C221C221 /* SettingsControlPresentation.swift in Sources */,
+				C222C222C222C222C222C222 /* SettingsControlPrimitives.swift in Sources */,
 				67FEEA1796F9BC33A0D57CF6 /* SettingsPageModel.swift in Sources */,
+				C223C223C223C223C223C223 /* SettingsPageModel+Lifecycle.swift in Sources */,
+				C224C224C224C224C224C224 /* SettingsPageModel+Mutations.swift in Sources */,
+				C225C225C225C225C225C225 /* SettingsPageModel+Presentation.swift in Sources */,
 				A316A316A316A316A316A316 /* SettingsPageSections.swift in Sources */,
 				9BE1D9951912C722CF37BC67 /* SettingsPageView.swift in Sources */,
 				46F70E216B2D9F94247190D5 /* ShellCommandRunner.swift in Sources */,
