@@ -132,6 +132,10 @@ final class AccountsPageModel: ObservableObject {
         !isRefreshing && !refreshingAccountIDs.contains(id)
     }
 
+    func isUsageRefreshActive(forAccountID id: String) -> Bool {
+        isManualRefreshing || isRemoteUsageRefreshing || refreshingAccountIDs.contains(id)
+    }
+
     func handlePageAction(_ intent: AccountsPageActionIntent) async {
         switch intent {
         case .importCurrentAuth:

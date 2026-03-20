@@ -6,6 +6,7 @@ struct AccountCardView: View {
     let switching: Bool
     let refreshing: Bool
     let isRefreshEnabled: Bool
+    let isUsageRefreshActive: Bool
     let onSwitch: () -> Void
     let onRefresh: () -> Void
     let onDelete: () -> Void
@@ -77,7 +78,7 @@ struct AccountCardView: View {
                 switching: switching,
                 refreshing: refreshing,
                 isRefreshEnabled: isRefreshEnabled,
-                usageError: account.usageError,
+                usageError: isUsageRefreshActive ? nil : account.usageError,
                 palette: palette,
                 onSwitch: onSwitch,
                 onRefresh: onRefresh

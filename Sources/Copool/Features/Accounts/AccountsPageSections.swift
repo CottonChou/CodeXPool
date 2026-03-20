@@ -55,6 +55,7 @@ private struct AccountsGridSection: View {
                     switching: model.switchingAccountID == account.id,
                     refreshing: model.isAccountRefreshing(account.id),
                     isRefreshEnabled: model.canRefreshAccount(account.id),
+                    isUsageRefreshActive: model.isUsageRefreshActive(forAccountID: account.id),
                     areCardsPresented: areCardsPresented,
                     index: index,
                     isOverviewMode: isOverviewMode,
@@ -79,6 +80,7 @@ private struct AccountCardGridItem: View {
     let switching: Bool
     let refreshing: Bool
     let isRefreshEnabled: Bool
+    let isUsageRefreshActive: Bool
     let areCardsPresented: Bool
     let index: Int
     let isOverviewMode: Bool
@@ -93,6 +95,7 @@ private struct AccountCardGridItem: View {
             switching: switching,
             refreshing: refreshing,
             isRefreshEnabled: isRefreshEnabled,
+            isUsageRefreshActive: isUsageRefreshActive,
             onSwitch: onSwitch,
             onRefresh: onRefresh,
             onDelete: onDelete
