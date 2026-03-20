@@ -2,6 +2,36 @@ import XCTest
 @testable import Copool
 
 final class AccountsCoordinatorTests: XCTestCase {
+    func testAccountsUsageRefreshPlanningTargetsCurrentAndNearResetAccounts() {
+        let now: Int64 = 1_763_216_000
+        let policy = AccountsUsageRefreshPlanningPolicy(nonCurrentResetLeadTimeSeconds: 60)
+        let accounts = [
+            makeAccountSummary(
+                id: "acct-current",
+                accountID: "account-current",
+                isCurrent: true,
+                usage: makeUsageSnapshot(fetchedAt: now - 300, fiveHourResetAt: now + 600)
+            ),
+            makeAccountSummary(
+                id: "acct-near-reset",
+                accountID: "account-near-reset",
+                isCurrent: false,
+                usage: makeUsageSnapshot(fetchedAt: now - 300, fiveHourResetAt: now + 45)
+            ),
+            makeAccountSummary(
+                id: "acct-idle",
+                accountID: "account-idle",
+                isCurrent: false,
+                usage: makeUsageSnapshot(fetchedAt: now - 300, fiveHourResetAt: now + 600)
+            )
+        ]
+
+        XCTAssertEqual(
+            policy.targetAccountIDs(from: accounts, now: now),
+            ["acct-current", "acct-near-reset"]
+        )
+    }
+
     func testListAccountsBackfillsWorkspaceNameFromRemoteMetadata() async throws {
         let now: Int64 = 1_763_216_000
         let storeRepository = InMemoryAccountsStoreRepository(
@@ -239,6 +269,50 @@ final class AccountsCoordinatorTests: XCTestCase {
 
         _ = try await coordinator.refreshAllUsage(force: true)
         XCTAssertEqual(usageService.callCount, 1)
+    }
+
+    func testSelectiveUsageRefreshOnlyRequestsTargetAccounts() async throws {
+        let now: Int64 = 1_763_216_000
+        let store = AccountsStore(
+            version: 1,
+            accounts: [
+                makeStoredAccount(id: "acct-1", accountID: "account-1", now: now),
+                makeStoredAccount(id: "acct-2", accountID: "account-2", now: now),
+                makeStoredAccount(id: "acct-3", accountID: "account-3", now: now),
+            ],
+            currentSelection: nil,
+            settings: .defaultValue
+        )
+        let usageService = RecordingAccountUsageService(
+            results: [
+                "account-1": makeUsageSnapshot(fetchedAt: now, fiveHourResetAt: now + 300),
+                "account-2": makeUsageSnapshot(fetchedAt: now, fiveHourResetAt: now + 300),
+                "account-3": makeUsageSnapshot(fetchedAt: now, fiveHourResetAt: now + 300),
+            ]
+        )
+        let authRepository = MultiAccountAuthRepository(
+            extractedByAccountID: [
+                "account-1": makeExtractedAuth(accountID: "account-1"),
+                "account-2": makeExtractedAuth(accountID: "account-2"),
+                "account-3": makeExtractedAuth(accountID: "account-3"),
+            ],
+            currentAccountID: "account-1"
+        )
+        let coordinator = AccountsCoordinator(
+            storeRepository: InMemoryAccountsStoreRepository(store: store),
+            authRepository: authRepository,
+            usageService: usageService,
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+
+        _ = try await coordinator.refreshUsage(forAccountIDs: ["acct-1", "acct-3"], force: true)
+
+        let requestedAccountIDs = await usageService.readRequestedAccountIDs()
+        XCTAssertEqual(requestedAccountIDs, ["account-1", "account-3"])
     }
 
     func testRefreshAllUsageDoesNotClearStoredWorkspaceNameWhenAuthLacksTeamName() async throws {
@@ -651,6 +725,44 @@ final class AccountsCoordinatorTests: XCTestCase {
     }
 
     @MainActor
+    func testAccountsPageModelSkipsManualRefreshWhileBackgroundUsageRefreshIsActive() async {
+        let coordinator = AccountsCoordinator(
+            storeRepository: InMemoryAccountsStoreRepository(store: AccountsStore()),
+            authRepository: StubAuthRepository(),
+            usageService: CountingUsageService(
+                result: UsageSnapshot(
+                    fetchedAt: 1,
+                    planType: "pro",
+                    fiveHour: nil,
+                    oneWeek: nil,
+                    credits: nil
+                )
+            ),
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService()
+        )
+        let gate = ManualRefreshGate()
+        let callCounter = ManualRefreshCallCounter()
+        let model = AccountsPageModel(
+            coordinator: coordinator,
+            manualRefreshService: BlockingAccountsManualRefreshService(
+                gate: gate,
+                callCounter: callCounter,
+                onStart: {}
+            )
+        )
+        model.syncRemoteUsageRefreshActivity(isRefreshing: true)
+
+        await model.refreshUsage()
+        let callCount = await callCounter.value
+
+        XCTAssertEqual(callCount, 0)
+        await gate.open()
+    }
+
+    @MainActor
     func testAccountsPageModelLocalMutationTriggersImmediateCloudSync() async {
         let now: Int64 = 1_763_216_000
         let storeRepository = InMemoryAccountsStoreRepository(
@@ -710,6 +822,83 @@ final class AccountsCoordinatorTests: XCTestCase {
     }
 }
 
+private func makeAccountSummary(
+    id: String,
+    accountID: String,
+    isCurrent: Bool,
+    usage: UsageSnapshot?
+) -> AccountSummary {
+    AccountSummary(
+        id: id,
+        label: id,
+        email: "\(accountID)@example.com",
+        accountID: accountID,
+        planType: "pro",
+        teamName: nil,
+        teamAlias: nil,
+        addedAt: 1,
+        updatedAt: 1,
+        usage: usage,
+        usageError: nil,
+        isCurrent: isCurrent
+    )
+}
+
+private func makeStoredAccount(
+    id: String,
+    accountID: String,
+    now: Int64
+) -> StoredAccount {
+    StoredAccount(
+        id: id,
+        label: id,
+        email: "\(accountID)@example.com",
+        accountID: accountID,
+        planType: "pro",
+        teamName: nil,
+        teamAlias: nil,
+        authJSON: .object([
+            "account_id": .string(accountID)
+        ]),
+        addedAt: now,
+        updatedAt: now,
+        usage: nil,
+        usageError: nil
+    )
+}
+
+private func makeUsageSnapshot(
+    fetchedAt: Int64,
+    fiveHourResetAt: Int64? = nil,
+    oneWeekResetAt: Int64? = nil
+) -> UsageSnapshot {
+    UsageSnapshot(
+        fetchedAt: fetchedAt,
+        planType: "pro",
+        fiveHour: UsageWindow(
+            usedPercent: 10,
+            windowSeconds: 18_000,
+            resetAt: fiveHourResetAt
+        ),
+        oneWeek: UsageWindow(
+            usedPercent: 20,
+            windowSeconds: 604_800,
+            resetAt: oneWeekResetAt
+        ),
+        credits: nil
+    )
+}
+
+private func makeExtractedAuth(accountID: String) -> ExtractedAuth {
+    ExtractedAuth(
+        accountID: accountID,
+        accessToken: "token-\(accountID)",
+        email: "\(accountID)@example.com",
+        planType: "pro",
+        teamName: "workspace-\(accountID)"
+    )
+}
+
 private final class InMemoryAccountsStoreRepository: AccountsStoreRepository, @unchecked Sendable {
     private var store: AccountsStore
 
@@ -755,6 +944,28 @@ private final class AccountIDUsageService: UsageService, @unchecked Sendable {
             throw AppError.invalidData("Missing usage snapshot for \(accountID)")
         }
         return result
+    }
+}
+
+private actor RecordingAccountUsageService: UsageService {
+    private let results: [String: UsageSnapshot]
+    private(set) var requestedAccountIDs: [String] = []
+
+    init(results: [String: UsageSnapshot]) {
+        self.results = results
+    }
+
+    func fetchUsage(accessToken: String, accountID: String) async throws -> UsageSnapshot {
+        _ = accessToken
+        requestedAccountIDs.append(accountID)
+        guard let result = results[accountID] else {
+            throw AppError.invalidData("Missing usage snapshot for \(accountID)")
+        }
+        return result
+    }
+
+    func readRequestedAccountIDs() -> [String] {
+        requestedAccountIDs
     }
 }
 

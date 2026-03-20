@@ -212,50 +212,140 @@ actor AccountsCoordinator {
     }
 
     func refreshAllUsage() async throws -> [AccountSummary] {
-        try await refreshAllUsage(using: .parallel, force: false, onPartialUpdate: nil)
+        try await refreshAllUsage(
+            using: .parallel,
+            force: false,
+            targetAccountIDs: nil,
+            onPartialUpdate: nil
+        )
     }
 
     func refreshAllUsageSerially() async throws -> [AccountSummary] {
-        try await refreshAllUsage(using: .serial, force: false, onPartialUpdate: nil)
+        try await refreshAllUsage(
+            using: .serial,
+            force: false,
+            targetAccountIDs: nil,
+            onPartialUpdate: nil
+        )
     }
 
     func refreshAllUsage(force: Bool) async throws -> [AccountSummary] {
-        try await refreshAllUsage(using: .parallel, force: force, onPartialUpdate: nil)
+        try await refreshAllUsage(
+            using: .parallel,
+            force: force,
+            targetAccountIDs: nil,
+            onPartialUpdate: nil
+        )
     }
 
     func refreshAllUsageSerially(force: Bool) async throws -> [AccountSummary] {
-        try await refreshAllUsage(using: .serial, force: force, onPartialUpdate: nil)
+        try await refreshAllUsage(
+            using: .serial,
+            force: force,
+            targetAccountIDs: nil,
+            onPartialUpdate: nil
+        )
+    }
+
+    func refreshUsage(
+        forAccountIDs accountIDs: [String],
+        force: Bool
+    ) async throws -> [AccountSummary] {
+        try await refreshAllUsage(
+            using: .parallel,
+            force: force,
+            targetAccountIDs: accountIDs,
+            onPartialUpdate: nil
+        )
+    }
+
+    func refreshUsageSerially(
+        forAccountIDs accountIDs: [String],
+        force: Bool
+    ) async throws -> [AccountSummary] {
+        try await refreshAllUsage(
+            using: .serial,
+            force: force,
+            targetAccountIDs: accountIDs,
+            onPartialUpdate: nil
+        )
     }
 
     func refreshAllUsage(
         force: Bool,
         onPartialUpdate: @escaping @Sendable ([AccountSummary]) async -> Void
     ) async throws -> [AccountSummary] {
-        try await refreshAllUsage(using: .parallel, force: force, onPartialUpdate: onPartialUpdate)
+        try await refreshAllUsage(
+            using: .parallel,
+            force: force,
+            targetAccountIDs: nil,
+            onPartialUpdate: onPartialUpdate
+        )
     }
 
     func refreshAllUsageSerially(
         force: Bool,
         onPartialUpdate: @escaping @Sendable ([AccountSummary]) async -> Void
     ) async throws -> [AccountSummary] {
-        try await refreshAllUsage(using: .serial, force: force, onPartialUpdate: onPartialUpdate)
+        try await refreshAllUsage(
+            using: .serial,
+            force: force,
+            targetAccountIDs: nil,
+            onPartialUpdate: onPartialUpdate
+        )
+    }
+
+    func refreshUsage(
+        forAccountIDs accountIDs: [String],
+        force: Bool,
+        onPartialUpdate: @escaping @Sendable ([AccountSummary]) async -> Void
+    ) async throws -> [AccountSummary] {
+        try await refreshAllUsage(
+            using: .parallel,
+            force: force,
+            targetAccountIDs: accountIDs,
+            onPartialUpdate: onPartialUpdate
+        )
+    }
+
+    func refreshUsageSerially(
+        forAccountIDs accountIDs: [String],
+        force: Bool,
+        onPartialUpdate: @escaping @Sendable ([AccountSummary]) async -> Void
+    ) async throws -> [AccountSummary] {
+        try await refreshAllUsage(
+            using: .serial,
+            force: force,
+            targetAccountIDs: accountIDs,
+            onPartialUpdate: onPartialUpdate
+        )
     }
 
     private func refreshAllUsage(
         using mode: UsageRefreshExecutionMode,
         force: Bool,
+        targetAccountIDs: [String]?,
         onPartialUpdate: (@Sendable ([AccountSummary]) async -> Void)?
     ) async throws -> [AccountSummary] {
         let now = dateProvider.unixSecondsNow()
         let snapshot = try storeRepository.loadStore()
         let authRepository = self.authRepository
         let usageService = self.usageService
+        let targetIDSet = targetAccountIDs.map(Set.init)
+        let refreshTargets = snapshot.accounts.filter { account in
+            guard let targetIDSet else { return true }
+            return targetIDSet.contains(account.id)
+        }
+
+        guard !refreshTargets.isEmpty else {
+            return snapshot.accountSummaries(currentAccountID: authRepository.currentAuthAccountID())
+        }
 
         var latest = snapshot
         switch mode {
         case .parallel:
             try await withThrowingTaskGroup(of: StoredAccount.self, returning: Void.self) { group in
-                for account in snapshot.accounts {
+                for account in refreshTargets {
                     group.addTask {
                         await Self.refreshAccount(
                             account,
@@ -277,7 +367,7 @@ actor AccountsCoordinator {
                 }
             }
         case .serial:
-            for account in snapshot.accounts {
+            for account in refreshTargets {
                 let refreshed = await Self.refreshAccount(
                     account,
                     now: now,

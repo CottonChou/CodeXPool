@@ -2,7 +2,7 @@ import Foundation
 
 extension AccountsPageModel {
     func refreshUsage() async {
-        guard !isManualRefreshing else { return }
+        guard !isRefreshing else { return }
         isManualRefreshing = true
         defer { isManualRefreshing = false }
 
