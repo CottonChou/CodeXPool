@@ -140,65 +140,53 @@ struct PublicAccessSection: View {
             columns: [GridItem(.adaptive(minimum: LayoutRules.proxyPublicFieldMinWidth), spacing: 10)],
             spacing: 10
         ) {
-            labeledField(
-                title: L10n.tr("proxy.public.field.api_token"),
-                content: {
-                    SecureField(
-                        L10n.tr("proxy.public.field.api_token_placeholder"),
-                        text: Binding(
-                            get: { model.cloudflaredNamedInput.apiToken },
-                            set: { model.cloudflaredNamedInput.apiToken = $0 }
-                        )
+            ProxyFieldGroup(title: L10n.tr("proxy.public.field.api_token")) {
+                SecureField(
+                    L10n.tr("proxy.public.field.api_token_placeholder"),
+                    text: Binding(
+                        get: { model.cloudflaredNamedInput.apiToken },
+                        set: { model.cloudflaredNamedInput.apiToken = $0 }
                     )
-                    .frostedRoundedInput()
-                    .disabled(!model.canEditCloudflaredInput)
-                }
-            )
+                )
+                .frostedRoundedInput()
+                .disabled(!model.canEditCloudflaredInput)
+            }
 
-            labeledField(
-                title: L10n.tr("proxy.public.field.account_id"),
-                content: {
-                    TextField(
-                        L10n.tr("proxy.public.field.account_id_placeholder"),
-                        text: Binding(
-                            get: { model.cloudflaredNamedInput.accountID },
-                            set: { model.cloudflaredNamedInput.accountID = $0 }
-                        )
+            ProxyFieldGroup(title: L10n.tr("proxy.public.field.account_id")) {
+                TextField(
+                    L10n.tr("proxy.public.field.account_id_placeholder"),
+                    text: Binding(
+                        get: { model.cloudflaredNamedInput.accountID },
+                        set: { model.cloudflaredNamedInput.accountID = $0 }
                     )
-                    .frostedRoundedInput()
-                    .disabled(!model.canEditCloudflaredInput)
-                }
-            )
+                )
+                .frostedRoundedInput()
+                .disabled(!model.canEditCloudflaredInput)
+            }
 
-            labeledField(
-                title: L10n.tr("proxy.public.field.zone_id"),
-                content: {
-                    TextField(
-                        L10n.tr("proxy.public.field.zone_id_placeholder"),
-                        text: Binding(
-                            get: { model.cloudflaredNamedInput.zoneID },
-                            set: { model.cloudflaredNamedInput.zoneID = $0 }
-                        )
+            ProxyFieldGroup(title: L10n.tr("proxy.public.field.zone_id")) {
+                TextField(
+                    L10n.tr("proxy.public.field.zone_id_placeholder"),
+                    text: Binding(
+                        get: { model.cloudflaredNamedInput.zoneID },
+                        set: { model.cloudflaredNamedInput.zoneID = $0 }
                     )
-                    .frostedRoundedInput()
-                    .disabled(!model.canEditCloudflaredInput)
-                }
-            )
+                )
+                .frostedRoundedInput()
+                .disabled(!model.canEditCloudflaredInput)
+            }
 
-            labeledField(
-                title: L10n.tr("proxy.public.field.hostname"),
-                content: {
-                    TextField(
-                        L10n.tr("proxy.public.field.hostname_placeholder"),
-                        text: Binding(
-                            get: { model.cloudflaredNamedInput.hostname },
-                            set: { model.updateCloudflaredNamedHostname($0) }
-                        )
+            ProxyFieldGroup(title: L10n.tr("proxy.public.field.hostname")) {
+                TextField(
+                    L10n.tr("proxy.public.field.hostname_placeholder"),
+                    text: Binding(
+                        get: { model.cloudflaredNamedInput.hostname },
+                        set: { model.updateCloudflaredNamedHostname($0) }
                     )
-                    .frostedRoundedInput()
-                    .disabled(!model.canEditCloudflaredInput)
-                }
-            )
+                )
+                .frostedRoundedInput()
+                .disabled(!model.canEditCloudflaredInput)
+            }
         }
     }
 
@@ -242,33 +230,45 @@ struct PublicAccessSection: View {
 
     private var statusGrid: some View {
         LazyVStack(spacing: 10) {
-            PublicAccessInfoCard(
+            ProxyInfoCard(
                 title: L10n.tr("proxy.public.status_title"),
                 headline: model.cloudflaredStatus.running ? L10n.tr("proxy.status.running") : L10n.tr("proxy.status.stopped"),
-                message: model.cloudflaredStatus.running
+                detailText: model.cloudflaredStatus.running
                     ? L10n.tr("proxy.public.status_running_message")
-                    : L10n.tr("proxy.public.status_stopped_message")
+                    : L10n.tr("proxy.public.status_stopped_message"),
+                headlineFont: .title3.weight(.semibold),
+                detailFont: .subheadline,
+                headlineLineLimit: 2
             )
 
-            PublicAccessInfoCard(
+            ProxyInfoCard(
                 title: L10n.tr("proxy.public.url_title"),
                 headline: model.cloudflaredStatus.publicURL ?? L10n.tr("proxy.value.generated_after_start"),
-                message: "",
-                canCopy: model.cloudflaredStatus.publicURL != nil
+                detailText: "",
+                headlineFont: .title3.weight(.semibold),
+                headlineLineLimit: 2,
+                headlineTruncationMode: .middle,
+                canCopy: model.cloudflaredStatus.publicURL != nil,
+                allowsTextSelection: true
             ) {
                 onCopy(model.cloudflaredStatus.publicURL)
             }
 
-            PublicAccessInfoCard(
+            ProxyInfoCard(
                 title: L10n.tr("proxy.public.install_path_title"),
                 headline: model.cloudflaredStatus.binaryPath ?? L10n.tr("proxy.public.not_detected"),
-                message: ""
+                detailText: "",
+                headlineFont: .title3.weight(.semibold),
+                headlineLineLimit: 2,
+                headlineTruncationMode: .middle
             )
 
-            PublicAccessInfoCard(
+            ProxyInfoCard(
                 title: L10n.tr("proxy.detail.last_error"),
                 headline: model.cloudflaredStatus.lastError ?? L10n.tr("common.none"),
-                message: ""
+                detailText: "",
+                headlineFont: .title3.weight(.semibold),
+                headlineLineLimit: 2
             )
         }
     }
@@ -282,115 +282,6 @@ struct PublicAccessSection: View {
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .cardSurface(cornerRadius: 12)
-    }
-
-    private func labeledField<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
-            content()
-        }
-    }
-}
-
-private struct PublicAccessSwitchPill: View {
-    @Binding var isOn: Bool
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Toggle("", isOn: $isOn)
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .controlSize(.small)
-            Text(isOn ? L10n.tr("proxy.switch.on") : L10n.tr("proxy.switch.off"))
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .frostedCapsuleSurface(prominent: isOn, tint: isOn ? .accentColor : nil)
-    }
-}
-
-private struct PublicAccessModeCard: View {
-    let kicker: String
-    let title: String
-    let message: String
-    let selected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(kicker)
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.secondary)
-                Text(title)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.primary)
-                Text(message)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.leading)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .padding(12)
-            .glassSelectableCard(selected: selected, cornerRadius: 12)
-        }
-        .buttonStyle(.plain)
-        .background {
-            GeometryReader { proxy in
-                Color.clear
-                    .preference(key: PublicAccessModeCardHeightKey.self, value: proxy.size.height)
-            }
-        }
-    }
-}
-
-private struct PublicAccessModeCardHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = max(value, nextValue())
-    }
-}
-
-private struct PublicAccessInfoCard: View {
-    let title: String
-    let headline: String
-    let message: String
-    var canCopy: Bool = false
-    var onCopy: (() -> Void)?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(title)
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                Spacer(minLength: 0)
-                if let onCopy {
-                    Button("common.copy", action: onCopy)
-                        .liquidGlassActionButtonStyle()
-                        .disabled(!canCopy)
-                }
-            }
-            Text(headline)
-                .font(.title3.weight(.semibold))
-                .lineLimit(2)
-                .truncationMode(.middle)
-                .textSelection(.enabled)
-            if !message.isEmpty {
-                Text(message)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
         .padding(12)
         .cardSurface(cornerRadius: 12)
     }
