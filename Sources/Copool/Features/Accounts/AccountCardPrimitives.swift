@@ -4,14 +4,8 @@ private enum AccountCardOverlayLayout {
     static let actionReservationWidth: CGFloat = 144
 }
 
-@MainActor
 enum AccountCardMorphRules {
     static let animation = Animation.spring(response: 0.34, dampingFraction: 0.84)
-    static let sectionTransition = AnyTransition.asymmetric(
-        insertion: .opacity.combined(with: .scale(scale: 0.98, anchor: .top)),
-        removal: .opacity.combined(with: .scale(scale: 0.98, anchor: .top))
-    )
-    static let overlayTransition = AnyTransition.move(edge: .bottom).combined(with: .opacity)
 }
 
 enum AccountCardSwitchButtonLabelStyle {
@@ -139,23 +133,6 @@ struct AccountCardCompactUsageSection: View {
     }
 }
 
-struct AccountCardUsageContent: View {
-    let presentation: AccountCardPresentation
-    let isCollapsed: Bool
-
-    var body: some View {
-        Group {
-            if isCollapsed {
-                AccountCardCompactUsageSection(presentation: presentation)
-                    .transition(AccountCardMorphRules.sectionTransition)
-            } else {
-                AccountCardExpandedUsageSection(presentation: presentation)
-                    .transition(AccountCardMorphRules.sectionTransition)
-            }
-        }
-    }
-}
-
 struct AccountCardBottomOverlay: View {
     let isCollapsed: Bool
     let isCurrent: Bool
@@ -188,7 +165,6 @@ struct AccountCardBottomOverlay: View {
                 )
             }
             .padding(8)
-            .transition(AccountCardMorphRules.overlayTransition)
         }
     }
 }
