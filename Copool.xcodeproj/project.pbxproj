@@ -8,11 +8,21 @@
 
 /* Begin PBXBuildFile section */
 		019AD726EBC45FE0E21B4AAF /* FileSystemPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D518BC8C9103B4FD9C16B27 /* FileSystemPaths.swift */; };
-		02089089DAC781CC160D2E45 /* ProxyPageModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D42AE96D25E97F39B6AAB9A8 /* ProxyPageModel.swift */; };
-		02089089DAC781CC160D2E46 /* ProxySectionViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A104A104A104A104A104A104 /* ProxySectionViews.swift */; };
-		0282389FA63950E67A52EB08 /* JSONValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5000155760C69A6117DF5E08 /* JSONValue.swift */; };
-		A301A301A301A301A301A301 /* ProxyActionPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = A201A201A201A201A201A201 /* ProxyActionPrimitives.swift */; };
-		A302A302A302A302A302A302 /* ProxyInfoPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = A202A202A202A202A202A202 /* ProxyInfoPrimitives.swift */; };
+			02089089DAC781CC160D2E45 /* ProxyPageModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D42AE96D25E97F39B6AAB9A8 /* ProxyPageModel.swift */; };
+			02089089DAC781CC160D2E46 /* ProxySectionViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A104A104A104A104A104A104 /* ProxySectionViews.swift */; };
+			0282389FA63950E67A52EB08 /* JSONValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5000155760C69A6117DF5E08 /* JSONValue.swift */; };
+			A501A501A501A501A501A501 /* RemoteServerAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = A401A401A401A401A401A401 /* RemoteServerAction.swift */; };
+			A502A502A502A502A502A502 /* ProxySyncPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A402A402A402A402A402A402 /* ProxySyncPolicy.swift */; };
+			A503A503A503A503A503A503 /* ProxyRemoteSnapshotPresentationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A403A403A403A403A403A403 /* ProxyRemoteSnapshotPresentationState.swift */; };
+			A504A504A504A504A504A504 /* ProxyPageModel+Lifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A404A404A404A404A404A404 /* ProxyPageModel+Lifecycle.swift */; };
+			A505A505A505A505A505A505 /* ProxyPageModel+APIProxyActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A405A405A405A405A405A405 /* ProxyPageModel+APIProxyActions.swift */; };
+			A506A506A506A506A506A506 /* ProxyPageModel+PublicAccessActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A406A406A406A406A406A406 /* ProxyPageModel+PublicAccessActions.swift */; };
+			A507A507A507A507A507A507 /* ProxyPageModel+ProxyConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A407A407A407A407A407A407 /* ProxyPageModel+ProxyConfiguration.swift */; };
+			A508A508A508A508A508A508 /* ProxyPageModel+RemoteServerActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A408A408A408A408A408A408 /* ProxyPageModel+RemoteServerActions.swift */; };
+			A509A509A509A509A509A509 /* ProxyPageModel+RemoteSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = A409A409A409A409A409A409 /* ProxyPageModel+RemoteSync.swift */; };
+			A510A510A510A510A510A510 /* ProxyPageModel+CommandExecution.swift in Sources */ = {isa = PBXBuildFile; fileRef = A410A410A410A410A410A410 /* ProxyPageModel+CommandExecution.swift */; };
+			A301A301A301A301A301A301 /* ProxyActionPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = A201A201A201A201A201A201 /* ProxyActionPrimitives.swift */; };
+			A302A302A302A302A302A302 /* ProxyInfoPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = A202A202A202A202A202A202 /* ProxyInfoPrimitives.swift */; };
 		A303A303A303A303A303A303 /* RemoteServerCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A203A203A203A203A203A203 /* RemoteServerCardView.swift */; };
 		A304A304A304A304A304A304 /* PublicAccessPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = A204A204A204A204A204A204 /* PublicAccessPrimitives.swift */; };
 		A305A305A305A305A305A305 /* AccountsPageShells.swift in Sources */ = {isa = PBXBuildFile; fileRef = A205A205A205A205A205A205 /* AccountsPageShells.swift */; };
@@ -78,13 +88,23 @@
 		683DA0BB33E165DCFEFE8633 /* OpencodeAuthSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB56BDF9685A258D5CD4C18A /* OpencodeAuthSyncService.swift */; };
 		68A1228957522AF14BEF1006 /* utils.rs in Resources */ = {isa = PBXBuildFile; fileRef = 6190BE90C3A6928AE092B876 /* utils.rs */; };
 		6A3D57247F2D38163A35CBC0 /* L10n.swift in Sources */ = {isa = PBXBuildFile; fileRef = 315E6E562A9376AB6D34B744 /* L10n.swift */; };
-		A311A311A311A311A311A311 /* ProxyActionPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = A201A201A201A201A201A201 /* ProxyActionPrimitives.swift */; };
-		A312A312A312A312A312A312 /* ProxyInfoPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = A202A202A202A202A202A202 /* ProxyInfoPrimitives.swift */; };
-		A313A313A313A313A313A313 /* RemoteServerCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A203A203A203A203A203A203 /* RemoteServerCardView.swift */; };
-		A314A314A314A314A314A314 /* PublicAccessPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = A204A204A204A204A204A204 /* PublicAccessPrimitives.swift */; };
-		A315A315A315A315A315A315 /* AccountsPageShells.swift in Sources */ = {isa = PBXBuildFile; fileRef = A205A205A205A205A205A205 /* AccountsPageShells.swift */; };
-		A316A316A316A316A316A316 /* SettingsPageSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = A206A206A206A206A206A206 /* SettingsPageSections.swift */; };
-		6DE41EF6F476912C967CF60D /* ViewState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C36FDB8D2542926806D5B265 /* ViewState.swift */; };
+			A311A311A311A311A311A311 /* ProxyActionPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = A201A201A201A201A201A201 /* ProxyActionPrimitives.swift */; };
+			A312A312A312A312A312A312 /* ProxyInfoPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = A202A202A202A202A202A202 /* ProxyInfoPrimitives.swift */; };
+			A313A313A313A313A313A313 /* RemoteServerCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A203A203A203A203A203A203 /* RemoteServerCardView.swift */; };
+			A314A314A314A314A314A314 /* PublicAccessPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = A204A204A204A204A204A204 /* PublicAccessPrimitives.swift */; };
+			A315A315A315A315A315A315 /* AccountsPageShells.swift in Sources */ = {isa = PBXBuildFile; fileRef = A205A205A205A205A205A205 /* AccountsPageShells.swift */; };
+			A316A316A316A316A316A316 /* SettingsPageSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = A206A206A206A206A206A206 /* SettingsPageSections.swift */; };
+			A511A511A511A511A511A511 /* RemoteServerAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = A401A401A401A401A401A401 /* RemoteServerAction.swift */; };
+			A512A512A512A512A512A512 /* ProxySyncPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A402A402A402A402A402A402 /* ProxySyncPolicy.swift */; };
+			A513A513A513A513A513A513 /* ProxyRemoteSnapshotPresentationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A403A403A403A403A403A403 /* ProxyRemoteSnapshotPresentationState.swift */; };
+			A514A514A514A514A514A514 /* ProxyPageModel+Lifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A404A404A404A404A404A404 /* ProxyPageModel+Lifecycle.swift */; };
+			A515A515A515A515A515A515 /* ProxyPageModel+APIProxyActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A405A405A405A405A405A405 /* ProxyPageModel+APIProxyActions.swift */; };
+			A516A516A516A516A516A516 /* ProxyPageModel+PublicAccessActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A406A406A406A406A406A406 /* ProxyPageModel+PublicAccessActions.swift */; };
+			A517A517A517A517A517A517 /* ProxyPageModel+ProxyConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A407A407A407A407A407A407 /* ProxyPageModel+ProxyConfiguration.swift */; };
+			A518A518A518A518A518A518 /* ProxyPageModel+RemoteServerActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A408A408A408A408A408A408 /* ProxyPageModel+RemoteServerActions.swift */; };
+			A519A519A519A519A519A519 /* ProxyPageModel+RemoteSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = A409A409A409A409A409A409 /* ProxyPageModel+RemoteSync.swift */; };
+			A520A520A520A520A520A520 /* ProxyPageModel+CommandExecution.swift in Sources */ = {isa = PBXBuildFile; fileRef = A410A410A410A410A410A410 /* ProxyPageModel+CommandExecution.swift */; };
+			6DE41EF6F476912C967CF60D /* ViewState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C36FDB8D2542926806D5B265 /* ViewState.swift */; };
 		70D4D043779E579444C91021 /* SimpleHTTPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E9DBE99B4528C42CED746B8 /* SimpleHTTPServer.swift */; };
 		75C5CBC7206160F013685830 /* GitHubUpdateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E875E904D3ADACBDBF66C1D /* GitHubUpdateService.swift */; };
 		7614A610947D7CB86C7CDF9C /* SimpleHTTPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E9DBE99B4528C42CED746B8 /* SimpleHTTPServer.swift */; };
@@ -260,13 +280,23 @@
 		A104A104A104A104A104A104 /* ProxySectionViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxySectionViews.swift; sourceTree = "<group>"; };
 		A105A105A105A105A105A105 /* PlatformClipboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformClipboard.swift; sourceTree = "<group>"; };
 		A106A106A106A106A106A106 /* RemoteServerConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteServerConfiguration.swift; sourceTree = "<group>"; };
-		A201A201A201A201A201A201 /* ProxyActionPrimitives.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyActionPrimitives.swift; sourceTree = "<group>"; };
-		A202A202A202A202A202A202 /* ProxyInfoPrimitives.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyInfoPrimitives.swift; sourceTree = "<group>"; };
-		A203A203A203A203A203A203 /* RemoteServerCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteServerCardView.swift; sourceTree = "<group>"; };
-		A204A204A204A204A204A204 /* PublicAccessPrimitives.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublicAccessPrimitives.swift; sourceTree = "<group>"; };
-		A205A205A205A205A205A205 /* AccountsPageShells.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsPageShells.swift; sourceTree = "<group>"; };
-		A206A206A206A206A206A206 /* SettingsPageSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPageSections.swift; sourceTree = "<group>"; };
-		A107A107A107A107A107A107 /* AccountCardPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountCardPresentationTests.swift; sourceTree = "<group>"; };
+			A201A201A201A201A201A201 /* ProxyActionPrimitives.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyActionPrimitives.swift; sourceTree = "<group>"; };
+			A202A202A202A202A202A202 /* ProxyInfoPrimitives.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyInfoPrimitives.swift; sourceTree = "<group>"; };
+			A203A203A203A203A203A203 /* RemoteServerCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteServerCardView.swift; sourceTree = "<group>"; };
+			A204A204A204A204A204A204 /* PublicAccessPrimitives.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublicAccessPrimitives.swift; sourceTree = "<group>"; };
+			A205A205A205A205A205A205 /* AccountsPageShells.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsPageShells.swift; sourceTree = "<group>"; };
+			A206A206A206A206A206A206 /* SettingsPageSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPageSections.swift; sourceTree = "<group>"; };
+			A401A401A401A401A401A401 /* RemoteServerAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteServerAction.swift; sourceTree = "<group>"; };
+			A402A402A402A402A402A402 /* ProxySyncPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxySyncPolicy.swift; sourceTree = "<group>"; };
+			A403A403A403A403A403A403 /* ProxyRemoteSnapshotPresentationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyRemoteSnapshotPresentationState.swift; sourceTree = "<group>"; };
+			A404A404A404A404A404A404 /* ProxyPageModel+Lifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProxyPageModel+Lifecycle.swift"; sourceTree = "<group>"; };
+			A405A405A405A405A405A405 /* ProxyPageModel+APIProxyActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProxyPageModel+APIProxyActions.swift"; sourceTree = "<group>"; };
+			A406A406A406A406A406A406 /* ProxyPageModel+PublicAccessActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProxyPageModel+PublicAccessActions.swift"; sourceTree = "<group>"; };
+			A407A407A407A407A407A407 /* ProxyPageModel+ProxyConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProxyPageModel+ProxyConfiguration.swift"; sourceTree = "<group>"; };
+			A408A408A408A408A408A408 /* ProxyPageModel+RemoteServerActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProxyPageModel+RemoteServerActions.swift"; sourceTree = "<group>"; };
+			A409A409A409A409A409A409 /* ProxyPageModel+RemoteSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProxyPageModel+RemoteSync.swift"; sourceTree = "<group>"; };
+			A410A410A410A410A410A410 /* ProxyPageModel+CommandExecution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProxyPageModel+CommandExecution.swift"; sourceTree = "<group>"; };
+			A107A107A107A107A107A107 /* AccountCardPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountCardPresentationTests.swift; sourceTree = "<group>"; };
 			A108A108A108A108A108A108 /* RemoteServerConfigurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteServerConfigurationTests.swift; sourceTree = "<group>"; };
 			A10B6B54D0E14B9CB2CB0A71 /* ProxyControlBridgeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyControlBridgeTests.swift; sourceTree = "<group>"; };
 			A146C7576AB39EFCD658BFED /* AppLocaleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLocaleTests.swift; sourceTree = "<group>"; };
@@ -498,13 +528,23 @@
 			path = Tests;
 			sourceTree = "<group>";
 		};
-		8495462C524B0C9B515D2F1A /* Proxy */ = {
-			isa = PBXGroup;
-			children = (
-				D42AE96D25E97F39B6AAB9A8 /* ProxyPageModel.swift */,
-				D3AE6ECBCE990356DEB5BBE0 /* ProxyPageView.swift */,
-				A201A201A201A201A201A201 /* ProxyActionPrimitives.swift */,
-				A202A202A202A202A202A202 /* ProxyInfoPrimitives.swift */,
+			8495462C524B0C9B515D2F1A /* Proxy */ = {
+				isa = PBXGroup;
+				children = (
+					A401A401A401A401A401A401 /* RemoteServerAction.swift */,
+					A402A402A402A402A402A402 /* ProxySyncPolicy.swift */,
+					A403A403A403A403A403A403 /* ProxyRemoteSnapshotPresentationState.swift */,
+					D42AE96D25E97F39B6AAB9A8 /* ProxyPageModel.swift */,
+					A404A404A404A404A404A404 /* ProxyPageModel+Lifecycle.swift */,
+					A405A405A405A405A405A405 /* ProxyPageModel+APIProxyActions.swift */,
+					A406A406A406A406A406A406 /* ProxyPageModel+PublicAccessActions.swift */,
+					A407A407A407A407A407A407 /* ProxyPageModel+ProxyConfiguration.swift */,
+					A408A408A408A408A408A408 /* ProxyPageModel+RemoteServerActions.swift */,
+					A409A409A409A409A409A409 /* ProxyPageModel+RemoteSync.swift */,
+					A410A410A410A410A410A410 /* ProxyPageModel+CommandExecution.swift */,
+					D3AE6ECBCE990356DEB5BBE0 /* ProxyPageView.swift */,
+					A201A201A201A201A201A201 /* ProxyActionPrimitives.swift */,
+					A202A202A202A202A202A202 /* ProxyInfoPrimitives.swift */,
 				A104A104A104A104A104A104 /* ProxySectionViews.swift */,
 				0830DA51B1BE82286FA407AB /* PublicAccessSection.swift */,
 				A204A204A204A204A204A204 /* PublicAccessPrimitives.swift */,
@@ -775,20 +815,30 @@
 				54F5A32512F8226641F0655F /* PlatformClipboard.swift in Sources */,
 				881BE1D789DA6FB779A0BDD7 /* PlatformCapabilities.swift in Sources */,
 				183F30DA3314F21DE014B4DA /* Protocols.swift in Sources */,
-				2261720D489C2F04D3AF5EFE /* ProxyControlBridge.swift in Sources */,
-				18828CB243BB1936642EF79E /* ProxyCoordinator.swift in Sources */,
-				02089089DAC781CC160D2E45 /* ProxyPageModel.swift in Sources */,
-				D022FDC1F72C2FEE9B5078C8 /* ProxyPageView.swift in Sources */,
-				A301A301A301A301A301A301 /* ProxyActionPrimitives.swift in Sources */,
-				A302A302A302A302A302A302 /* ProxyInfoPrimitives.swift in Sources */,
-				02089089DAC781CC160D2E46 /* ProxySectionViews.swift in Sources */,
-				7CE1C8E16058C777BD2728A4 /* ProxyRuntimeLimits.swift in Sources */,
+					2261720D489C2F04D3AF5EFE /* ProxyControlBridge.swift in Sources */,
+					18828CB243BB1936642EF79E /* ProxyCoordinator.swift in Sources */,
+					02089089DAC781CC160D2E45 /* ProxyPageModel.swift in Sources */,
+					A504A504A504A504A504A504 /* ProxyPageModel+Lifecycle.swift in Sources */,
+					A505A505A505A505A505A505 /* ProxyPageModel+APIProxyActions.swift in Sources */,
+					A506A506A506A506A506A506 /* ProxyPageModel+PublicAccessActions.swift in Sources */,
+					A507A507A507A507A507A507 /* ProxyPageModel+ProxyConfiguration.swift in Sources */,
+					A508A508A508A508A508A508 /* ProxyPageModel+RemoteServerActions.swift in Sources */,
+					A509A509A509A509A509A509 /* ProxyPageModel+RemoteSync.swift in Sources */,
+					A510A510A510A510A510A510 /* ProxyPageModel+CommandExecution.swift in Sources */,
+					D022FDC1F72C2FEE9B5078C8 /* ProxyPageView.swift in Sources */,
+					A301A301A301A301A301A301 /* ProxyActionPrimitives.swift in Sources */,
+					A302A302A302A302A302A302 /* ProxyInfoPrimitives.swift in Sources */,
+					02089089DAC781CC160D2E46 /* ProxySectionViews.swift in Sources */,
+					7CE1C8E16058C777BD2728A4 /* ProxyRuntimeLimits.swift in Sources */,
 				EC207C19839E278B3188700C /* PublicAccessSection.swift in Sources */,
-				A304A304A304A304A304A304 /* PublicAccessPrimitives.swift in Sources */,
-				D02B7B4BFDBDD89A002B4ED5 /* RemoteProxyService.swift in Sources */,
-				A303A303A303A303A303A303 /* RemoteServerCardView.swift in Sources */,
-				F0DC036F3F4710EFF791B713 /* RemoteServerConfiguration.swift in Sources */,
-				85C3AD5A91637E8A844AF88A /* RepositoryLocator.swift in Sources */,
+					A304A304A304A304A304A304 /* PublicAccessPrimitives.swift in Sources */,
+					D02B7B4BFDBDD89A002B4ED5 /* RemoteProxyService.swift in Sources */,
+					A501A501A501A501A501A501 /* RemoteServerAction.swift in Sources */,
+					A502A502A502A502A502A502 /* ProxySyncPolicy.swift in Sources */,
+					A503A503A503A503A503A503 /* ProxyRemoteSnapshotPresentationState.swift in Sources */,
+					A303A303A303A303A303A303 /* RemoteServerCardView.swift in Sources */,
+					F0DC036F3F4710EFF791B713 /* RemoteServerConfiguration.swift in Sources */,
+					85C3AD5A91637E8A844AF88A /* RepositoryLocator.swift in Sources */,
 				B375C045386BB145C4A50B01 /* RootScene.swift in Sources */,
 				4EECC683E393FA990DC947CB /* SectionCard.swift in Sources */,
 				D6B28C895504B86652D80D9B /* SettingsCoordinator.swift in Sources */,
@@ -873,20 +923,30 @@
 				683DA0BB33E165DCFEFE8633 /* OpencodeAuthSyncService.swift in Sources */,
 				BA5B276B09B95CA7284CDFA2 /* PlatformCapabilities.swift in Sources */,
 				7F539ED7076B2EA02CB6788C /* Protocols.swift in Sources */,
-				24AFC15BDC3390134F86990A /* ProxyControlBridge.swift in Sources */,
-				1FF5A858AFC00A862295F943 /* ProxyCoordinator.swift in Sources */,
-				AEEEE6E52FAC04AFF97354C1 /* ProxyPageModel.swift in Sources */,
-				D0611DC1C82F7B37B8D91040 /* ProxyPageView.swift in Sources */,
-				A311A311A311A311A311A311 /* ProxyActionPrimitives.swift in Sources */,
-				A312A312A312A312A312A312 /* ProxyInfoPrimitives.swift in Sources */,
-				AEEEE6E52FAC04AFF97354C2 /* ProxySectionViews.swift in Sources */,
-				4C2E52A903F7EAFC222BAA3B /* ProxyRuntimeLimits.swift in Sources */,
+					24AFC15BDC3390134F86990A /* ProxyControlBridge.swift in Sources */,
+					1FF5A858AFC00A862295F943 /* ProxyCoordinator.swift in Sources */,
+					AEEEE6E52FAC04AFF97354C1 /* ProxyPageModel.swift in Sources */,
+					A514A514A514A514A514A514 /* ProxyPageModel+Lifecycle.swift in Sources */,
+					A515A515A515A515A515A515 /* ProxyPageModel+APIProxyActions.swift in Sources */,
+					A516A516A516A516A516A516 /* ProxyPageModel+PublicAccessActions.swift in Sources */,
+					A517A517A517A517A517A517 /* ProxyPageModel+ProxyConfiguration.swift in Sources */,
+					A518A518A518A518A518A518 /* ProxyPageModel+RemoteServerActions.swift in Sources */,
+					A519A519A519A519A519A519 /* ProxyPageModel+RemoteSync.swift in Sources */,
+					A520A520A520A520A520A520 /* ProxyPageModel+CommandExecution.swift in Sources */,
+					D0611DC1C82F7B37B8D91040 /* ProxyPageView.swift in Sources */,
+					A311A311A311A311A311A311 /* ProxyActionPrimitives.swift in Sources */,
+					A312A312A312A312A312A312 /* ProxyInfoPrimitives.swift in Sources */,
+					AEEEE6E52FAC04AFF97354C2 /* ProxySectionViews.swift in Sources */,
+					4C2E52A903F7EAFC222BAA3B /* ProxyRuntimeLimits.swift in Sources */,
 				F4A2F9DC97CF53F2649C2F64 /* PublicAccessSection.swift in Sources */,
-				A314A314A314A314A314A314 /* PublicAccessPrimitives.swift in Sources */,
-				D0611DC1C82F7B37B8D91041 /* PlatformClipboard.swift in Sources */,
-				17EFD9B9B9CF5294FD765876 /* RemoteProxyService.swift in Sources */,
-				A313A313A313A313A313A313 /* RemoteServerCardView.swift in Sources */,
-				24AFC15BDC3390134F86990B /* RemoteServerConfiguration.swift in Sources */,
+					A314A314A314A314A314A314 /* PublicAccessPrimitives.swift in Sources */,
+					D0611DC1C82F7B37B8D91041 /* PlatformClipboard.swift in Sources */,
+					17EFD9B9B9CF5294FD765876 /* RemoteProxyService.swift in Sources */,
+					A511A511A511A511A511A511 /* RemoteServerAction.swift in Sources */,
+					A512A512A512A512A512A512 /* ProxySyncPolicy.swift in Sources */,
+					A513A513A513A513A513A513 /* ProxyRemoteSnapshotPresentationState.swift in Sources */,
+					A313A313A313A313A313A313 /* RemoteServerCardView.swift in Sources */,
+					24AFC15BDC3390134F86990B /* RemoteServerConfiguration.swift in Sources */,
 				82928E59A44DB5D0A6436A47 /* RepositoryLocator.swift in Sources */,
 				08342AB5B372E5D6B5F1B73F /* RootScene.swift in Sources */,
 				D6276568AD61117EBF6A0BDF /* SectionCard.swift in Sources */,
