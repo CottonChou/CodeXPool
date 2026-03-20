@@ -87,6 +87,42 @@ final class ProxyPageModelTests: XCTestCase {
         XCTAssertEqual(model.remoteStatuses, updatedSnapshot.remoteStatuses)
     }
 
+    func testMacOSModelAppliesLocalSnapshotBroadcastWithoutPageReload() async throws {
+        let model = makeModel(runtimePlatform: .macOS)
+        let runningSnapshot = makeSnapshot()
+        XCTAssertTrue(model.applyRemoteSnapshot(runningSnapshot))
+        XCTAssertTrue(model.publicAccessEnabled)
+        XCTAssertTrue(model.cloudflaredStatus.running)
+
+        var stoppedSnapshot = runningSnapshot
+        stoppedSnapshot.syncedAt += 1_000
+        stoppedSnapshot.cloudflaredStatus.running = false
+        stoppedSnapshot.cloudflaredStatus.publicURL = nil
+        stoppedSnapshot.publicAccessEnabled = false
+
+        NotificationCenter.default.post(
+            name: .copoolLocalProxySnapshotDidUpdate,
+            object: nil,
+            userInfo: [ProxyControlNotificationPayloadKey.snapshot: stoppedSnapshot]
+        )
+        try? await Task.sleep(for: .milliseconds(50))
+
+        XCTAssertFalse(model.publicAccessEnabled)
+        XCTAssertFalse(model.cloudflaredStatus.running)
+    }
+
+    func testRefreshForTabEntryDerivesPublicAccessFromCloudflaredStatus() async {
+        let model = makeModel(
+            cloudflaredService: StubCloudflaredService(statusValue: .idle),
+            runtimePlatform: .macOS
+        )
+        model.publicAccessEnabled = true
+
+        await model.refreshForTabEntry()
+
+        XCTAssertFalse(model.publicAccessEnabled)
+    }
+
     func testLocalStartProxyUsesLocalCommandServiceForImmediateSync() async {
         let snapshot = makeSnapshot()
         let localCommandService = SpyProxyLocalCommandService(snapshot: snapshot)
@@ -103,11 +139,12 @@ final class ProxyPageModelTests: XCTestCase {
     private func makeModel(
         proxyControlCloudSyncService: ProxyControlCloudSyncServiceProtocol? = nil,
         localProxyCommandService: ProxyLocalCommandServiceProtocol? = nil,
+        cloudflaredService: CloudflaredServiceProtocol = StubCloudflaredService(),
         runtimePlatform: RuntimePlatform = .macOS
     ) -> ProxyPageModel {
         let proxyCoordinator = ProxyCoordinator(
             proxyService: StubProxyRuntimeService(),
-            cloudflaredService: StubCloudflaredService(),
+            cloudflaredService: cloudflaredService,
             remoteService: StubRemoteProxyService()
         )
         let settingsCoordinator = SettingsCoordinator(
@@ -310,13 +347,15 @@ private struct StubProxyRuntimeService: ProxyRuntimeService {
 }
 
 private struct StubCloudflaredService: CloudflaredServiceProtocol {
-    func status() async -> CloudflaredStatus { .idle }
-    func install() async throws -> CloudflaredStatus { .idle }
+    var statusValue: CloudflaredStatus = .idle
+
+    func status() async -> CloudflaredStatus { statusValue }
+    func install() async throws -> CloudflaredStatus { statusValue }
     func start(_ input: StartCloudflaredTunnelInput) async throws -> CloudflaredStatus {
         _ = input
-        return .idle
+        return statusValue
     }
-    func stop() async -> CloudflaredStatus { .idle }
+    func stop() async -> CloudflaredStatus { statusValue }
 }
 
 private struct StubRemoteProxyService: RemoteProxyServiceProtocol {

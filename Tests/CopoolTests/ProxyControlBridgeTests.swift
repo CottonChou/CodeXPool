@@ -129,6 +129,44 @@ final class ProxyControlBridgeTests: XCTestCase {
         XCTAssertEqual(metrics.pushLocalSnapshotCallCount, 1)
     }
 
+    func testPerformLocalCommandBroadcastsLocalSnapshotUpdate() async throws {
+        let cloudSyncService = SpyProxyControlCloudSyncService()
+        let bridge = makeBridge(
+            cloudSyncService: cloudSyncService,
+            runtimePlatform: .macOS
+        )
+        let expectation = expectation(description: "proxy snapshot broadcast")
+
+        let observer = NotificationCenter.default.addObserver(
+            forName: .copoolLocalProxySnapshotDidUpdate,
+            object: nil,
+            queue: nil
+        ) { notification in
+            let snapshot = notification.userInfo?[ProxyControlNotificationPayloadKey.snapshot] as? ProxyControlSnapshot
+            XCTAssertNotNil(snapshot)
+            expectation.fulfill()
+        }
+        defer {
+            NotificationCenter.default.removeObserver(observer)
+        }
+
+        let command = ProxyControlCommand(
+            id: UUID().uuidString,
+            createdAt: 1_763_216_000_000,
+            sourceDeviceID: "macos-proxy-control",
+            kind: .refreshStatus,
+            preferredProxyPort: nil,
+            autoStartProxy: nil,
+            cloudflaredInput: nil,
+            remoteServer: nil,
+            remoteServerID: nil,
+            logLines: nil
+        )
+
+        _ = try await bridge.performLocalCommand(command)
+        await fulfillment(of: [expectation], timeout: 1.0)
+    }
+
     private func makeBridge(
         cloudSyncService: ProxyControlCloudSyncServiceProtocol?,
         runtimePlatform: RuntimePlatform,
@@ -260,16 +298,18 @@ private struct StubProxyRuntimeService: ProxyRuntimeService {
 }
 
 private struct StubCloudflaredService: CloudflaredServiceProtocol {
-    func status() async -> CloudflaredStatus { .idle }
+    var statusValue: CloudflaredStatus = .idle
 
-    func install() async throws -> CloudflaredStatus { .idle }
+    func status() async -> CloudflaredStatus { statusValue }
+
+    func install() async throws -> CloudflaredStatus { statusValue }
 
     func start(_ input: StartCloudflaredTunnelInput) async throws -> CloudflaredStatus {
         _ = input
-        return .idle
+        return statusValue
     }
 
-    func stop() async -> CloudflaredStatus { .idle }
+    func stop() async -> CloudflaredStatus { statusValue }
 }
 
 private struct StubRemoteProxyService: RemoteProxyServiceProtocol {

@@ -88,10 +88,10 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
 
         let executionResult = try await execute(command)
         lastCommandError = nil
-
-        let snapshot = try await buildSnapshot(forceRemoteStatusRefresh: executionResult.forceRemoteStatusRefresh)
-        try await cloudSyncService?.pushLocalSnapshot(snapshot)
-        return snapshot
+        return try await publishSnapshot(
+            forceRemoteStatusRefresh: executionResult.forceRemoteStatusRefresh,
+            broadcastLocally: true
+        )
     }
 
     func handlePushNotification() async {
@@ -139,14 +139,22 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
             }
     }
 
-    private func publishSnapshot() async throws {
-        try await publishSnapshot(forceRemoteStatusRefresh: false)
+    @discardableResult
+    private func publishSnapshot() async throws -> ProxyControlSnapshot {
+        try await publishSnapshot(forceRemoteStatusRefresh: false, broadcastLocally: false)
     }
 
-    private func publishSnapshot(forceRemoteStatusRefresh: Bool) async throws {
-        guard let cloudSyncService else { return }
+    @discardableResult
+    private func publishSnapshot(
+        forceRemoteStatusRefresh: Bool,
+        broadcastLocally: Bool
+    ) async throws -> ProxyControlSnapshot {
         let snapshot = try await buildSnapshot(forceRemoteStatusRefresh: forceRemoteStatusRefresh)
-        try await cloudSyncService.pushLocalSnapshot(snapshot)
+        try await cloudSyncService?.pushLocalSnapshot(snapshot)
+        if broadcastLocally {
+            broadcastLocalSnapshot(snapshot)
+        }
+        return snapshot
     }
 
     @discardableResult
@@ -166,7 +174,10 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
             lastCommandError = error.localizedDescription
         }
 
-        try await publishSnapshot(forceRemoteStatusRefresh: executionResult.forceRemoteStatusRefresh)
+        _ = try await publishSnapshot(
+            forceRemoteStatusRefresh: executionResult.forceRemoteStatusRefresh,
+            broadcastLocally: true
+        )
         return true
     }
 
@@ -271,7 +282,10 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
             cachedRemoteStatuses = refreshSnapshot.remoteStatuses
             lastRemoteStatusRefreshAt = refreshSnapshot.remoteStatusesSyncedAt
             guard refreshSnapshot.remoteStatuses != previousStatuses else { return }
-            try await publishSnapshot()
+            _ = try await publishSnapshot(
+                forceRemoteStatusRefresh: false,
+                broadcastLocally: true
+            )
         } catch {
             #if DEBUG
             // print("Proxy control remote status refresh skipped:", error.localizedDescription)
@@ -408,5 +422,13 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
         }
         let settings = try await settingsCoordinator.currentSettings()
         return settings.remoteServers.first(where: { $0.id == id })
+    }
+
+    private func broadcastLocalSnapshot(_ snapshot: ProxyControlSnapshot) {
+        NotificationCenter.default.post(
+            name: .copoolLocalProxySnapshotDidUpdate,
+            object: nil,
+            userInfo: [ProxyControlNotificationPayloadKey.snapshot: snapshot]
+        )
     }
 }

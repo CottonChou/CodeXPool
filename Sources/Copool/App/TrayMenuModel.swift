@@ -5,6 +5,11 @@ extension Notification.Name {
     static let copoolAccountsSnapshotPushDidArrive = Notification.Name("copool.accounts-snapshot.push")
     static let copoolCurrentAccountSelectionPushDidArrive = Notification.Name("copool.current-account-selection.push")
     static let copoolProxyControlPushDidArrive = Notification.Name("copool.proxy-control.push")
+    static let copoolLocalProxySnapshotDidUpdate = Notification.Name("copool.proxy.snapshot.local-update")
+}
+
+enum ProxyControlNotificationPayloadKey {
+    static let snapshot = "snapshot"
 }
 
 struct CloudPushPullRetryPolicy: Sendable {

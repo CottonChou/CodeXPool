@@ -95,6 +95,7 @@ final class ProxyPageModel: ObservableObject {
     private var lastAppliedRemoteSnapshotSyncedAt: Int64?
     private var lastAppliedRemoteStatusesSyncedAt: Int64?
     private var proxyPushCancellable: AnyCancellable?
+    private var localSnapshotCancellable: AnyCancellable?
 
     @Published var proxyStatus: ApiProxyStatus = .idle
     @Published var cloudflaredStatus: CloudflaredStatus = .idle
@@ -141,6 +142,7 @@ final class ProxyPageModel: ObservableObject {
         self.localProxyCommandService = localProxyCommandService
         self.dateProvider = dateProvider
         self.runtimePlatform = runtimePlatform
+        configureLocalSnapshotHandlingIfNeeded()
     }
 
     deinit {
@@ -687,6 +689,7 @@ final class ProxyPageModel: ObservableObject {
 
     private func applyCloudflaredStatus(_ status: CloudflaredStatus) {
         cloudflaredStatus = status
+        publicAccessEnabled = status.running
         cloudflaredUseHTTP2 = status.useHTTP2
         if let mode = status.tunnelMode {
             cloudflaredTunnelMode = mode
@@ -696,7 +699,6 @@ final class ProxyPageModel: ObservableObject {
             cloudflaredNamedInput.hostname = hostname
         }
         if status.running {
-            publicAccessEnabled = true
             cloudflaredSectionExpanded = true
         }
     }
@@ -775,6 +777,20 @@ final class ProxyPageModel: ObservableObject {
                 Task { @MainActor in
                     await self.refreshRemoteSnapshotAfterPush()
                 }
+            }
+    }
+
+    private func configureLocalSnapshotHandlingIfNeeded() {
+        guard runtimePlatform == .macOS else { return }
+        guard localSnapshotCancellable == nil else { return }
+
+        localSnapshotCancellable = NotificationCenter.default
+            .publisher(for: .copoolLocalProxySnapshotDidUpdate)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
+                guard let self,
+                      let snapshot = notification.userInfo?[ProxyControlNotificationPayloadKey.snapshot] as? ProxyControlSnapshot else { return }
+                self.applyRemoteSnapshot(snapshot)
             }
     }
 
