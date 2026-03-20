@@ -23,7 +23,9 @@ struct CopoolApp: App {
         _trayModel = StateObject(wrappedValue: container.trayModel)
         Task { @MainActor in
             container.trayModel.startBackgroundRefresh()
+            #if os(macOS)
             await container.proxyControlBridge.start()
+            #endif
         }
     }
 

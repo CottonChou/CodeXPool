@@ -1,12 +1,50 @@
 import Foundation
 
 @MainActor
-struct AppContainer {
+final class AppContainer {
     let accountsModel: AccountsPageModel
-    let proxyModel: ProxyPageModel
     let settingsModel: SettingsPageModel
     let trayModel: TrayMenuModel
-    let proxyControlBridge: ProxyControlBridge
+
+    private let paths: FileSystemPaths
+    private let storeRepository: StoreFileRepository
+    private let authRepository: AuthFileRepository
+    private let settingsCoordinator: SettingsCoordinator
+
+    private lazy var proxyService = SwiftNativeProxyRuntimeService(
+        paths: paths,
+        storeRepository: storeRepository,
+        authRepository: authRepository
+    )
+
+    private lazy var cloudflaredService = CloudflaredService(paths: paths)
+
+    private lazy var remoteService = RemoteProxyService(
+        repoRoot: RepositoryLocator.findRepoRoot(startingAt: URL(fileURLWithPath: #filePath)),
+        sourceAccountStorePath: paths.accountStorePath,
+        sourceAuthPath: paths.codexAuthPath
+    )
+
+    private lazy var proxyCoordinator = ProxyCoordinator(
+        proxyService: proxyService,
+        cloudflaredService: cloudflaredService,
+        remoteService: remoteService
+    )
+
+    private lazy var proxyControlCloudSyncService = CloudKitProxyControlSyncService()
+
+    lazy var proxyControlBridge: ProxyControlBridge = ProxyControlBridge(
+        proxyCoordinator: proxyCoordinator,
+        settingsCoordinator: settingsCoordinator,
+        cloudSyncService: proxyControlCloudSyncService
+    )
+
+    lazy var proxyModel: ProxyPageModel = ProxyPageModel(
+        coordinator: proxyCoordinator,
+        settingsCoordinator: settingsCoordinator,
+        proxyControlCloudSyncService: proxyControlCloudSyncService,
+        localProxyCommandService: proxyControlBridge
+    )
 
     static func liveOrCrash() -> AppContainer {
         do {
@@ -16,17 +54,6 @@ struct AppContainer {
             let initialAccounts = initialAccountsSnapshot(using: storeRepository)
             let usageService = DefaultUsageService(configPath: paths.codexConfigPath)
             let workspaceMetadataService = DefaultWorkspaceMetadataService(configPath: paths.codexConfigPath)
-            let proxyService = SwiftNativeProxyRuntimeService(
-                paths: paths,
-                storeRepository: storeRepository,
-                authRepository: authRepository
-            )
-            let cloudflaredService = CloudflaredService(paths: paths)
-            let remoteService = RemoteProxyService(
-                repoRoot: RepositoryLocator.findRepoRoot(startingAt: URL(fileURLWithPath: #filePath)),
-                sourceAccountStorePath: paths.accountStorePath,
-                sourceAuthPath: paths.codexAuthPath
-            )
             let chatGPTOAuthLoginService = OpenAIChatGPTOAuthLoginService(configPath: paths.codexConfigPath)
             let codexCLIService = CodexCLIService()
             let editorAppService = EditorAppService()
@@ -34,7 +61,6 @@ struct AppContainer {
             let launchAtStartupService = LaunchAtStartupService()
             let cloudSyncService = CloudKitAccountsSyncService(storeRepository: storeRepository)
             let cloudSyncAvailabilityService = CloudSyncAvailabilityService()
-            let proxyControlCloudSyncService = CloudKitProxyControlSyncService()
             let currentAccountSelectionSyncService = CloudKitCurrentAccountSelectionSyncService(
                 storeRepository: storeRepository,
                 authRepository: authRepository
@@ -53,16 +79,6 @@ struct AppContainer {
                 codexCLIService: codexCLIService,
                 editorAppService: editorAppService,
                 opencodeAuthSyncService: opencodeSyncService
-            )
-            let proxyCoordinator = ProxyCoordinator(
-                proxyService: proxyService,
-                cloudflaredService: cloudflaredService,
-                remoteService: remoteService
-            )
-            let proxyControlBridge = ProxyControlBridge(
-                proxyCoordinator: proxyCoordinator,
-                settingsCoordinator: settingsCoordinator,
-                cloudSyncService: proxyControlCloudSyncService
             )
             let trayModel = TrayMenuModel(
                 accountsCoordinator: accountsCoordinator,
@@ -89,6 +105,10 @@ struct AppContainer {
             }
 
             return AppContainer(
+                paths: paths,
+                storeRepository: storeRepository,
+                authRepository: authRepository,
+                settingsCoordinator: settingsCoordinator,
                 accountsModel: AccountsPageModel(
                     coordinator: accountsCoordinator,
                     manualRefreshService: trayModel,
@@ -100,19 +120,30 @@ struct AppContainer {
                     },
                     initialAccounts: initialAccounts
                 ),
-                proxyModel: ProxyPageModel(
-                    coordinator: proxyCoordinator,
-                    settingsCoordinator: settingsCoordinator,
-                    proxyControlCloudSyncService: proxyControlCloudSyncService,
-                    localProxyCommandService: proxyControlBridge
-                ),
                 settingsModel: settingsModel,
-                trayModel: trayModel,
-                proxyControlBridge: proxyControlBridge
+                trayModel: trayModel
             )
         } catch {
             fatalError("Failed to bootstrap Swift migration app: \(error.localizedDescription)")
         }
+    }
+
+    private init(
+        paths: FileSystemPaths,
+        storeRepository: StoreFileRepository,
+        authRepository: AuthFileRepository,
+        settingsCoordinator: SettingsCoordinator,
+        accountsModel: AccountsPageModel,
+        settingsModel: SettingsPageModel,
+        trayModel: TrayMenuModel
+    ) {
+        self.paths = paths
+        self.storeRepository = storeRepository
+        self.authRepository = authRepository
+        self.settingsCoordinator = settingsCoordinator
+        self.accountsModel = accountsModel
+        self.settingsModel = settingsModel
+        self.trayModel = trayModel
     }
 
     private static func initialAccountsSnapshot(

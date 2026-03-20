@@ -10,13 +10,14 @@ import UIKit
 struct RootScene: View {
     @State private var selectedTab: AppTab = .accounts
     @StateObject private var accountsModel: AccountsPageModel
-    @StateObject private var proxyModel: ProxyPageModel
     @StateObject private var settingsModel: SettingsPageModel
+    @StateObject private var deferredProxyModel = DeferredProxyModelStore()
     @ObservedObject private var trayModel: TrayMenuModel
+    private let container: AppContainer
 
     init(container: AppContainer, trayModel: TrayMenuModel) {
+        self.container = container
         _accountsModel = StateObject(wrappedValue: container.accountsModel)
-        _proxyModel = StateObject(wrappedValue: container.proxyModel)
         _settingsModel = StateObject(wrappedValue: container.settingsModel)
         self.trayModel = trayModel
     }
@@ -30,7 +31,7 @@ struct RootScene: View {
         case .accounts:
             return accountsModel.notice
         case .proxy:
-            return proxyModel.notice
+            return deferredProxyModel.model?.notice
         case .settings:
             return settingsModel.notice
         }
@@ -63,11 +64,19 @@ struct RootScene: View {
         .onReceive(trayModel.$isFetchingRemoteUsage.removeDuplicates()) { isRefreshing in
             accountsModel.syncRemoteUsageRefreshActivity(isRefreshing: isRefreshing)
         }
+        .onChange(of: selectedTab) { _, value in
+            guard value == .proxy else { return }
+            deferredProxyModel.loadIfNeeded(using: container)
+        }
         .task {
             await settingsModel.loadIfNeeded()
         }
         .task(id: settingsModel.hasLoaded) {
             guard settingsModel.hasLoaded else { return }
+            #if os(macOS)
+            deferredProxyModel.loadIfNeeded(using: container)
+            #endif
+            guard let proxyModel = deferredProxyModel.model else { return }
             await proxyModel.bootstrapOnAppLaunch(using: settingsModel.settings)
         }
         .rootSceneNoticePresentation(currentNotice)
@@ -115,7 +124,7 @@ struct RootScene: View {
                 }
             }
             NavigationStack {
-                ProxyPageView(model: proxyModel)
+                proxyTabContent
             }
             .tag(AppTab.proxy)
             .tabItem {
@@ -152,10 +161,42 @@ struct RootScene: View {
                 }
             )
         case .proxy:
-            ProxyPageView(model: proxyModel)
+            proxyTabContent
         case .settings:
             SettingsPageView(model: settingsModel)
         }
+    }
+
+    @ViewBuilder
+    private var proxyTabContent: some View {
+        if let proxyModel = deferredProxyModel.model {
+            ProxyPageView(model: proxyModel)
+        } else {
+            DeferredPagePlaceholder()
+                .task {
+                    deferredProxyModel.loadIfNeeded(using: container)
+                }
+        }
+    }
+}
+
+@MainActor
+private final class DeferredProxyModelStore: ObservableObject {
+    @Published private(set) var model: ProxyPageModel?
+
+    func loadIfNeeded(using container: AppContainer) {
+        guard model == nil else { return }
+        model = container.proxyModel
+    }
+}
+
+private struct DeferredPagePlaceholder: View {
+    var body: some View {
+        VStack {
+            ProgressView()
+                .controlSize(.large)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 }
 
