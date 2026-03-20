@@ -70,13 +70,10 @@ struct AccountCardPresentation: Equatable {
     }
 
     private static func displayName(for account: AccountSummary, isCollapsed: Bool) -> String {
-        let raw = (account.email ?? account.accountID).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard isCollapsed,
-              let atIndex = raw.firstIndex(of: "@"),
-              atIndex > raw.startIndex else {
-            return raw
-        }
-        return String(raw[..<atIndex])
+        AccountDisplayNameFormatter.format(
+            account: account,
+            style: isCollapsed ? .localPart : .full
+        )
     }
 
     private static func creditsText(for account: AccountSummary) -> String {

@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 #if canImport(AppKit)
 import AppKit
 #endif
@@ -13,6 +14,8 @@ final class AppContainer {
     private let storeRepository: StoreFileRepository
     private let authRepository: AuthFileRepository
     private let settingsCoordinator: SettingsCoordinator
+    private let accountsWidgetSnapshotWriter: AccountsWidgetSnapshotWriter
+    private var accountsWidgetSnapshotCancellable: AnyCancellable?
 
     private lazy var proxyService = SwiftNativeProxyRuntimeService(
         paths: paths,
@@ -87,6 +90,13 @@ final class AppContainer {
                 storeRepository: storeRepository,
                 launchAtStartupService: launchAtStartupService
             )
+            let accountsWidgetSnapshotWriter = AccountsWidgetSnapshotWriter(
+                localeProvider: {
+                    let identifier = (try? await settingsCoordinator.currentSettings().locale)
+                        ?? AppLocale.systemDefault.identifier
+                    return Locale(identifier: AppLocale.resolve(identifier).identifier)
+                }
+            )
             let accountsCoordinator = AccountsCoordinator(
                 storeRepository: storeRepository,
                 authRepository: authRepository,
@@ -110,6 +120,9 @@ final class AppContainer {
                 editorAppService: editorAppService,
                 onSettingsUpdated: { settings in
                     trayModel.applySettings(settings)
+                    Task {
+                        await accountsWidgetSnapshotWriter.write(accounts: trayModel.accounts)
+                    }
                 },
                 onQuitRequested: {
                     #if canImport(AppKit)
@@ -131,6 +144,7 @@ final class AppContainer {
                 storeRepository: storeRepository,
                 authRepository: authRepository,
                 settingsCoordinator: settingsCoordinator,
+                accountsWidgetSnapshotWriter: accountsWidgetSnapshotWriter,
                 accountsModel: AccountsPageModel(
                     coordinator: accountsCoordinator,
                     manualRefreshService: trayModel,
@@ -155,6 +169,7 @@ final class AppContainer {
         storeRepository: StoreFileRepository,
         authRepository: AuthFileRepository,
         settingsCoordinator: SettingsCoordinator,
+        accountsWidgetSnapshotWriter: AccountsWidgetSnapshotWriter,
         accountsModel: AccountsPageModel,
         settingsModel: SettingsPageModel,
         trayModel: TrayMenuModel
@@ -163,9 +178,20 @@ final class AppContainer {
         self.storeRepository = storeRepository
         self.authRepository = authRepository
         self.settingsCoordinator = settingsCoordinator
+        self.accountsWidgetSnapshotWriter = accountsWidgetSnapshotWriter
         self.accountsModel = accountsModel
         self.settingsModel = settingsModel
         self.trayModel = trayModel
+        accountsWidgetSnapshotCancellable = trayModel.$accounts
+            .removeDuplicates()
+            .sink { [accountsWidgetSnapshotWriter] accounts in
+                Task {
+                    await accountsWidgetSnapshotWriter.write(accounts: accounts)
+                }
+            }
+        Task {
+            await accountsWidgetSnapshotWriter.write(accounts: trayModel.accounts)
+        }
     }
 
     private static func initialAccountsSnapshot(
