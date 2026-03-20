@@ -88,11 +88,8 @@ struct AccountCardView: View {
             AccountCollapsedSwitchOverlay(
                 isVisible: interactionPresentation.isCollapsedSwitchOverlayVisible,
                 switching: switching,
-                refreshing: refreshing,
-                isRefreshEnabled: isRefreshEnabled,
                 onDismiss: dismissCollapsedSwitchOverlay,
-                onSwitch: onSwitch,
-                onRefresh: onRefresh
+                onSwitch: onSwitch
             )
         }
         .onHover { hovering in

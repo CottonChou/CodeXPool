@@ -205,11 +205,8 @@ struct AccountCardBottomOverlay: View {
 struct AccountCollapsedSwitchOverlay: View {
     let isVisible: Bool
     let switching: Bool
-    let refreshing: Bool
-    let isRefreshEnabled: Bool
     let onDismiss: () -> Void
     let onSwitch: () -> Void
-    let onRefresh: () -> Void
 
     var body: some View {
         if isVisible {
@@ -224,18 +221,11 @@ struct AccountCollapsedSwitchOverlay: View {
                         onDismiss()
                     }
 
-                HStack(spacing: 10) {
-                    AccountSwitchButton(
-                        switching: switching,
-                        labelStyle: .expanded,
-                        onSwitch: onSwitch
-                    )
-                    AccountRefreshButton(
-                        refreshing: refreshing,
-                        isEnabled: isRefreshEnabled,
-                        onRefresh: onRefresh
-                    )
-                }
+                AccountSwitchButton(
+                    switching: switching,
+                    labelStyle: .expanded,
+                    onSwitch: onSwitch
+                )
             }
             .transition(.opacity)
         }
