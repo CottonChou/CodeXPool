@@ -15,6 +15,14 @@ struct AccountCardView: View {
     @State private var isHoveringCollapsedSwitch = false
     @State private var isCollapsedSwitchOverlayPresented = false
 
+    private struct MorphState: Equatable {
+        let isCollapsed: Bool
+        let isCurrent: Bool
+        let switching: Bool
+        let refreshing: Bool
+        let usageError: String?
+    }
+
     private var presentation: AccountCardPresentation {
         AccountCardPresentation(account: account, isCollapsed: isCollapsed, locale: locale)
     }
@@ -42,6 +50,16 @@ struct AccountCardView: View {
         #endif
     }
 
+    private var morphState: MorphState {
+        MorphState(
+            isCollapsed: isCollapsed,
+            isCurrent: account.isCurrent,
+            switching: switching,
+            refreshing: refreshing,
+            usageError: isUsageRefreshActive ? nil : account.usageError
+        )
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             AccountCardHeaderSection(
@@ -59,11 +77,10 @@ struct AccountCardView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .truncationMode(.tail)
 
-            if isCollapsed {
-                AccountCardCompactUsageSection(presentation: presentation)
-            } else {
-                AccountCardExpandedUsageSection(presentation: presentation)
-            }
+            AccountCardUsageContent(
+                presentation: presentation,
+                isCollapsed: isCollapsed
+            )
         }
         .padding(isCollapsed ? 8 : 10)
         .accountCardSurface(cornerRadius: 12, tint: palette.surfaceTint)
@@ -84,6 +101,7 @@ struct AccountCardView: View {
                 onRefresh: onRefresh
             )
         }
+        .animation(AccountCardMorphRules.animation, value: morphState)
         .overlay {
             AccountCollapsedSwitchOverlay(
                 isVisible: interactionPresentation.isCollapsedSwitchOverlayVisible,
