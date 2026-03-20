@@ -29,6 +29,7 @@ enum LayoutRules {
     static let proxyHeroPortFieldWidth = CGFloat(108)
     static let proxyRemoteFieldMinWidth = CGFloat(160)
     static let proxyRemoteActionMinWidth = CGFloat(118)
+    static let proxyRemoteActionGridMinWidth = CGFloat(92)
     static let proxyRemoteMetricMinWidth = CGFloat(108)
     static let proxyRemoteMetricHeight = CGFloat(68)
     static let proxyRemoteDetailMinWidth = CGFloat(220)

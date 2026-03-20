@@ -63,6 +63,11 @@ struct ProxyActionButtonDescriptor<Intent: Hashable>: Identifiable, Equatable {
     var id: Intent { intent }
 }
 
+enum ProxyActionStripLayout: Equatable {
+    case row(scrollable: Bool)
+    case adaptiveGrid(minimumColumnWidth: CGFloat)
+}
+
 enum ProxyActionPresentation {
     static func apiProxyButtons(
         isRunning: Bool,
@@ -134,7 +139,7 @@ enum ProxyActionPresentation {
                 surfaceStyle: surfaceStyle(for: intent),
                 isEnabled: activeAction == nil,
                 showsProgress: activeAction == intent,
-                minimumWidth: LayoutRules.proxyRemoteActionMinWidth
+                minimumWidth: LayoutRules.proxyRemoteActionGridMinWidth
             )
         }
     }
@@ -179,18 +184,30 @@ enum ProxyActionPresentation {
 
 struct ProxyActionStrip<Intent: Hashable>: View {
     let buttons: [ProxyActionButtonDescriptor<Intent>]
-    var scrollable: Bool = false
+    var layout: ProxyActionStripLayout = .row(scrollable: false)
     let onAction: @MainActor (Intent) async -> Void
 
     var body: some View {
         Group {
-            if scrollable {
-                ScrollView(.horizontal) {
+            switch layout {
+            case .row(let scrollable):
+                if scrollable {
+                    ScrollView(.horizontal) {
+                        buttonRow
+                    }
+                    .scrollIndicators(.hidden)
+                } else {
                     buttonRow
                 }
-                .scrollIndicators(.hidden)
-            } else {
-                buttonRow
+            case .adaptiveGrid(let minimumColumnWidth):
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: minimumColumnWidth), spacing: 8)],
+                    spacing: 8
+                ) {
+                    ForEach(buttons) { button in
+                        actionButton(button, expandsToFillWidth: true)
+                    }
+                }
             }
         }
     }
@@ -198,24 +215,46 @@ struct ProxyActionStrip<Intent: Hashable>: View {
     private var buttonRow: some View {
         HStack(spacing: 8) {
             ForEach(buttons) { button in
-                Button(role: button.role.buttonRole) {
-                    Task { await onAction(button.intent) }
-                } label: {
-                    if button.showsProgress {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Text(LocalizedStringKey(button.titleKey))
-                            .lineLimit(1)
-                    }
-                }
-                .frame(minWidth: button.minimumWidth)
-                .liquidGlassActionButtonStyle(
-                    prominent: button.surfaceStyle.isProminent,
-                    tint: button.surfaceStyle.tint
-                )
-                .disabled(!button.isEnabled)
+                actionButton(button, expandsToFillWidth: false)
             }
         }
+    }
+
+    private func actionButton(
+        _ button: ProxyActionButtonDescriptor<Intent>,
+        expandsToFillWidth: Bool
+    ) -> some View {
+        Button(role: button.role.buttonRole) {
+            Task { await onAction(button.intent) }
+        } label: {
+            if button.showsProgress {
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(maxWidth: expandsToFillWidth ? .infinity : nil)
+            } else {
+                actionLabel(button, expandsToFillWidth: expandsToFillWidth)
+            }
+        }
+        .frame(
+            minWidth: button.minimumWidth,
+            maxWidth: expandsToFillWidth ? .infinity : nil
+        )
+        .fixedSize(horizontal: !expandsToFillWidth, vertical: false)
+        .liquidGlassActionButtonStyle(
+            prominent: button.surfaceStyle.isProminent,
+            tint: button.surfaceStyle.tint
+        )
+        .disabled(!button.isEnabled)
+    }
+
+    private func actionLabel(
+        _ button: ProxyActionButtonDescriptor<Intent>,
+        expandsToFillWidth: Bool
+    ) -> some View {
+        Text(LocalizedStringKey(button.titleKey))
+            .lineLimit(1)
+            .minimumScaleFactor(expandsToFillWidth ? 0.84 : 1)
+            .frame(maxWidth: expandsToFillWidth ? .infinity : nil)
+            .fixedSize(horizontal: !expandsToFillWidth, vertical: false)
     }
 }

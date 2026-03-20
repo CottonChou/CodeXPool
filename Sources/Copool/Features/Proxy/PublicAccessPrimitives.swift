@@ -220,18 +220,19 @@ struct PublicAccessToolbar: View {
     let onAction: @MainActor (PublicAccessActionIntent) async -> Void
 
     var body: some View {
-        #if os(iOS)
-        VStack(alignment: .leading, spacing: 10) {
-            http2ToggleRow
-            actionStrip
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 10) {
+                http2ToggleRow
+                actionStrip
+            }
+            .fixedSize(horizontal: true, vertical: false)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: 10) {
+                http2ToggleRow
+                actionStrip
+            }
         }
-        #else
-        HStack(spacing: 10) {
-            http2ToggleRow
-            Spacer(minLength: 0)
-            actionStrip
-        }
-        #endif
     }
 
     private var http2ToggleRow: some View {
@@ -255,6 +256,7 @@ struct PublicAccessToolbar: View {
     private var actionStrip: some View {
         ProxyActionStrip(
             buttons: actionButtons,
+            layout: .row(scrollable: false),
             onAction: onAction
         )
     }

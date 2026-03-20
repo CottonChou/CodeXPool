@@ -73,7 +73,9 @@ struct RemoteServerCardView: View {
                         isRunning: status?.running == true,
                         activeAction: activeAction
                     ),
-                    scrollable: true,
+                    layout: .adaptiveGrid(
+                        minimumColumnWidth: LayoutRules.proxyRemoteActionGridMinWidth
+                    ),
                     onAction: handleRemoteAction
                 )
                 RemoteServerStatusGrid(
