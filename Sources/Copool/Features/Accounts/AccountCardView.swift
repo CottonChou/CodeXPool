@@ -65,7 +65,7 @@ struct AccountCardView: View {
             }
         }
         .padding(isCollapsed ? 8 : 10)
-        .cardSurface(cornerRadius: 12, tint: palette.surfaceTint)
+        .accountCardSurface(cornerRadius: 12, tint: palette.surfaceTint)
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(account.isCurrent ? palette.toneColor.opacity(0.45) : .clear, lineWidth: 1)
@@ -92,9 +92,8 @@ struct AccountCardView: View {
                 isHoveringCollapsedSwitch = false
                 return
             }
-            withAnimation(.easeInOut(duration: 0.16)) {
-                isHoveringCollapsedSwitch = hovering
-            }
+            guard isHoveringCollapsedSwitch != hovering else { return }
+            isHoveringCollapsedSwitch = hovering
         }
         #if os(iOS)
         .onLongPressGesture(minimumDuration: 0.35) {
