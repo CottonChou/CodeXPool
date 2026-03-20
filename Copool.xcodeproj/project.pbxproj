@@ -19,6 +19,7 @@
 		0797784F1F471715624CA9CD /* AppLocaleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A146C7576AB39EFCD658BFED /* AppLocaleTests.swift */; };
 		08342AB5B372E5D6B5F1B73F /* RootScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF3990C942090A68CBEDDDE1 /* RootScene.swift */; };
 		08E6BB21C1E6371C4D7C56A9 /* AccountsCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 975800F0AD21824941F02AD3 /* AccountsCoordinator.swift */; };
+		09F3CA0CAAD59390AD8D69EB /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7AF3D2A6E0F0352C20B25EBF /* Cocoa.framework */; };
 		0A211B816427E58E3878715A /* Cargo.toml in Resources */ = {isa = PBXBuildFile; fileRef = 06F1E6F2CD1F32BE938A10E2 /* Cargo.toml */; };
 		0C9AE3027C3A66531EA9F038 /* AccountsWidgetSnapshotBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48DAEB06DC9DE19B80FE052D /* AccountsWidgetSnapshotBuilderTests.swift */; };
 		0CC97446577263889F1C8A0C /* SystemDateProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 962E931E377964D0704D3809 /* SystemDateProvider.swift */; };
@@ -59,6 +60,7 @@
 		4340388029808F096EA1D252 /* JSONValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5000155760C69A6117DF5E08 /* JSONValue.swift */; };
 		4353553A171096B9C9653258 /* LocalizationConsistencyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 251BC10FF4D8538941CDC174 /* LocalizationConsistencyTests.swift */; };
 		4389F9981E6B19B863CA31F9 /* Notice.swift in Sources */ = {isa = PBXBuildFile; fileRef = D593B8E21B1B66A64179E605 /* Notice.swift */; };
+		441A3F777207D342E186832D /* AccountsWidgetViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A541962BDDFDAF6E6C1F8F0 /* AccountsWidgetViews.swift */; };
 		45830625E7AE6173AB0F99E3 /* ViewState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C36FDB8D2542926806D5B265 /* ViewState.swift */; };
 		46F70E216B2D9F94247190D5 /* ShellCommandRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00E0EE08E1645AD783C2DED1 /* ShellCommandRunner.swift */; };
 		4A5ABB9C59FC0E1570AECC00 /* UsageWindowSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F5229A7F5573D51E6740E23 /* UsageWindowSelector.swift */; };
@@ -70,6 +72,7 @@
 		4EECC683E393FA990DC947CB /* SectionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54944E5E848D062E524900CF /* SectionCard.swift */; };
 		50922F8C48CF01B728AD262F /* LiquidProgressMetricsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6318743D5B32C4FA1244FAD /* LiquidProgressMetricsTests.swift */; };
 		50A1E15C1EDB4A5C9E8D1120 /* AccountsSnapshotFreshnessPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50A1E15C1EDB4A5C9E8D1121 /* AccountsSnapshotFreshnessPolicyTests.swift */; };
+		5227C48169EE13F088BBE923 /* AccountsWidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E655B80A368B9D3F2B6371 /* AccountsWidgetSnapshot.swift */; };
 		53243CFFBC40F306DCE9ED45 /* AuthFileRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7296C82EB9955D9DB121C940 /* AuthFileRepository.swift */; };
 		54F5A32512F8226641F0655E /* AccountsPageModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6649CF1B9E1CA80D5522A9A6 /* AccountsPageModel.swift */; };
 		54F5A32512F8226641F0655F /* PlatformClipboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A105A105A105A105A105A105 /* PlatformClipboard.swift */; };
@@ -80,6 +83,7 @@
 		67FEEA1796F9BC33A0D57CF6 /* SettingsPageModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBF9C8262357FD7DC9AA4855 /* SettingsPageModel.swift */; };
 		683DA0BB33E165DCFEFE8633 /* OpencodeAuthSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB56BDF9685A258D5CD4C18A /* OpencodeAuthSyncService.swift */; };
 		686934530489EC97EBE6280E /* AccountsWidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E655B80A368B9D3F2B6371 /* AccountsWidgetSnapshot.swift */; };
+		686A80B3D7911437D45C7C4F /* CopoolWidgetsMac.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = D80CD7B4C481368659FC6B4D /* CopoolWidgetsMac.appex */; };
 		68A1228957522AF14BEF1006 /* utils.rs in Resources */ = {isa = PBXBuildFile; fileRef = 6190BE90C3A6928AE092B876 /* utils.rs */; };
 		6A3D57247F2D38163A35CBC0 /* L10n.swift in Sources */ = {isa = PBXBuildFile; fileRef = 315E6E562A9376AB6D34B744 /* L10n.swift */; };
 		6DE41EF6F476912C967CF60D /* ViewState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C36FDB8D2542926806D5B265 /* ViewState.swift */; };
@@ -188,6 +192,7 @@
 		B02FB96AC2AA18DA0EE1FE21 /* AppSettingsCodableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 615AE055972ED222439110F8 /* AppSettingsCodableTests.swift */; };
 		B1D5612DF2DA63BE81C96320 /* figure.pool.swim.png in Resources */ = {isa = PBXBuildFile; fileRef = D97DE818E2B47EBF28DFEA3D /* figure.pool.swim.png */; };
 		B375C045386BB145C4A50B01 /* RootScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF3990C942090A68CBEDDDE1 /* RootScene.swift */; };
+		B83EF2508B9D4DCEB00F5906 /* AccountsWidgetSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B254AFEE55040C2E15986AC /* AccountsWidgetSnapshotStore.swift */; };
 		B88C538B91735481F385D582 /* SwiftNativeProxyRuntimeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E072B2DEE9973F725135D145 /* SwiftNativeProxyRuntimeService.swift */; };
 		BA5B276B09B95CA7284CDFA2 /* PlatformCapabilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1928844F787DAA8E86F1AE1A /* PlatformCapabilities.swift */; };
 		BAA8370E04EE38AD6F28F62E /* NoticeBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4EB189FA13DC18FA698AFB /* NoticeBanner.swift */; };
@@ -219,6 +224,7 @@
 		C244C244C244C244C244C244 /* SettingsPageModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B212B212B212B212B212B212 /* SettingsPageModelTests.swift */; };
 		C3E767529B0F672C5F000B54 /* StoreFileRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D0007E157CB217C0A6DD1E7 /* StoreFileRepository.swift */; };
 		C4AEB739AA9D4A84ABBB9E21 /* ProxyControlBridgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10B6B54D0E14B9CB2CB0A71 /* ProxyControlBridgeTests.swift */; };
+		C63E3638C58D5A7C3B4EAC4B /* CopoolWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84D177FE0E597E58E234104A /* CopoolWidgets.swift */; };
 		C879F3AE92E5053F7684E876 /* AccountsWidgetSnapshotBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CFEECEA686528A0A209CD86 /* AccountsWidgetSnapshotBuilder.swift */; };
 		CA37BD95DACA443113BF6EC6 /* EditorAppService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5358263820EB410620C79AB /* EditorAppService.swift */; };
 		CB0CCB971A94A76BEF441706 /* AccountsWidgetSnapshotWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 776F4BC14F29F8D53E147B4C /* AccountsWidgetSnapshotWriter.swift */; };
@@ -282,6 +288,13 @@
 			remoteGlobalIDString = F134D7DFF69D1813795AB942;
 			remoteInfo = CopoolWidgets;
 		};
+		DD816558B6D6966EB6C76332 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1C9F670E75F4E6A54634D42A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C5D57F058A5B1F7A1C741161;
+			remoteInfo = CopoolWidgetsMac;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -292,6 +305,17 @@
 			dstSubfolderSpec = 13;
 			files = (
 				CCE7DCFC99330C85E587D094 /* CopoolWidgets.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C5AB32357C913EDBE3D61083 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				686A80B3D7911437D45C7C4F /* CopoolWidgetsMac.appex in Embed App Extensions */,
 			);
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -356,6 +380,7 @@
 		7296C82EB9955D9DB121C940 /* AuthFileRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthFileRepository.swift; sourceTree = "<group>"; };
 		776F4BC14F29F8D53E147B4C /* AccountsWidgetSnapshotWriter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AccountsWidgetSnapshotWriter.swift; sourceTree = "<group>"; };
 		7AA20CF2CE8BAE80E1447086 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		7AF3D2A6E0F0352C20B25EBF /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
 		84D177FE0E597E58E234104A /* CopoolWidgets.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CopoolWidgets.swift; sourceTree = "<group>"; };
 		85BEA62E5EB96361AD117627 /* AccountsCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsCoordinatorTests.swift; sourceTree = "<group>"; };
 		8644DF48AF768B1D855A3404 /* AppError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppError.swift; sourceTree = "<group>"; };
@@ -444,6 +469,7 @@
 		D3AE6ECBCE990356DEB5BBE0 /* ProxyPageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyPageView.swift; sourceTree = "<group>"; };
 		D42AE96D25E97F39B6AAB9A8 /* ProxyPageModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyPageModel.swift; sourceTree = "<group>"; };
 		D593B8E21B1B66A64179E605 /* Notice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Notice.swift; sourceTree = "<group>"; };
+		D80CD7B4C481368659FC6B4D /* CopoolWidgetsMac.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; name = CopoolWidgetsMac.appex; path = CopoolWidgetsMac.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		D97DE818E2B47EBF28DFEA3D /* figure.pool.swim.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = figure.pool.swim.png; sourceTree = "<group>"; };
 		DBF9C8262357FD7DC9AA4855 /* SettingsPageModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPageModel.swift; sourceTree = "<group>"; };
 		DF11B93A2C05CC3B851D671A /* StoreFileRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreFileRepositoryTests.swift; sourceTree = "<group>"; };
@@ -463,6 +489,14 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		2362AB870453F10F5DBBB3CE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				09F3CA0CAAD59390AD8D69EB /* Cocoa.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		E2937D91FCB855B92DD845E5 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -742,6 +776,7 @@
 				C119BECC2B20B53E52701FFC /* Copool.app */,
 				90255D0425196173B702CB66 /* CopoolTests.xctest */,
 				4908DE94D353088580738F02 /* CopoolWidgets.appex */,
+				D80CD7B4C481368659FC6B4D /* CopoolWidgetsMac.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -754,6 +789,14 @@
 				596621B3395F4D9CF54DC584 /* Settings */,
 			);
 			path = Features;
+			sourceTree = "<group>";
+		};
+		B9D793D48DED9B71D733BC86 /* OS X */ = {
+			isa = PBXGroup;
+			children = (
+				7AF3D2A6E0F0352C20B25EBF /* Cocoa.framework */,
+			);
+			name = "OS X";
 			sourceTree = "<group>";
 		};
 		C9AC7B49928FE751CD24CA38 /* CopoolTests */ = {
@@ -801,6 +844,7 @@
 			isa = PBXGroup;
 			children = (
 				40C934B26EF3A7403E60547F /* iOS */,
+				B9D793D48DED9B71D733BC86 /* OS X */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -844,6 +888,23 @@
 			productReference = 90255D0425196173B702CB66 /* CopoolTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		C5D57F058A5B1F7A1C741161 /* CopoolWidgetsMac */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A357E08B01880565180834E6 /* Build configuration list for PBXNativeTarget "CopoolWidgetsMac" */;
+			buildPhases = (
+				6BC88A7481ABBE3804D740BA /* Sources */,
+				2362AB870453F10F5DBBB3CE /* Frameworks */,
+				A9AF78374CAB0F85BFEF3552 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CopoolWidgetsMac;
+			productName = CopoolWidgetsMac;
+			productReference = D80CD7B4C481368659FC6B4D /* CopoolWidgetsMac.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		F134D7DFF69D1813795AB942 /* CopoolWidgets */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = F87E0D59A3C640204899DF08 /* Build configuration list for PBXNativeTarget "CopoolWidgets" */;
@@ -867,10 +928,12 @@
 			buildPhases = (
 				B5878CD9780E2ADEA4EC9D37 /* Sources */,
 				D78B47AB5F9A1A8C8ACC3B11 /* Resources */,
+				C5AB32357C913EDBE3D61083 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				6D5F7DDF22A153B5E7A53788 /* PBXTargetDependency */,
 			);
 			name = Copool;
 			productName = Copool;
@@ -960,6 +1023,7 @@
 				3EBBD4883F32E94097730AC9 /* CopoolTests */,
 				FED0D978DEF83A73E2D0A3AB /* CopooliOS */,
 				F134D7DFF69D1813795AB942 /* CopoolWidgets */,
+				C5D57F058A5B1F7A1C741161 /* CopoolWidgetsMac */,
 			);
 		};
 /* End PBXProject section */
@@ -980,6 +1044,13 @@
 				3A70E6A39F02CFF95209E993 /* LaunchScreen.storyboard in Resources */,
 				E27D31CC8BE01282100CFC92 /* Localizable.strings in Resources */,
 				8FC2E52A597979C5CA1D3DAE /* figure.pool.swim.png in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A9AF78374CAB0F85BFEF3552 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1161,6 +1232,17 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		6BC88A7481ABBE3804D740BA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C63E3638C58D5A7C3B4EAC4B /* CopoolWidgets.swift in Sources */,
+				441A3F777207D342E186832D /* AccountsWidgetViews.swift in Sources */,
+				5227C48169EE13F088BBE923 /* AccountsWidgetSnapshot.swift in Sources */,
+				B83EF2508B9D4DCEB00F5906 /* AccountsWidgetSnapshotStore.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		B5878CD9780E2ADEA4EC9D37 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -1287,6 +1369,12 @@
 			target = F134D7DFF69D1813795AB942 /* CopoolWidgets */;
 			targetProxy = C64FC8249A1FEA26F18F013D /* PBXContainerItemProxy */;
 		};
+		6D5F7DDF22A153B5E7A53788 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = CopoolWidgetsMac;
+			target = C5D57F058A5B1F7A1C741161 /* CopoolWidgetsMac */;
+			targetProxy = DD816558B6D6966EB6C76332 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
@@ -1352,6 +1440,28 @@
 				SDKROOT = macosx;
 			};
 			name = Release;
+		};
+		0CAFB7DA38441C498B28AA54 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = CopoolWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 6;
+				DEVELOPMENT_TEAM = KLU8GF65GP;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Sources/CopoolWidgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited)";
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0.8;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alick.copool.widgets;
+				PRODUCT_NAME = CopoolWidgetsMac;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
 		};
 		3FA9C1CC8AF190BFB35AEB0D /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -1470,6 +1580,29 @@
 				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		8467474981EF236DC6C7A7FE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = CopoolWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 6;
+				DEVELOPMENT_TEAM = KLU8GF65GP;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Sources/CopoolWidgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited)";
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0.8;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alick.copool.widgets;
+				PRODUCT_NAME = CopoolWidgetsMac;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 6.0;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
@@ -1708,6 +1841,15 @@
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
+		};
+		A357E08B01880565180834E6 /* Build configuration list for PBXNativeTarget "CopoolWidgetsMac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8467474981EF236DC6C7A7FE /* Release */,
+				0CAFB7DA38441C498B28AA54 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		E83C33B36F807C0A2EE9404F /* Build configuration list for PBXNativeTarget "CopoolTests" */ = {
 			isa = XCConfigurationList;
