@@ -62,7 +62,6 @@ private struct AccountsGridSection: View {
                     card: card,
                     areCardsPresented: areCardsPresented,
                     index: index,
-                    isOverviewMode: isOverviewMode,
                     onSwitch: { onSwitchAccount(card.id) },
                     onRefresh: { onRefreshAccountUsage(card.id) },
                     onDelete: { onDeleteAccount(card.id) }
@@ -82,7 +81,6 @@ private struct AccountCardGridItem: View {
     let card: AccountCardViewState
     let areCardsPresented: Bool
     let index: Int
-    let isOverviewMode: Bool
     let onSwitch: () -> Void
     let onRefresh: () -> Void
     let onDelete: () -> Void
@@ -100,7 +98,7 @@ private struct AccountCardGridItem: View {
             onDelete: onDelete
         )
         .copoolCardEntrance(index: index, isPresented: areCardsPresented)
-        .modifier(AccountCardFrameModifier(isOverviewMode: isOverviewMode))
+        .modifier(AccountCardFrameModifier())
     }
 }
 
@@ -127,16 +125,7 @@ private extension View {
 }
 
 private struct AccountCardFrameModifier: ViewModifier {
-    let isOverviewMode: Bool
-
     func body(content: Content) -> some View {
-        #if os(iOS)
         content.frame(maxWidth: .infinity, alignment: .topLeading)
-        #else
-        content.frame(
-            width: LayoutRules.accountsCardFrameWidth(isOverviewMode: isOverviewMode, isCompactWidth: false),
-            alignment: .topLeading
-        )
-        #endif
     }
 }

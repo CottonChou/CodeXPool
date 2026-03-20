@@ -85,28 +85,24 @@ enum LayoutRules {
             )
         }
 
-        if isOverviewMode {
-            return Array(
-                repeating: GridItem(
-                    .fixed(accountsCollapsedCardWidth),
-                    spacing: accountsRowSpacing,
-                    alignment: .top
-                ),
-                count: accountsCollapsedColumns
-            )
-        }
-
+        let columnCount = isOverviewMode
+            ? accountsCollapsedColumns
+            : accountsExpandedColumns
         return Array(
             repeating: GridItem(
-                .fixed(accountsCardWidth),
+                .flexible(minimum: 0, maximum: .infinity),
                 spacing: accountsRowSpacing,
                 alignment: .top
             ),
-            count: accountsExpandedColumns
+            count: columnCount
         )
     }
 
     static func accountsCardFrameWidth(isOverviewMode: Bool, isCompactWidth: Bool) -> CGFloat? {
-        isCompactWidth ? nil : (isOverviewMode ? accountsCollapsedCardWidth : accountsCardWidth)
+        nil
+    }
+
+    static func accountsPageContentWidth(isCompactWidth: Bool) -> CGFloat? {
+        isCompactWidth ? nil : accountsPageTargetWidth
     }
 }

@@ -94,6 +94,10 @@ private struct AccountsMacPageShell: View {
     let onRefreshAccountUsage: (String) -> Void
     let onDeleteAccount: (String) -> Void
 
+    private var pageContentWidth: CGFloat {
+        LayoutRules.accountsPageContentWidth(isCompactWidth: false) ?? LayoutRules.accountsPageTargetWidth
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: LayoutRules.sectionSpacing) {
             AccountsActionBarContainer(
@@ -101,7 +105,8 @@ private struct AccountsMacPageShell: View {
                 onTriggerAction: onTriggerAction,
                 onToggleCollapse: onToggleCollapse
             )
-                .padding(.horizontal, LayoutRules.pagePadding)
+            .padding(.horizontal, LayoutRules.pagePadding)
+            .frame(width: pageContentWidth, alignment: .leading)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
@@ -114,10 +119,11 @@ private struct AccountsMacPageShell: View {
                     )
                 }
                 .padding(.bottom, 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(width: pageContentWidth, alignment: .leading)
             }
             .scrollIndicators(.hidden)
         }
+        .frame(width: pageContentWidth, alignment: .topLeading)
         .padding(.top, LayoutRules.pagePadding)
     }
 }
