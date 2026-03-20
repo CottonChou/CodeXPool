@@ -70,7 +70,7 @@ extension AccountsPageModel {
     }
 
     private func withAccountsSwitchAnimation(_ updates: () -> Void) {
-        withAnimation(.spring(response: 0.36, dampingFraction: 0.84)) {
+        withAnimation(AccountsAnimationRules.contentReorder) {
             updates()
         }
     }

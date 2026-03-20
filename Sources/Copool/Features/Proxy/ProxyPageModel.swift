@@ -9,6 +9,7 @@ final class ProxyPageModel: ObservableObject {
     let localProxyCommandService: ProxyLocalCommandServiceProtocol?
     let dateProvider: DateProviding
     let runtimePlatform: RuntimePlatform
+    let chooseIdentityFilePath: @MainActor () -> String?
 
     private let noticeScheduler = NoticeAutoDismissScheduler()
 
@@ -63,7 +64,8 @@ final class ProxyPageModel: ObservableObject {
         proxyControlCloudSyncService: ProxyControlCloudSyncServiceProtocol? = nil,
         localProxyCommandService: ProxyLocalCommandServiceProtocol? = nil,
         dateProvider: DateProviding = SystemDateProvider(),
-        runtimePlatform: RuntimePlatform = PlatformCapabilities.currentPlatform
+        runtimePlatform: RuntimePlatform = PlatformCapabilities.currentPlatform,
+        chooseIdentityFilePath: @escaping @MainActor () -> String? = { nil }
     ) {
         self.coordinator = coordinator
         self.settingsCoordinator = settingsCoordinator
@@ -71,6 +73,7 @@ final class ProxyPageModel: ObservableObject {
         self.localProxyCommandService = localProxyCommandService
         self.dateProvider = dateProvider
         self.runtimePlatform = runtimePlatform
+        self.chooseIdentityFilePath = chooseIdentityFilePath
         configureLocalSnapshotHandlingIfNeeded()
     }
 

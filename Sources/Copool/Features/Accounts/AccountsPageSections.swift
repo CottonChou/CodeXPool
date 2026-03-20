@@ -70,7 +70,7 @@ private struct AccountsGridSection: View {
             }
         }
         .animation(
-            .spring(response: 0.36, dampingFraction: 0.84),
+            AccountsAnimationRules.contentReorder,
             value: cards.map(\.id)
         )
         .padding(.horizontal, LayoutRules.pagePadding)
@@ -114,8 +114,7 @@ private struct CardEntranceModifier: ViewModifier {
             .offset(y: isPresented ? 0 : 22)
             .scaleEffect(isPresented ? 1 : 0.985)
             .animation(
-                .spring(response: 0.5, dampingFraction: 0.86)
-                    .delay(min(0.28, Double(index) * 0.035)),
+                AccountsAnimationRules.cardEntrance(index: index),
                 value: isPresented
             )
     }

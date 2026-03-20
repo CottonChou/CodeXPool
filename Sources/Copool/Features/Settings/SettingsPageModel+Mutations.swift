@@ -38,6 +38,10 @@ extension SettingsPageModel {
         updateRestartEditorTarget(target)
     }
 
+    func quitApp() {
+        onQuitRequested()
+    }
+
     func updateToggle(_ intent: SettingsToggleIntent, to value: Bool) {
         switch intent {
         case .launchAtStartup:

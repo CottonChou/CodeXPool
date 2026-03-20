@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(AppKit)
+import AppKit
+#endif
 
 @MainActor
 final class AppContainer {
@@ -43,7 +46,21 @@ final class AppContainer {
         coordinator: proxyCoordinator,
         settingsCoordinator: settingsCoordinator,
         proxyControlCloudSyncService: proxyControlCloudSyncService,
-        localProxyCommandService: proxyControlBridge
+        localProxyCommandService: proxyControlBridge,
+        chooseIdentityFilePath: {
+            #if canImport(AppKit)
+            let panel = NSOpenPanel()
+            panel.canChooseFiles = true
+            panel.canChooseDirectories = false
+            panel.allowsMultipleSelection = false
+            panel.canCreateDirectories = false
+            panel.title = "Select SSH key file"
+            guard panel.runModal() == .OK else { return nil }
+            return panel.url?.path
+            #else
+            return nil
+            #endif
+        }
     )
 
     static func liveOrCrash() -> AppContainer {
@@ -93,6 +110,11 @@ final class AppContainer {
                 editorAppService: editorAppService,
                 onSettingsUpdated: { settings in
                     trayModel.applySettings(settings)
+                },
+                onQuitRequested: {
+                    #if canImport(AppKit)
+                    NSApp.terminate(nil)
+                    #endif
                 }
             )
 

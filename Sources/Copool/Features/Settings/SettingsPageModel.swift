@@ -6,6 +6,7 @@ final class SettingsPageModel: ObservableObject {
     let settingsCoordinator: SettingsCoordinator
     let editorAppService: EditorAppServiceProtocol
     let onSettingsUpdated: @MainActor (AppSettings) -> Void
+    let onQuitRequested: @MainActor () -> Void
 
     private let noticeScheduler = NoticeAutoDismissScheduler()
 
@@ -24,10 +25,12 @@ final class SettingsPageModel: ObservableObject {
     init(
         settingsCoordinator: SettingsCoordinator,
         editorAppService: EditorAppServiceProtocol,
-        onSettingsUpdated: @escaping @MainActor (AppSettings) -> Void = { _ in }
+        onSettingsUpdated: @escaping @MainActor (AppSettings) -> Void = { _ in },
+        onQuitRequested: @escaping @MainActor () -> Void = {}
     ) {
         self.settingsCoordinator = settingsCoordinator
         self.editorAppService = editorAppService
         self.onSettingsUpdated = onSettingsUpdated
+        self.onQuitRequested = onQuitRequested
     }
 }

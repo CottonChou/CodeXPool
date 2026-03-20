@@ -1,7 +1,4 @@
 import SwiftUI
-#if canImport(AppKit)
-import AppKit
-#endif
 
 struct SettingsPageContent: View {
     @ObservedObject var model: SettingsPageModel
@@ -29,7 +26,7 @@ private struct MacSettingsPageContent: View {
             .formStyle(.grouped)
             .scrollIndicators(.hidden)
 
-            SettingsQuitFooter()
+            SettingsQuitFooter(onQuit: model.quitApp)
         }
         .task {
             await model.loadIfNeeded()
@@ -69,12 +66,14 @@ private struct SettingsSwitchBehaviorSection: View {
 }
 
 private struct SettingsQuitFooter: View {
+    let onQuit: () -> Void
+
     var body: some View {
         HStack(spacing: LayoutRules.listRowSpacing) {
             Spacer(minLength: 0)
 
             Button(role: .destructive) {
-                quitApp()
+                onQuit()
             } label: {
                 Text("common.quit")
             }
@@ -83,12 +82,6 @@ private struct SettingsQuitFooter: View {
         .padding(.horizontal, LayoutRules.pagePadding)
         .padding(.top, 6)
         .padding(.bottom, 10)
-    }
-
-    private func quitApp() {
-        #if canImport(AppKit)
-        NSApp.terminate(nil)
-        #endif
     }
 }
 #endif

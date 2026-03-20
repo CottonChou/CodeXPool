@@ -25,6 +25,7 @@
 			A302A302A302A302A302A302 /* ProxyInfoPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = A202A202A202A202A202A202 /* ProxyInfoPrimitives.swift */; };
 		A303A303A303A303A303A303 /* RemoteServerCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A203A203A203A203A203A203 /* RemoteServerCardView.swift */; };
 		A304A304A304A304A304A304 /* PublicAccessPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = A204A204A204A204A204A204 /* PublicAccessPrimitives.swift */; };
+		A307A307A307A307A307A307 /* ProxyPageViewAdapters.swift in Sources */ = {isa = PBXBuildFile; fileRef = A207A207A207A207A207A207 /* ProxyPageViewAdapters.swift */; };
 		A305A305A305A305A305A305 /* AccountsPageShells.swift in Sources */ = {isa = PBXBuildFile; fileRef = A205A205A205A205A205A205 /* AccountsPageShells.swift */; };
 		A306A306A306A306A306A306 /* SettingsPageSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = A206A206A206A206A206A206 /* SettingsPageSections.swift */; };
 		A801A801A801A801A801A801 /* AccountsActionPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A701A701A701A701A701A701 /* AccountsActionPresentation.swift */; };
@@ -37,6 +38,9 @@
 		A808A808A808A808A808A808 /* AccountsPageModel+Refresh.swift in Sources */ = {isa = PBXBuildFile; fileRef = A708A708A708A708A708A708 /* AccountsPageModel+Refresh.swift */; };
 		A809A809A809A809A809A809 /* AccountsPageModel+Selection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A709A709A709A709A709A709 /* AccountsPageModel+Selection.swift */; };
 		A810A810A810A810A810A810 /* AccountsPageModel+State.swift in Sources */ = {isa = PBXBuildFile; fileRef = A710A710A710A710A710A710 /* AccountsPageModel+State.swift */; };
+		A811A811A811A811A811A811 /* AccountsPagePresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A713A713A713A713A713A713 /* AccountsPagePresentation.swift */; };
+		A812A812A812A812A812A812 /* AccountsPageViewStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A714A714A714A714A714A714 /* AccountsPageViewStore.swift */; };
+		A813A813A813A813A813A813 /* AccountsAnimationRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = A715A715A715A715A715A715 /* AccountsAnimationRules.swift */; };
 		A821A821A821A821A821A821 /* AccountsActionPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A701A701A701A701A701A701 /* AccountsActionPresentation.swift */; };
 		A822A822A822A822A822A822 /* AccountsActionPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = A702A702A702A702A702A702 /* AccountsActionPrimitives.swift */; };
 		A823A823A823A823A823A823 /* AccountsPageSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = A703A703A703A703A703A703 /* AccountsPageSections.swift */; };
@@ -47,6 +51,9 @@
 		A828A828A828A828A828A828 /* AccountsPageModel+Refresh.swift in Sources */ = {isa = PBXBuildFile; fileRef = A708A708A708A708A708A708 /* AccountsPageModel+Refresh.swift */; };
 		A829A829A829A829A829A829 /* AccountsPageModel+Selection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A709A709A709A709A709A709 /* AccountsPageModel+Selection.swift */; };
 		A830A830A830A830A830A830 /* AccountsPageModel+State.swift in Sources */ = {isa = PBXBuildFile; fileRef = A710A710A710A710A710A710 /* AccountsPageModel+State.swift */; };
+		A831A831A831A831A831A831 /* AccountsPagePresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A713A713A713A713A713A713 /* AccountsPagePresentation.swift */; };
+		A832A832A832A832A832A832 /* AccountsPageViewStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A714A714A714A714A714A714 /* AccountsPageViewStore.swift */; };
+		A833A833A833A833A833A833 /* AccountsAnimationRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = A715A715A715A715A715A715 /* AccountsAnimationRules.swift */; };
 		A841A841A841A841A841A841 /* AccountsActionPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A711A711A711A711A711A711 /* AccountsActionPresentationTests.swift */; };
 		A842A842A842A842A842A842 /* AccountCardInteractionPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A712A712A712A712A712A712 /* AccountCardInteractionPresentationTests.swift */; };
 		C201C201C201C201C201C201 /* SettingsControlPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B201B201B201B201B201B201 /* SettingsControlPresentation.swift */; };
@@ -68,6 +75,7 @@
 		C241C241C241C241C241C241 /* SettingsControlPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B209B209B209B209B209B209 /* SettingsControlPresentationTests.swift */; };
 		C242C242C242C242C242C242 /* PublicAccessSectionPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B210B210B210B210B210B210 /* PublicAccessSectionPresentationTests.swift */; };
 		C243C243C243C243C243C243 /* RemoteServerCardPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B211B211B211B211B211B211 /* RemoteServerCardPresentationTests.swift */; };
+		C244C244C244C244C244C244 /* SettingsPageModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B212B212B212B212B212B212 /* SettingsPageModelTests.swift */; };
 		02824E5ABDF8A2C228BC1B03 /* ShellCommandRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00E0EE08E1645AD783C2DED1 /* ShellCommandRunner.swift */; };
 		0291143814388B4D29DCB163 /* SettingsPageModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBF9C8262357FD7DC9AA4855 /* SettingsPageModel.swift */; };
 		037DB8B9A2A1E5FA00C16E1E /* proxy_daemon.rs in Resources */ = {isa = PBXBuildFile; fileRef = 3E013D6F6786AE2EA7E9AF59 /* proxy_daemon.rs */; };
@@ -132,8 +140,9 @@
 			A311A311A311A311A311A311 /* ProxyActionPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = A201A201A201A201A201A201 /* ProxyActionPrimitives.swift */; };
 			A312A312A312A312A312A312 /* ProxyInfoPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = A202A202A202A202A202A202 /* ProxyInfoPrimitives.swift */; };
 			A313A313A313A313A313A313 /* RemoteServerCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A203A203A203A203A203A203 /* RemoteServerCardView.swift */; };
-			A314A314A314A314A314A314 /* PublicAccessPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = A204A204A204A204A204A204 /* PublicAccessPrimitives.swift */; };
-			A315A315A315A315A315A315 /* AccountsPageShells.swift in Sources */ = {isa = PBXBuildFile; fileRef = A205A205A205A205A205A205 /* AccountsPageShells.swift */; };
+		A314A314A314A314A314A314 /* PublicAccessPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = A204A204A204A204A204A204 /* PublicAccessPrimitives.swift */; };
+		A317A317A317A317A317A317 /* ProxyPageViewAdapters.swift in Sources */ = {isa = PBXBuildFile; fileRef = A207A207A207A207A207A207 /* ProxyPageViewAdapters.swift */; };
+		A315A315A315A315A315A315 /* AccountsPageShells.swift in Sources */ = {isa = PBXBuildFile; fileRef = A205A205A205A205A205A205 /* AccountsPageShells.swift */; };
 			A316A316A316A316A316A316 /* SettingsPageSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = A206A206A206A206A206A206 /* SettingsPageSections.swift */; };
 			A511A511A511A511A511A511 /* RemoteServerAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = A401A401A401A401A401A401 /* RemoteServerAction.swift */; };
 			A512A512A512A512A512A512 /* ProxySyncPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A402A402A402A402A402A402 /* ProxySyncPolicy.swift */; };
@@ -331,6 +340,9 @@
 		A708A708A708A708A708A708 /* AccountsPageModel+Refresh.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AccountsPageModel+Refresh.swift"; sourceTree = "<group>"; };
 		A709A709A709A709A709A709 /* AccountsPageModel+Selection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AccountsPageModel+Selection.swift"; sourceTree = "<group>"; };
 		A710A710A710A710A710A710 /* AccountsPageModel+State.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AccountsPageModel+State.swift"; sourceTree = "<group>"; };
+		A713A713A713A713A713A713 /* AccountsPagePresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsPagePresentation.swift; sourceTree = "<group>"; };
+		A714A714A714A714A714A714 /* AccountsPageViewStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsPageViewStore.swift; sourceTree = "<group>"; };
+		A715A715A715A715A715A715 /* AccountsAnimationRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsAnimationRules.swift; sourceTree = "<group>"; };
 		A711A711A711A711A711A711 /* AccountsActionPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsActionPresentationTests.swift; sourceTree = "<group>"; };
 		A712A712A712A712A712A712 /* AccountCardInteractionPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountCardInteractionPresentationTests.swift; sourceTree = "<group>"; };
 		B201B201B201B201B201B201 /* SettingsControlPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsControlPresentation.swift; sourceTree = "<group>"; };
@@ -344,10 +356,12 @@
 		B209B209B209B209B209B209 /* SettingsControlPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsControlPresentationTests.swift; sourceTree = "<group>"; };
 		B210B210B210B210B210B210 /* PublicAccessSectionPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublicAccessSectionPresentationTests.swift; sourceTree = "<group>"; };
 		B211B211B211B211B211B211 /* RemoteServerCardPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteServerCardPresentationTests.swift; sourceTree = "<group>"; };
+		B212B212B212B212B212B212 /* SettingsPageModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPageModelTests.swift; sourceTree = "<group>"; };
 			A201A201A201A201A201A201 /* ProxyActionPrimitives.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyActionPrimitives.swift; sourceTree = "<group>"; };
 			A202A202A202A202A202A202 /* ProxyInfoPrimitives.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyInfoPrimitives.swift; sourceTree = "<group>"; };
 			A203A203A203A203A203A203 /* RemoteServerCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteServerCardView.swift; sourceTree = "<group>"; };
 			A204A204A204A204A204A204 /* PublicAccessPrimitives.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublicAccessPrimitives.swift; sourceTree = "<group>"; };
+			A207A207A207A207A207A207 /* ProxyPageViewAdapters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyPageViewAdapters.swift; sourceTree = "<group>"; };
 			A205A205A205A205A205A205 /* AccountsPageShells.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsPageShells.swift; sourceTree = "<group>"; };
 			A206A206A206A206A206A206 /* SettingsPageSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPageSections.swift; sourceTree = "<group>"; };
 			A401A401A401A401A401A401 /* RemoteServerAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteServerAction.swift; sourceTree = "<group>"; };
@@ -534,6 +548,9 @@
 				A708A708A708A708A708A708 /* AccountsPageModel+Refresh.swift */,
 				A709A709A709A709A709A709 /* AccountsPageModel+Selection.swift */,
 				A710A710A710A710A710A710 /* AccountsPageModel+State.swift */,
+				A713A713A713A713A713A713 /* AccountsPagePresentation.swift */,
+				A714A714A714A714A714A714 /* AccountsPageViewStore.swift */,
+				A715A715A715A715A715A715 /* AccountsAnimationRules.swift */,
 				A103A103A103A103A103A103 /* AccountsPageControls.swift */,
 				A703A703A703A703A703A703 /* AccountsPageSections.swift */,
 				A205A205A205A205A205A205 /* AccountsPageShells.swift */,
@@ -623,6 +640,7 @@
 					A409A409A409A409A409A409 /* ProxyPageModel+RemoteSync.swift */,
 					A410A410A410A410A410A410 /* ProxyPageModel+CommandExecution.swift */,
 					D3AE6ECBCE990356DEB5BBE0 /* ProxyPageView.swift */,
+					A207A207A207A207A207A207 /* ProxyPageViewAdapters.swift */,
 					A201A201A201A201A201A201 /* ProxyActionPrimitives.swift */,
 					A202A202A202A202A202A202 /* ProxyInfoPrimitives.swift */,
 				A104A104A104A104A104A104 /* ProxySectionViews.swift */,
@@ -686,6 +704,7 @@
 					B211B211B211B211B211B211 /* RemoteServerCardPresentationTests.swift */,
 					A108A108A108A108A108A108 /* RemoteServerConfigurationTests.swift */,
 					B209B209B209B209B209B209 /* SettingsControlPresentationTests.swift */,
+					B212B212B212B212B212B212 /* SettingsPageModelTests.swift */,
 					DF11B93A2C05CC3B851D671A /* StoreFileRepositoryTests.swift */,
 				1302CF1943B5AEB08D667C6E /* SwiftNativeProxyRuntimeServiceTests.swift */,
 				C10E7339F7656FE20240B3B8 /* UsageWindowSelectorTests.swift */,
@@ -878,6 +897,9 @@
 				A808A808A808A808A808A808 /* AccountsPageModel+Refresh.swift in Sources */,
 				A809A809A809A809A809A809 /* AccountsPageModel+Selection.swift in Sources */,
 				A810A810A810A810A810A810 /* AccountsPageModel+State.swift in Sources */,
+				A811A811A811A811A811A811 /* AccountsPagePresentation.swift in Sources */,
+				A812A812A812A812A812A812 /* AccountsPageViewStore.swift in Sources */,
+				A813A813A813A813A813A813 /* AccountsAnimationRules.swift in Sources */,
 				FCB8E6490AA6D2891320E6A2 /* AccountsPageControls.swift in Sources */,
 				A803A803A803A803A803A803 /* AccountsPageSections.swift in Sources */,
 				A305A305A305A305A305A305 /* AccountsPageShells.swift in Sources */,
@@ -923,6 +945,7 @@
 					A509A509A509A509A509A509 /* ProxyPageModel+RemoteSync.swift in Sources */,
 					A510A510A510A510A510A510 /* ProxyPageModel+CommandExecution.swift in Sources */,
 					D022FDC1F72C2FEE9B5078C8 /* ProxyPageView.swift in Sources */,
+					A307A307A307A307A307A307 /* ProxyPageViewAdapters.swift in Sources */,
 					A301A301A301A301A301A301 /* ProxyActionPrimitives.swift in Sources */,
 					A302A302A302A302A302A302 /* ProxyInfoPrimitives.swift in Sources */,
 					02089089DAC781CC160D2E46 /* ProxySectionViews.swift in Sources */,
@@ -984,6 +1007,7 @@
 					C243C243C243C243C243C243 /* RemoteServerCardPresentationTests.swift in Sources */,
 					137463A0132E4160501DD2AE /* RemoteServerConfigurationTests.swift in Sources */,
 				C241C241C241C241C241C241 /* SettingsControlPresentationTests.swift in Sources */,
+				C244C244C244C244C244C244 /* SettingsPageModelTests.swift in Sources */,
 				137463A0132E4160501DD2AC /* StoreFileRepositoryTests.swift in Sources */,
 				634D954799F1968A5D418EA2 /* SwiftNativeProxyRuntimeServiceTests.swift in Sources */,
 				E11DCC850FA489BD46094EE0 /* UsageWindowSelectorTests.swift in Sources */,
@@ -1010,6 +1034,9 @@
 				A828A828A828A828A828A828 /* AccountsPageModel+Refresh.swift in Sources */,
 				A829A829A829A829A829A829 /* AccountsPageModel+Selection.swift in Sources */,
 				A830A830A830A830A830A830 /* AccountsPageModel+State.swift in Sources */,
+				A831A831A831A831A831A831 /* AccountsPagePresentation.swift in Sources */,
+				A832A832A832A832A832A832 /* AccountsPageViewStore.swift in Sources */,
+				A833A833A833A833A833A833 /* AccountsAnimationRules.swift in Sources */,
 				137936A0518C78C5549E91A1 /* AccountsPageControls.swift in Sources */,
 				A823A823A823A823A823A823 /* AccountsPageSections.swift in Sources */,
 				A315A315A315A315A315A315 /* AccountsPageShells.swift in Sources */,
@@ -1054,6 +1081,7 @@
 					A519A519A519A519A519A519 /* ProxyPageModel+RemoteSync.swift in Sources */,
 					A520A520A520A520A520A520 /* ProxyPageModel+CommandExecution.swift in Sources */,
 					D0611DC1C82F7B37B8D91040 /* ProxyPageView.swift in Sources */,
+					A317A317A317A317A317A317 /* ProxyPageViewAdapters.swift in Sources */,
 					A311A311A311A311A311A311 /* ProxyActionPrimitives.swift in Sources */,
 					A312A312A312A312A312A312 /* ProxyInfoPrimitives.swift in Sources */,
 					AEEEE6E52FAC04AFF97354C2 /* ProxySectionViews.swift in Sources */,

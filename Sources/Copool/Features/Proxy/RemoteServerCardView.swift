@@ -1,20 +1,11 @@
 import SwiftUI
-#if canImport(AppKit)
-import AppKit
-#endif
 
 struct RemoteServerCardView: View {
     let server: RemoteServerConfig
     let status: RemoteProxyStatus?
     let logs: String?
     let activeAction: RemoteServerAction?
-    let onSave: (RemoteServerConfig) -> Void
-    let onRemove: (String) -> Void
-    let onRefresh: () -> Void
-    let onDeploy: () -> Void
-    let onStart: () -> Void
-    let onStop: () -> Void
-    let onLogs: () -> Void
+    let actions: RemoteServerCardActions
 
     @State private var draft: RemoteServerConfig
     @State private var isExpanded: Bool
@@ -24,25 +15,13 @@ struct RemoteServerCardView: View {
         status: RemoteProxyStatus?,
         logs: String?,
         activeAction: RemoteServerAction?,
-        onSave: @escaping (RemoteServerConfig) -> Void,
-        onRemove: @escaping (String) -> Void,
-        onRefresh: @escaping () -> Void,
-        onDeploy: @escaping () -> Void,
-        onStart: @escaping () -> Void,
-        onStop: @escaping () -> Void,
-        onLogs: @escaping () -> Void
+        actions: RemoteServerCardActions
     ) {
         self.server = server
         self.status = status
         self.logs = logs
         self.activeAction = activeAction
-        self.onSave = onSave
-        self.onRemove = onRemove
-        self.onRefresh = onRefresh
-        self.onDeploy = onDeploy
-        self.onStart = onStart
-        self.onStop = onStop
-        self.onLogs = onLogs
+        self.actions = actions
         _draft = State(initialValue: server)
         _isExpanded = State(initialValue: RemoteServerConfiguration.isPlaceholderDraft(server))
     }
@@ -66,7 +45,7 @@ struct RemoteServerCardView: View {
                 RemoteServerFieldGrid(draft: $draft)
                 RemoteServerAuthSection(
                     draft: $draft,
-                    onChooseIdentityFile: chooseIdentityFilePath
+                    onChooseIdentityFile: actions.onChooseIdentityFile
                 )
                 ProxyActionStrip(
                     buttons: ProxyActionPresentation.remoteServerButtons(
@@ -111,35 +90,19 @@ struct RemoteServerCardView: View {
     private func handleRemoteAction(_ intent: RemoteServerAction) async {
         switch intent {
         case .save:
-            onSave(draft)
+            actions.onSave(draft)
         case .remove:
-            onRemove(server.id)
+            actions.onRemove(server.id)
         case .refresh:
-            onRefresh()
+            actions.onRefresh()
         case .deploy:
-            onDeploy()
+            actions.onDeploy()
         case .start:
-            onStart()
+            actions.onStart()
         case .stop:
-            onStop()
+            actions.onStop()
         case .logs:
-            onLogs()
+            actions.onLogs()
         }
-    }
-
-    private func chooseIdentityFilePath() -> String? {
-        #if canImport(AppKit)
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = false
-        panel.canCreateDirectories = false
-        panel.title = "Select SSH key file"
-        let response = panel.runModal()
-        guard response == .OK else { return nil }
-        return panel.url?.path
-        #else
-        return nil
-        #endif
     }
 }

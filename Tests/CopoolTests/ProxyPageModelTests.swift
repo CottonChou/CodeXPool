@@ -249,6 +249,34 @@ final class ProxyPageModelTests: XCTestCase {
         XCTAssertEqual(localCommandService.commands.last?.proxyConfiguration?.cloudflared.enabled, true)
     }
 
+    func testPublicAccessEnabledBindingDispatchesConfigurationSync() async {
+        var snapshot = makeSnapshot()
+        snapshot.proxyStatus.running = true
+        snapshot.proxyStatus.port = 8787
+        snapshot.cloudflaredStatus.installed = true
+        snapshot.cloudflaredStatus.running = false
+        snapshot.publicAccessEnabled = false
+
+        let localCommandService = SpyProxyLocalCommandService(snapshot: snapshot)
+        let model = makeModel(localProxyCommandService: localCommandService)
+        _ = model.applyRemoteSnapshot(snapshot)
+
+        model.publicAccessEnabledBinding.wrappedValue = true
+        try? await Task.sleep(for: .milliseconds(50))
+
+        XCTAssertEqual(localCommandService.commands.last?.kind, .updateProxyConfiguration)
+        XCTAssertEqual(localCommandService.commands.last?.proxyConfiguration?.cloudflared.enabled, true)
+    }
+
+    func testRemoteServerCardActionsUseInjectedIdentityPicker() {
+        let model = makeModel(chooseIdentityFilePath: { "/tmp/id_ed25519" })
+        let server = makeSnapshot().remoteServers[0]
+
+        let actions = model.remoteServerCardActions(for: server)
+
+        XCTAssertEqual(actions.onChooseIdentityFile(), "/tmp/id_ed25519")
+    }
+
     func testCannotStartCloudflaredWhenPublicAccessDisabled() async {
         var snapshot = makeSnapshot()
         snapshot.cloudflaredStatus.running = false
@@ -316,7 +344,8 @@ final class ProxyPageModelTests: XCTestCase {
         localProxyCommandService: ProxyLocalCommandServiceProtocol? = nil,
         cloudflaredService: CloudflaredServiceProtocol = StubCloudflaredService(),
         runtimePlatform: RuntimePlatform = .macOS,
-        store: AccountsStore = AccountsStore()
+        store: AccountsStore = AccountsStore(),
+        chooseIdentityFilePath: @escaping @MainActor () -> String? = { nil }
     ) -> ProxyPageModel {
         let proxyCoordinator = ProxyCoordinator(
             proxyService: StubProxyRuntimeService(),
@@ -333,7 +362,8 @@ final class ProxyPageModelTests: XCTestCase {
             settingsCoordinator: settingsCoordinator,
             proxyControlCloudSyncService: proxyControlCloudSyncService,
             localProxyCommandService: localProxyCommandService,
-            runtimePlatform: runtimePlatform
+            runtimePlatform: runtimePlatform,
+            chooseIdentityFilePath: chooseIdentityFilePath
         )
     }
 

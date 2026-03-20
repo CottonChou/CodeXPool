@@ -100,14 +100,14 @@ struct AccountCardView: View {
                 return
             }
             guard isHoveringCollapsedSwitch != hovering else { return }
-            withAnimation(.easeInOut(duration: 0.16)) {
+            withAnimation(AccountsAnimationRules.cardHoverOverlay) {
                 isHoveringCollapsedSwitch = hovering
             }
         }
         #if os(iOS)
-        .onLongPressGesture(minimumDuration: 0.35) {
+        .onLongPressGesture(minimumDuration: AccountsAnimationRules.collapsedOverlayMinimumPressDuration) {
             guard interactionPresentation.canRevealCollapsedSwitchOverlay else { return }
-            withAnimation(.easeInOut(duration: 0.16)) {
+            withAnimation(AccountsAnimationRules.cardHoverOverlay) {
                 isCollapsedSwitchOverlayPresented = true
             }
         }
@@ -126,7 +126,7 @@ struct AccountCardView: View {
 
     private func dismissCollapsedSwitchOverlay() {
         guard isCollapsedSwitchOverlayPresented else { return }
-        withAnimation(.easeInOut(duration: 0.16)) {
+        withAnimation(AccountsAnimationRules.cardHoverOverlay) {
             isCollapsedSwitchOverlayPresented = false
         }
     }

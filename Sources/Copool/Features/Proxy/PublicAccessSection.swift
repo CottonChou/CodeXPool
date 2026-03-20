@@ -8,14 +8,9 @@ struct PublicAccessSection: View {
         VStack(alignment: .leading, spacing: 12) {
             PublicAccessHeader(
                 isExpanded: model.cloudflaredExpanded,
-                isEnabled: Binding(
-                    get: { model.publicAccessEnabled },
-                    set: { value in
-                        Task { await model.setPublicAccessEnabled(value) }
-                    }
-                ),
+                isEnabled: model.publicAccessEnabledBinding,
                 onToggleExpanded: toggleExpanded,
-                onToggleEnabled: togglePublicAccessEnabled
+                onToggleEnabled: model.dispatchPublicAccessEnabledUpdate
             )
 
             if model.cloudflaredExpanded {
@@ -53,22 +48,10 @@ struct PublicAccessSection: View {
 
             if model.cloudflaredTunnelMode == .named {
                 PublicAccessNamedTunnelForm(
-                    apiToken: Binding(
-                        get: { model.cloudflaredNamedInput.apiToken },
-                        set: { model.cloudflaredNamedInput.apiToken = $0 }
-                    ),
-                    accountID: Binding(
-                        get: { model.cloudflaredNamedInput.accountID },
-                        set: { model.cloudflaredNamedInput.accountID = $0 }
-                    ),
-                    zoneID: Binding(
-                        get: { model.cloudflaredNamedInput.zoneID },
-                        set: { model.cloudflaredNamedInput.zoneID = $0 }
-                    ),
-                    hostname: Binding(
-                        get: { model.cloudflaredNamedInput.hostname },
-                        set: { model.updateCloudflaredNamedHostname($0) }
-                    ),
+                    apiToken: model.cloudflaredAPITokenBinding,
+                    accountID: model.cloudflaredAccountIDBinding,
+                    zoneID: model.cloudflaredZoneIDBinding,
+                    hostname: model.cloudflaredHostnameBinding,
                     isEnabled: model.canEditCloudflaredInput
                 )
             }
@@ -116,9 +99,5 @@ struct PublicAccessSection: View {
         withAnimation(.easeInOut(duration: 0.2)) {
             model.cloudflaredSectionExpanded.toggle()
         }
-    }
-
-    private func togglePublicAccessEnabled(_ value: Bool) {
-        Task { await model.setPublicAccessEnabled(value) }
     }
 }

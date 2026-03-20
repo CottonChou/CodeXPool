@@ -61,7 +61,7 @@ struct AccountsPageView: View {
     }
 
     private func toggleCollapse() {
-        withAnimation(.easeInOut(duration: 0.2)) {
+        withAnimation(AccountsAnimationRules.collapseToggle) {
             model.toggleAllAccountsCollapsed()
         }
     }

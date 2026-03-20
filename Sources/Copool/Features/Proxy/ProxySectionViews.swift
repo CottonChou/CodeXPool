@@ -57,10 +57,7 @@ struct ApiProxySectionView: View {
             HStack(spacing: 10) {
                 TextField(
                     "8787",
-                    text: Binding(
-                        get: { model.preferredPortText },
-                        set: { model.updatePreferredPortText($0) }
-                    )
+                    text: model.preferredPortBinding
                 )
                 .frostedCapsuleInput()
                 .frame(width: LayoutRules.proxyHeroPortFieldWidth)
@@ -75,12 +72,7 @@ struct ApiProxySectionView: View {
                 Text("proxy.start_on_launch")
                     .font(.subheadline)
                 Spacer(minLength: 0)
-                Toggle("", isOn: Binding(
-                    get: { model.autoStartProxy },
-                    set: { value in
-                        Task { await model.setAutoStartProxy(value) }
-                    }
-                ))
+                Toggle("", isOn: model.autoStartProxyBinding)
                 .labelsHidden()
                 .toggleStyle(.switch)
                 .controlSize(.small)
@@ -121,9 +113,7 @@ struct ApiProxySectionView: View {
                 value: model.proxyStatus.apiKey ?? L10n.tr("proxy.value.generated_after_first_start"),
                 canCopy: model.proxyStatus.apiKey != nil
             ) {
-                Button("common.refresh") {
-                    Task { await model.refreshAPIKey() }
-                }
+                Button("common.refresh", action: model.dispatchRefreshAPIKey)
                 .liquidGlassActionButtonStyle()
                 .disabled(model.loading)
             }
@@ -149,9 +139,7 @@ struct RemoteServersSectionView: View {
         SectionCard(
             title: L10n.tr("proxy.section.remote_servers"),
             headerTrailing: {
-                Button("proxy.action.add_server") {
-                    Task { await model.addRemoteServer() }
-                }
+                Button("proxy.action.add_server", action: model.dispatchAddRemoteServer)
                 .liquidGlassActionButtonStyle(prominent: true)
             }
         ) {
@@ -173,13 +161,7 @@ struct RemoteServersSectionView: View {
                                 status: model.remoteStatuses[server.id],
                                 logs: model.remoteLogs[server.id],
                                 activeAction: model.remoteActions[server.id],
-                                onSave: { updated in Task { await model.saveRemoteServer(updated) } },
-                                onRemove: { id in Task { await model.removeRemoteServer(id: id) } },
-                                onRefresh: { Task { await model.refreshRemote(server: server) } },
-                                onDeploy: { Task { await model.deployRemote(server: server) } },
-                                onStart: { Task { await model.startRemote(server: server) } },
-                                onStop: { Task { await model.stopRemote(server: server) } },
-                                onLogs: { Task { await model.readRemoteLogs(server: server) } }
+                                actions: model.remoteServerCardActions(for: server)
                             )
                         }
                     }
