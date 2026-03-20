@@ -38,4 +38,28 @@ extension AccountsPageModel {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
         }
     }
+
+    func refreshUsage(forAccountID id: String) async {
+        guard !isRefreshing else { return }
+        refreshingAccountIDs.insert(id)
+        defer { refreshingAccountIDs.remove(id) }
+
+        do {
+            let accounts = try await coordinator.refreshUsage(
+                forAccountIDs: [id],
+                force: true,
+                onPartialUpdate: { [weak self] accounts in
+                    guard let self else { return }
+                    await MainActor.run {
+                        self.applyAccounts(accounts)
+                        self.publishLocalAccounts(accounts)
+                    }
+                }
+            )
+            applyAccounts(accounts)
+            publishAndSyncLocalAccountsMutation(accounts)
+        } catch {
+            notice = NoticeMessage(style: .error, text: error.localizedDescription)
+        }
+    }
 }

@@ -28,6 +28,7 @@ final class AccountsPageModel: ObservableObject {
     @Published var isImporting = false
     @Published var isAdding = false
     @Published var switchingAccountID: String?
+    @Published var refreshingAccountIDs: Set<String> = []
     @Published var collapsedAccountIDs: Set<String> = []
 
     init(
@@ -81,7 +82,7 @@ final class AccountsPageModel: ObservableObject {
     }
 
     var isRefreshing: Bool {
-        isManualRefreshing || isRemoteUsageRefreshing
+        isManualRefreshing || isRemoteUsageRefreshing || !refreshingAccountIDs.isEmpty
     }
 
     var isRefreshSpinnerActive: Bool {
@@ -121,6 +122,14 @@ final class AccountsPageModel: ObservableObject {
 
     func isAccountCollapsed(_ id: String) -> Bool {
         collapsedAccountIDs.contains(id)
+    }
+
+    func isAccountRefreshing(_ id: String) -> Bool {
+        refreshingAccountIDs.contains(id)
+    }
+
+    func canRefreshAccount(_ id: String) -> Bool {
+        !isRefreshing && !refreshingAccountIDs.contains(id)
     }
 
     func handlePageAction(_ intent: AccountsPageActionIntent) async {

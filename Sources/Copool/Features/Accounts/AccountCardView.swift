@@ -4,7 +4,10 @@ struct AccountCardView: View {
     let account: AccountSummary
     let isCollapsed: Bool
     let switching: Bool
+    let refreshing: Bool
+    let isRefreshEnabled: Bool
     let onSwitch: () -> Void
+    let onRefresh: () -> Void
     let onDelete: () -> Void
 
     @Environment(\.locale) private var locale
@@ -58,10 +61,7 @@ struct AccountCardView: View {
             if isCollapsed {
                 AccountCardCompactUsageSection(presentation: presentation)
             } else {
-                AccountCardExpandedUsageSection(
-                    presentation: presentation,
-                    usageError: account.usageError
-                )
+                AccountCardExpandedUsageSection(presentation: presentation)
             }
         }
         .padding(isCollapsed ? 8 : 10)
@@ -71,20 +71,27 @@ struct AccountCardView: View {
                 .strokeBorder(account.isCurrent ? palette.toneColor.opacity(0.45) : .clear, lineWidth: 1)
         )
         .overlay(alignment: .bottomTrailing) {
-            AccountExpandedTrailingOverlay(
+            AccountCardBottomOverlay(
                 isCollapsed: isCollapsed,
                 isCurrent: account.isCurrent,
                 switching: switching,
+                refreshing: refreshing,
+                isRefreshEnabled: isRefreshEnabled,
+                usageError: account.usageError,
                 palette: palette,
-                onSwitch: onSwitch
+                onSwitch: onSwitch,
+                onRefresh: onRefresh
             )
         }
         .overlay {
             AccountCollapsedSwitchOverlay(
                 isVisible: interactionPresentation.isCollapsedSwitchOverlayVisible,
                 switching: switching,
+                refreshing: refreshing,
+                isRefreshEnabled: isRefreshEnabled,
                 onDismiss: dismissCollapsedSwitchOverlay,
-                onSwitch: onSwitch
+                onSwitch: onSwitch,
+                onRefresh: onRefresh
             )
         }
         .onHover { hovering in

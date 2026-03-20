@@ -53,10 +53,13 @@ private struct AccountsGridSection: View {
                     account: account,
                     isCollapsed: model.isAccountCollapsed(account.id),
                     switching: model.switchingAccountID == account.id,
+                    refreshing: model.isAccountRefreshing(account.id),
+                    isRefreshEnabled: model.canRefreshAccount(account.id),
                     areCardsPresented: areCardsPresented,
                     index: index,
                     isOverviewMode: isOverviewMode,
                     onSwitch: { Task { await model.switchAccount(id: account.id) } },
+                    onRefresh: { Task { await model.refreshUsage(forAccountID: account.id) } },
                     onDelete: { Task { await model.deleteAccount(id: account.id) } }
                 )
             }
@@ -74,10 +77,13 @@ private struct AccountCardGridItem: View {
     let account: AccountSummary
     let isCollapsed: Bool
     let switching: Bool
+    let refreshing: Bool
+    let isRefreshEnabled: Bool
     let areCardsPresented: Bool
     let index: Int
     let isOverviewMode: Bool
     let onSwitch: () -> Void
+    let onRefresh: () -> Void
     let onDelete: () -> Void
 
     var body: some View {
@@ -85,7 +91,10 @@ private struct AccountCardGridItem: View {
             account: account,
             isCollapsed: isCollapsed,
             switching: switching,
+            refreshing: refreshing,
+            isRefreshEnabled: isRefreshEnabled,
             onSwitch: onSwitch,
+            onRefresh: onRefresh,
             onDelete: onDelete
         )
         .copoolCardEntrance(index: index, isPresented: areCardsPresented)

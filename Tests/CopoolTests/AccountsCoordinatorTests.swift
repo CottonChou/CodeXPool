@@ -820,6 +820,68 @@ final class AccountsCoordinatorTests: XCTestCase {
         XCTAssertEqual(syncSpy.syncCallCount, 1)
         XCTAssertEqual(syncSpy.acceptedSnapshots.last?.first?.teamAlias, "Renamed")
     }
+
+    @MainActor
+    func testAccountsPageModelSingleAccountRefreshTargetsOnlyOneAccountAndSyncsMutation() async {
+        let now: Int64 = 1_763_216_000
+        let storeRepository = InMemoryAccountsStoreRepository(
+            store: AccountsStore(
+                accounts: [
+                    makeStoredAccount(id: "acct-1", accountID: "account-1", now: now),
+                    makeStoredAccount(id: "acct-2", accountID: "account-2", now: now),
+                ]
+            )
+        )
+        let usageService = RecordingAccountUsageService(
+            results: [
+                "account-1": makeUsageSnapshot(fetchedAt: now, fiveHourResetAt: now + 300),
+                "account-2": makeUsageSnapshot(fetchedAt: now, fiveHourResetAt: now + 600),
+            ]
+        )
+        let coordinator = AccountsCoordinator(
+            storeRepository: storeRepository,
+            authRepository: MultiAccountAuthRepository(
+                extractedByAccountID: [
+                    "account-1": makeExtractedAuth(accountID: "account-1"),
+                    "account-2": makeExtractedAuth(accountID: "account-2"),
+                ],
+                currentAccountID: "account-1"
+            ),
+            usageService: usageService,
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+        let syncSpy = SpyAccountsLocalMutationSyncService()
+        let model = AccountsPageModel(
+            coordinator: coordinator,
+            localAccountsMutationSyncService: syncSpy,
+            onLocalAccountsChanged: { accounts in
+                syncSpy.acceptLocalAccountsSnapshot(accounts)
+            }
+        )
+
+        await model.refreshUsage(forAccountID: "acct-2")
+
+        let requestedAccountIDs = await usageService.readRequestedAccountIDs()
+        XCTAssertEqual(requestedAccountIDs, ["account-2"])
+
+        for _ in 0..<10 where syncSpy.syncCallCount == 0 {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+
+        XCTAssertEqual(syncSpy.syncCallCount, 1)
+        XCTAssertTrue(model.refreshingAccountIDs.isEmpty)
+        if case .content(let accounts) = model.state {
+            XCTAssertEqual(accounts.count, 2)
+            XCTAssertNil(accounts.first(where: { $0.id == "acct-1" })?.usage)
+            XCTAssertNotNil(accounts.first(where: { $0.id == "acct-2" })?.usage)
+        } else {
+            XCTFail("Expected refreshed accounts content state")
+        }
+    }
 }
 
 private func makeAccountSummary(

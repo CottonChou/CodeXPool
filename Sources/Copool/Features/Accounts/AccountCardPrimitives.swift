@@ -1,5 +1,9 @@
 import SwiftUI
 
+private enum AccountCardOverlayLayout {
+    static let actionReservationWidth: CGFloat = 144
+}
+
 enum AccountCardSwitchButtonLabelStyle {
     case iconOnly
     case expanded
@@ -127,7 +131,6 @@ struct AccountCardHeaderSection: View {
 
 struct AccountCardExpandedUsageSection: View {
     let presentation: AccountCardPresentation
-    let usageError: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -138,15 +141,8 @@ struct AccountCardExpandedUsageSection: View {
                 Text(L10n.tr("accounts.card.credits_format", presentation.creditsText))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .padding(.trailing, 64)
+                    .padding(.trailing, AccountCardOverlayLayout.actionReservationWidth)
                 Spacer(minLength: 0)
-            }
-
-            if let usageError, !usageError.isEmpty {
-                Text(usageError)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .lineLimit(2)
             }
         }
     }
@@ -170,30 +166,38 @@ struct AccountCardCompactUsageSection: View {
     }
 }
 
-struct AccountExpandedTrailingOverlay: View {
+struct AccountCardBottomOverlay: View {
     let isCollapsed: Bool
     let isCurrent: Bool
     let switching: Bool
+    let refreshing: Bool
+    let isRefreshEnabled: Bool
+    let usageError: String?
     let palette: AccountCardPalette
     let onSwitch: () -> Void
+    let onRefresh: () -> Void
 
     var body: some View {
         if !isCollapsed {
-            if isCurrent {
-                AccountTagView(
-                    text: L10n.tr("accounts.card.current"),
-                    backgroundColor: palette.toneColor.opacity(0.24),
-                    foregroundColor: palette.toneColor
-                )
-                .padding(8)
-            } else {
-                AccountSwitchButton(
+            HStack(alignment: .bottom, spacing: 10) {
+                if let usageError, !usageError.isEmpty {
+                    AccountUsageErrorOverlay(text: usageError)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    Spacer(minLength: 0)
+                }
+
+                AccountTrailingActionCluster(
+                    isCurrent: isCurrent,
                     switching: switching,
-                    labelStyle: .iconOnly,
-                    onSwitch: onSwitch
+                    refreshing: refreshing,
+                    isRefreshEnabled: isRefreshEnabled,
+                    palette: palette,
+                    onSwitch: onSwitch,
+                    onRefresh: onRefresh
                 )
-                .padding(8)
             }
+            .padding(8)
         }
     }
 }
@@ -201,8 +205,11 @@ struct AccountExpandedTrailingOverlay: View {
 struct AccountCollapsedSwitchOverlay: View {
     let isVisible: Bool
     let switching: Bool
+    let refreshing: Bool
+    let isRefreshEnabled: Bool
     let onDismiss: () -> Void
     let onSwitch: () -> Void
+    let onRefresh: () -> Void
 
     var body: some View {
         if isVisible {
@@ -217,11 +224,18 @@ struct AccountCollapsedSwitchOverlay: View {
                         onDismiss()
                     }
 
-                AccountSwitchButton(
-                    switching: switching,
-                    labelStyle: .expanded,
-                    onSwitch: onSwitch
-                )
+                HStack(spacing: 10) {
+                    AccountSwitchButton(
+                        switching: switching,
+                        labelStyle: .expanded,
+                        onSwitch: onSwitch
+                    )
+                    AccountRefreshButton(
+                        refreshing: refreshing,
+                        isEnabled: isRefreshEnabled,
+                        onRefresh: onRefresh
+                    )
+                }
             }
             .transition(.opacity)
         }
@@ -303,6 +317,87 @@ private struct AccountSwitchButton: View {
         )
         .disabled(switching)
         .accessibilityLabel(Text(L10n.tr("accounts.card.switch_to_this")))
+    }
+}
+
+private struct AccountRefreshButton: View {
+    let refreshing: Bool
+    let isEnabled: Bool
+    let onRefresh: () -> Void
+
+    var body: some View {
+        Button {
+            onRefresh()
+        } label: {
+            if refreshing {
+                ProgressView()
+                    .controlSize(.small)
+            } else {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 14, weight: .semibold))
+            }
+        }
+        .copoolActionButtonStyle(
+            prominent: true,
+            tint: .teal,
+            density: .compact,
+            iOSStyle: .liquidGlass
+        )
+        .disabled(!isEnabled)
+        .accessibilityLabel(Text(L10n.tr("common.refresh_usage")))
+    }
+}
+
+private struct AccountTrailingActionCluster: View {
+    let isCurrent: Bool
+    let switching: Bool
+    let refreshing: Bool
+    let isRefreshEnabled: Bool
+    let palette: AccountCardPalette
+    let onSwitch: () -> Void
+    let onRefresh: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if isCurrent {
+                AccountTagView(
+                    text: L10n.tr("accounts.card.current"),
+                    backgroundColor: palette.toneColor.opacity(0.24),
+                    foregroundColor: palette.toneColor
+                )
+            } else {
+                AccountSwitchButton(
+                    switching: switching,
+                    labelStyle: .iconOnly,
+                    onSwitch: onSwitch
+                )
+            }
+
+            AccountRefreshButton(
+                refreshing: refreshing,
+                isEnabled: isRefreshEnabled,
+                onRefresh: onRefresh
+            )
+        }
+    }
+}
+
+private struct AccountUsageErrorOverlay: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.caption2.weight(.medium))
+            .foregroundStyle(.red)
+            .multilineTextAlignment(.leading)
+            .lineLimit(3)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(.red.opacity(0.18), lineWidth: 1)
+            }
     }
 }
 
