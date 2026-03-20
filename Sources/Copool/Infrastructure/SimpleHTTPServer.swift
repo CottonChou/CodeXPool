@@ -72,7 +72,7 @@ final class SimpleHTTPServer: @unchecked Sendable {
                 return
             }
 
-            if let error {
+            if error != nil {
                 connection.cancel()
                 // NSLog("SimpleHTTPServer receive error: \(error.localizedDescription)")
                 return
