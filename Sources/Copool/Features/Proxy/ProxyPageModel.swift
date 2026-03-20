@@ -195,8 +195,53 @@ final class ProxyPageModel: ObservableObject {
         runtimePlatform == .iOS && proxyControlCloudSyncService != nil
     }
 
+    var apiProxyActionButtons: [ProxyActionButtonDescriptor<ApiProxyActionIntent>] {
+        ProxyActionPresentation.apiProxyButtons(
+            isRunning: proxyStatus.running,
+            isLoading: loading
+        )
+    }
+
+    var publicAccessInstallButton: ProxyActionButtonDescriptor<PublicAccessActionIntent> {
+        ProxyActionPresentation.publicAccessInstallButton(
+            isLoading: loading
+        )
+    }
+
+    var publicAccessActionButtons: [ProxyActionButtonDescriptor<PublicAccessActionIntent>] {
+        ProxyActionPresentation.publicAccessButtons(
+            isRunning: cloudflaredStatus.running,
+            isLoading: loading,
+            canStart: canStartCloudflared
+        )
+    }
+
     func dismissRemoteControlCallout() {
         showsRemoteControlCallout = false
+    }
+
+    func handleAPIProxyAction(_ intent: ApiProxyActionIntent) async {
+        switch intent {
+        case .refreshStatus:
+            await refreshStatus()
+        case .start:
+            await startProxy()
+        case .stop:
+            await stopProxy()
+        }
+    }
+
+    func handlePublicAccessAction(_ intent: PublicAccessActionIntent) async {
+        switch intent {
+        case .install:
+            await installCloudflared()
+        case .refreshStatus:
+            await refreshCloudflared()
+        case .start:
+            await startCloudflared()
+        case .stop:
+            await stopCloudflared()
+        }
     }
 
     func bootstrapOnAppLaunch(using settings: AppSettings) async {

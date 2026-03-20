@@ -193,6 +193,44 @@ final class ProxyPageModelTests: XCTestCase {
         XCTAssertFalse(model.canStartCloudflared)
     }
 
+    func testAPIProxyActionButtonsSwitchPrimaryIntentWithRuntimeState() {
+        let stoppedButtons = ProxyActionPresentation.apiProxyButtons(
+            isRunning: false,
+            isLoading: false
+        )
+        XCTAssertEqual(stoppedButtons.map(\.intent), [.refreshStatus, .start])
+        XCTAssertEqual(stoppedButtons.last?.surfaceStyle, .prominent)
+
+        let runningButtons = ProxyActionPresentation.apiProxyButtons(
+            isRunning: true,
+            isLoading: false
+        )
+        XCTAssertEqual(runningButtons.map(\.intent), [.refreshStatus, .stop])
+        XCTAssertEqual(runningButtons.last?.role, .destructive)
+    }
+
+    func testPublicAccessActionButtonsDisableStartWhenStartPreconditionsFail() {
+        let buttons = ProxyActionPresentation.publicAccessButtons(
+            isRunning: false,
+            isLoading: false,
+            canStart: false
+        )
+
+        XCTAssertEqual(buttons.map(\.intent), [.refreshStatus, .start])
+        XCTAssertEqual(buttons.last?.isEnabled, false)
+    }
+
+    func testRemoteServerButtonsExposeProgressThroughDescriptorState() {
+        let buttons = ProxyActionPresentation.remoteServerButtons(
+            isRunning: false,
+            activeAction: .deploy
+        )
+
+        XCTAssertEqual(buttons.map(\.intent), [.save, .remove, .deploy, .refresh, .start, .logs])
+        XCTAssertEqual(buttons.first(where: { $0.intent == .deploy })?.showsProgress, true)
+        XCTAssertEqual(buttons.first(where: { $0.intent == .deploy })?.isEnabled, false)
+    }
+
     func testLocalStartProxyUsesLocalCommandServiceForImmediateSync() async {
         let snapshot = makeSnapshot()
         let localCommandService = SpyProxyLocalCommandService(snapshot: snapshot)

@@ -73,11 +73,10 @@ struct PublicAccessSection: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
-                Button("proxy.public.install_action") {
-                    Task { await model.installCloudflared() }
-                }
-                .liquidGlassActionButtonStyle(prominent: true)
-                .disabled(model.loading)
+                ProxyActionStrip(
+                    buttons: [model.publicAccessInstallButton],
+                    onAction: model.handlePublicAccessAction
+                )
             }
             .padding(12)
             .cardSurface(cornerRadius: 12)
@@ -206,82 +205,39 @@ struct PublicAccessSection: View {
     private var toolbar: some View {
         #if os(iOS)
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                Text(L10n.tr("proxy.toggle.use_http2"))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 0)
-                PublicAccessSwitchPill(
-                    isOn: Binding(
-                        get: { model.cloudflaredUseHTTP2 },
-                        set: { model.updateCloudflaredUseHTTP2($0) }
-                    )
-                )
-                .disabled(!model.canEditCloudflaredInput)
-            }
-
-            HStack(spacing: 8) {
-                Button("proxy.public.refresh_status") {
-                    Task { await model.refreshCloudflared() }
-                }
-                .liquidGlassActionButtonStyle()
-                .disabled(model.loading)
-
-                if model.cloudflaredStatus.running {
-                    Button("proxy.public.stop_action", role: .destructive) {
-                        Task { await model.stopCloudflared() }
-                    }
-                    .liquidGlassActionButtonStyle(prominent: true, tint: .red)
-                    .disabled(model.loading)
-                } else {
-                    Button("proxy.public.start_action") {
-                        Task { await model.startCloudflared() }
-                    }
-                    .liquidGlassActionButtonStyle(prominent: true)
-                    .disabled(!model.canStartCloudflared)
-                }
-            }
+            http2ToggleRow
+            publicAccessActionStrip
         }
         #else
         HStack(spacing: 10) {
-            HStack(spacing: 10) {
-                Text(L10n.tr("proxy.toggle.use_http2"))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                PublicAccessSwitchPill(
-                    isOn: Binding(
-                        get: { model.cloudflaredUseHTTP2 },
-                        set: { model.updateCloudflaredUseHTTP2($0) }
-                    )
-                )
-                .disabled(!model.canEditCloudflaredInput)
-            }
-
+            http2ToggleRow
             Spacer(minLength: 0)
-
-            HStack(spacing: 8) {
-                Button("proxy.public.refresh_status") {
-                    Task { await model.refreshCloudflared() }
-                }
-                .liquidGlassActionButtonStyle()
-                .disabled(model.loading)
-
-                if model.cloudflaredStatus.running {
-                    Button("proxy.public.stop_action", role: .destructive) {
-                        Task { await model.stopCloudflared() }
-                    }
-                    .liquidGlassActionButtonStyle(prominent: true, tint: .red)
-                    .disabled(model.loading)
-                } else {
-                    Button("proxy.public.start_action") {
-                        Task { await model.startCloudflared() }
-                    }
-                    .liquidGlassActionButtonStyle(prominent: true)
-                    .disabled(!model.canStartCloudflared)
-                }
-            }
+            publicAccessActionStrip
         }
         #endif
+    }
+
+    private var http2ToggleRow: some View {
+        HStack(spacing: 10) {
+            Text(L10n.tr("proxy.toggle.use_http2"))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+            PublicAccessSwitchPill(
+                isOn: Binding(
+                    get: { model.cloudflaredUseHTTP2 },
+                    set: { model.updateCloudflaredUseHTTP2($0) }
+                )
+            )
+            .disabled(!model.canEditCloudflaredInput)
+        }
+    }
+
+    private var publicAccessActionStrip: some View {
+        ProxyActionStrip(
+            buttons: model.publicAccessActionButtons,
+            onAction: model.handlePublicAccessAction
+        )
     }
 
     private var statusGrid: some View {
