@@ -1,9 +1,16 @@
 import Foundation
+import SwiftUI
 
 extension AccountsPageModel {
     func switchAccount(id: String) async {
-        switchingAccountID = id
-        defer { switchingAccountID = nil }
+        withAccountsSwitchAnimation {
+            switchingAccountID = id
+        }
+        defer {
+            withAccountsSwitchAnimation {
+                switchingAccountID = nil
+            }
+        }
 
         do {
             let execution = try await coordinator.switchAccountAndApplySettings(id: id)
@@ -11,7 +18,7 @@ extension AccountsPageModel {
             guard let selectedAccount = accounts.first(where: { $0.id == id }) else {
                 throw AppError.invalidData(L10n.tr("error.accounts.account_not_found_for_switch"))
             }
-            applyAccounts(accounts)
+            applyAccountsForAccountSwitch(accounts)
             publishAndSyncLocalAccountsMutation(accounts)
             syncCurrentAccountSelectionInBackground(accountID: selectedAccount.accountID)
             notice = buildSwitchNotice(execution: execution)
@@ -35,7 +42,7 @@ extension AccountsPageModel {
 
             let execution = try await coordinator.switchAccountAndApplySettings(id: best.id)
             let accounts = try await coordinator.listAccounts()
-            applyAccounts(accounts)
+            applyAccountsForAccountSwitch(accounts)
             publishAndSyncLocalAccountsMutation(accounts)
             syncCurrentAccountSelectionInBackground(accountID: best.accountID)
             var switchNotice = buildSwitchNotice(execution: execution)
@@ -54,5 +61,17 @@ extension AccountsPageModel {
             return
         }
         collapsedAccountIDs = collapsedAccountIDs.isSuperset(of: ids) ? [] : ids
+    }
+
+    private func applyAccountsForAccountSwitch(_ accounts: [AccountSummary]) {
+        withAccountsSwitchAnimation {
+            applyAccounts(accounts)
+        }
+    }
+
+    private func withAccountsSwitchAnimation(_ updates: () -> Void) {
+        withAnimation(.spring(response: 0.36, dampingFraction: 0.84)) {
+            updates()
+        }
     }
 }
