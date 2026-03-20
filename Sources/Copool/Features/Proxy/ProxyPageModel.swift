@@ -163,6 +163,7 @@ final class ProxyPageModel: ObservableObject {
 
     var canStartCloudflared: Bool {
         guard !loading else { return false }
+        guard publicAccessEnabled else { return false }
         guard proxyStatus.running, proxyStatus.port != nil else { return false }
         guard cloudflaredStatus.installed, !cloudflaredStatus.running else { return false }
         if cloudflaredTunnelMode == .quick {
@@ -452,16 +453,12 @@ final class ProxyPageModel: ObservableObject {
             publicAccessEnabled = false
             return
         }
+        guard publicAccessEnabled != enabled else { return }
+        publicAccessEnabled = enabled
         if enabled {
             cloudflaredSectionExpanded = true
-            await startCloudflared()
-        } else {
-            guard cloudflaredStatus.running else {
-                publicAccessEnabled = false
-                return
-            }
-            await stopCloudflared()
         }
+        await syncCurrentProxyConfiguration()
     }
 
     func updatePreferredPortText(_ value: String) {
@@ -720,7 +717,6 @@ final class ProxyPageModel: ObservableObject {
 
     private func applyCloudflaredStatus(_ status: CloudflaredStatus) {
         cloudflaredStatus = status
-        publicAccessEnabled = status.running
         if status.running {
             cloudflaredUseHTTP2 = status.useHTTP2
             if let mode = status.tunnelMode {
@@ -780,6 +776,7 @@ final class ProxyPageModel: ObservableObject {
         ProxyConfiguration(
             preferredPortText: preferredPortText,
             cloudflared: CloudflaredConfiguration(
+                enabled: publicAccessEnabled,
                 tunnelMode: cloudflaredTunnelMode,
                 useHTTP2: cloudflaredUseHTTP2,
                 namedHostname: cloudflaredNamedInput.hostname
@@ -796,6 +793,7 @@ final class ProxyPageModel: ObservableObject {
     private func applyProxyConfiguration(_ configuration: ProxyConfiguration) {
         let normalized = configuration.normalized()
         preferredPortText = normalized.preferredPortText
+        publicAccessEnabled = normalized.cloudflared.enabled
         cloudflaredTunnelMode = normalized.cloudflared.tunnelMode
         cloudflaredUseHTTP2 = normalized.cloudflared.useHTTP2
         cloudflaredNamedInput.hostname = normalized.cloudflared.namedHostname

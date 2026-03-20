@@ -21,6 +21,7 @@ final class AppSettingsCodableTests: XCTestCase {
         XCTAssertEqual(decoded.autoSmartSwitch, false)
         XCTAssertEqual(decoded.autoStartApiProxy, true)
         XCTAssertEqual(decoded.localProxyHostAPIOnly, false)
+        XCTAssertEqual(decoded.proxyConfiguration.cloudflared.enabled, false)
         XCTAssertEqual(decoded.proxyConfiguration, .defaultValue)
         XCTAssertEqual(decoded.locale, AppLocale.english.identifier)
     }

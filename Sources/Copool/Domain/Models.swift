@@ -250,18 +250,46 @@ struct RemoteServerConfig: Codable, Equatable, Identifiable, Sendable {
 }
 
 struct CloudflaredConfiguration: Codable, Equatable {
+    var enabled: Bool
     var tunnelMode: CloudflaredTunnelMode
     var useHTTP2: Bool
     var namedHostname: String
 
     init(
+        enabled: Bool = false,
         tunnelMode: CloudflaredTunnelMode = .quick,
         useHTTP2: Bool = false,
         namedHostname: String = ""
     ) {
+        self.enabled = enabled
         self.tunnelMode = tunnelMode
         self.useHTTP2 = useHTTP2
         self.namedHostname = Self.normalizeHostnameDraft(namedHostname)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case enabled
+        case tunnelMode
+        case useHTTP2
+        case namedHostname
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? false
+        tunnelMode = try container.decodeIfPresent(CloudflaredTunnelMode.self, forKey: .tunnelMode) ?? .quick
+        useHTTP2 = try container.decodeIfPresent(Bool.self, forKey: .useHTTP2) ?? false
+        namedHostname = Self.normalizeHostnameDraft(
+            try container.decodeIfPresent(String.self, forKey: .namedHostname) ?? ""
+        )
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(enabled, forKey: .enabled)
+        try container.encode(tunnelMode, forKey: .tunnelMode)
+        try container.encode(useHTTP2, forKey: .useHTTP2)
+        try container.encode(namedHostname, forKey: .namedHostname)
     }
 
     static var defaultValue: CloudflaredConfiguration {
@@ -270,6 +298,7 @@ struct CloudflaredConfiguration: Codable, Equatable {
 
     func normalized() -> CloudflaredConfiguration {
         CloudflaredConfiguration(
+            enabled: enabled,
             tunnelMode: tunnelMode,
             useHTTP2: useHTTP2,
             namedHostname: namedHostname

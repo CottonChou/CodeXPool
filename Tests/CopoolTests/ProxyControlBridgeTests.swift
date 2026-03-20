@@ -175,6 +175,7 @@ final class ProxyControlBridgeTests: XCTestCase {
         let proxyConfiguration = ProxyConfiguration(
             preferredPortText: "9000",
             cloudflared: CloudflaredConfiguration(
+                enabled: true,
                 tunnelMode: .named,
                 useHTTP2: true,
                 namedHostname: "Proxy.Example.com/"
@@ -197,6 +198,7 @@ final class ProxyControlBridgeTests: XCTestCase {
         let snapshot = try await bridge.performLocalCommand(command)
 
         XCTAssertEqual(snapshot.preferredProxyPortText, "9000")
+        XCTAssertEqual(snapshot.publicAccessEnabled, true)
         XCTAssertEqual(snapshot.cloudflaredTunnelMode, .named)
         XCTAssertEqual(snapshot.cloudflaredUseHTTP2, true)
         XCTAssertEqual(snapshot.cloudflaredNamedInput.hostname, "proxy.example.com")

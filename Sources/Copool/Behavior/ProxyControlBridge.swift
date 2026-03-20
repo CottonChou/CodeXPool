@@ -213,7 +213,7 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
                 hostname: proxyConfiguration.cloudflared.namedHostname
             ),
             cloudflaredUseHTTP2: proxyConfiguration.cloudflared.useHTTP2,
-            publicAccessEnabled: cloudflaredStatus.running,
+            publicAccessEnabled: proxyConfiguration.cloudflared.enabled,
             remoteServers: settings.remoteServers,
             remoteStatusesSyncedAt: lastRemoteStatusRefreshAt,
             remoteStatuses: remoteStatuses,

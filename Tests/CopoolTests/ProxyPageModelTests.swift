@@ -111,16 +111,20 @@ final class ProxyPageModelTests: XCTestCase {
         XCTAssertFalse(model.cloudflaredStatus.running)
     }
 
-    func testRefreshForTabEntryDerivesPublicAccessFromCloudflaredStatus() async {
+    func testRefreshForTabEntryPreservesPublicAccessConfiguration() async {
+        var store = AccountsStore()
+        store.settings.proxyConfiguration = ProxyConfiguration(
+            cloudflared: CloudflaredConfiguration(enabled: true)
+        )
         let model = makeModel(
             cloudflaredService: StubCloudflaredService(statusValue: .idle),
-            runtimePlatform: .macOS
+            runtimePlatform: .macOS,
+            store: store
         )
-        model.publicAccessEnabled = true
 
         await model.refreshForTabEntry()
 
-        XCTAssertFalse(model.publicAccessEnabled)
+        XCTAssertTrue(model.publicAccessEnabled)
     }
 
     func testApplyRemoteSnapshotPreservesLocalNamedTunnelSecrets() {
@@ -160,7 +164,7 @@ final class ProxyPageModelTests: XCTestCase {
         XCTAssertEqual(localCommandService.commands.first?.proxyConfiguration?.cloudflared.useHTTP2, true)
     }
 
-    func testSetPublicAccessEnabledStartsCloudflared() async {
+    func testSetPublicAccessEnabledSyncsProxyConfigurationWithoutStartingCloudflared() async {
         var snapshot = makeSnapshot()
         snapshot.proxyStatus.running = true
         snapshot.proxyStatus.port = 8787
@@ -174,7 +178,19 @@ final class ProxyPageModelTests: XCTestCase {
 
         await model.setPublicAccessEnabled(true)
 
-        XCTAssertEqual(localCommandService.commands.last?.kind, .startCloudflared)
+        XCTAssertEqual(localCommandService.commands.last?.kind, .updateProxyConfiguration)
+        XCTAssertEqual(localCommandService.commands.last?.proxyConfiguration?.cloudflared.enabled, true)
+    }
+
+    func testCannotStartCloudflaredWhenPublicAccessDisabled() async {
+        var snapshot = makeSnapshot()
+        snapshot.cloudflaredStatus.running = false
+        snapshot.publicAccessEnabled = false
+
+        let model = makeModel()
+        _ = model.applyRemoteSnapshot(snapshot)
+
+        XCTAssertFalse(model.canStartCloudflared)
     }
 
     func testLocalStartProxyUsesLocalCommandServiceForImmediateSync() async {
@@ -194,7 +210,8 @@ final class ProxyPageModelTests: XCTestCase {
         proxyControlCloudSyncService: ProxyControlCloudSyncServiceProtocol? = nil,
         localProxyCommandService: ProxyLocalCommandServiceProtocol? = nil,
         cloudflaredService: CloudflaredServiceProtocol = StubCloudflaredService(),
-        runtimePlatform: RuntimePlatform = .macOS
+        runtimePlatform: RuntimePlatform = .macOS,
+        store: AccountsStore = AccountsStore()
     ) -> ProxyPageModel {
         let proxyCoordinator = ProxyCoordinator(
             proxyService: StubProxyRuntimeService(),
@@ -202,7 +219,7 @@ final class ProxyPageModelTests: XCTestCase {
             remoteService: StubRemoteProxyService()
         )
         let settingsCoordinator = SettingsCoordinator(
-            storeRepository: InMemoryAccountsStoreRepository(store: AccountsStore()),
+            storeRepository: InMemoryAccountsStoreRepository(store: store),
             launchAtStartupService: StubLaunchAtStartupService()
         )
 
