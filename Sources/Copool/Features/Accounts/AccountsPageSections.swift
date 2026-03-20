@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AccountsPageContentSection: View {
     @ObservedObject var model: AccountsPageModel
+    let availableViewportSize: CGSize
     let areCardsPresented: Bool
     let onSwitchAccount: (String) -> Void
     let onRefreshAccountUsage: (String) -> Void
@@ -26,6 +27,7 @@ struct AccountsPageContentSection: View {
             AccountsGridSection(
                 cards: cards,
                 isOverviewMode: presentation.isOverviewMode,
+                availableViewportSize: availableViewportSize,
                 areCardsPresented: areCardsPresented,
                 onSwitchAccount: onSwitchAccount,
                 onRefreshAccountUsage: onRefreshAccountUsage,
@@ -38,17 +40,29 @@ struct AccountsPageContentSection: View {
 private struct AccountsGridSection: View {
     let cards: [AccountCardViewState]
     let isOverviewMode: Bool
+    let availableViewportSize: CGSize
     let areCardsPresented: Bool
     let onSwitchAccount: (String) -> Void
     let onRefreshAccountUsage: (String) -> Void
     let onDeleteAccount: (String) -> Void
 
-    private var columns: [GridItem] {
+    private var gridContext: LayoutRules.AccountsGridContext {
         #if os(iOS)
-        LayoutRules.accountsGridColumns(isOverviewMode: isOverviewMode, isCompactWidth: true)
+        LayoutRules.accountsGridContext(
+            isOverviewMode: isOverviewMode,
+            viewportSize: availableViewportSize
+        )
         #else
-        LayoutRules.accountsGridColumns(isOverviewMode: isOverviewMode, isCompactWidth: false)
+        LayoutRules.AccountsGridContext(
+            platform: .macOS,
+            isOverviewMode: isOverviewMode,
+            viewportSize: availableViewportSize
+        )
         #endif
+    }
+
+    private var columns: [GridItem] {
+        LayoutRules.accountsGridColumns(context: gridContext)
     }
 
     var body: some View {

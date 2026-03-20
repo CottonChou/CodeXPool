@@ -56,6 +56,7 @@ private struct AccountsIOSPageShell: View {
                 VStack(alignment: .leading, spacing: 0) {
                     AccountsPageContentSection(
                         model: model,
+                        availableViewportSize: proxy.size,
                         areCardsPresented: areCardsPresented,
                         onSwitchAccount: onSwitchAccount,
                         onRefreshAccountUsage: onRefreshAccountUsage,
@@ -112,6 +113,10 @@ private struct AccountsMacPageShell: View {
                 VStack(alignment: .leading, spacing: 0) {
                     AccountsPageContentSection(
                         model: model,
+                        availableViewportSize: CGSize(
+                            width: pageContentWidth,
+                            height: LayoutRules.defaultPanelHeight
+                        ),
                         areCardsPresented: areCardsPresented,
                         onSwitchAccount: onSwitchAccount,
                         onRefreshAccountUsage: onRefreshAccountUsage,
