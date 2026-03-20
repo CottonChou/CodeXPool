@@ -2,17 +2,62 @@ import SwiftUI
 import WidgetKit
 
 private enum AccountsWidgetStyle {
-    static let horizontalPadding: CGFloat = 14
-    static let verticalPadding: CGFloat = 14
-    static let largeHorizontalPadding: CGFloat = 10
-    static let compactSpacing: CGFloat = 12
-    static let compactUsageSpacing: CGFloat = 14
-    static let largeSectionSpacing: CGFloat = 14
-    static let rowSpacing: CGFloat = 10
-    static let compactRingSize: CGFloat = 48
+    static let defaultVerticalPadding: CGFloat = 14
     static let compactRingLineWidth: CGFloat = 6
-    static let metricColumnWidth: CGFloat = 156
-    static let rowMetricColumnWidth: CGFloat = 88
+
+    static func layout(for family: WidgetFamily, size: CGSize) -> AccountsWidgetLayout {
+        let width = size.width
+        let horizontalPadding: CGFloat
+        let compactSpacing: CGFloat
+        let compactUsageSpacing: CGFloat
+        let largeSectionSpacing: CGFloat
+        let rowSpacing: CGFloat
+        let compactRingSize: CGFloat
+        let metricColumnWidth: CGFloat
+        let rowMetricColumnWidth: CGFloat
+
+        switch family {
+        case .systemSmall:
+            horizontalPadding = max(10, min(16, width * 0.08))
+            compactSpacing = 10
+            compactUsageSpacing = max(10, min(16, width * 0.08))
+            largeSectionSpacing = 12
+            rowSpacing = 8
+            compactRingSize = max(40, min(52, width * 0.26))
+            metricColumnWidth = max(118, min(160, width * 0.72))
+            rowMetricColumnWidth = max(76, min(96, width * 0.30))
+        case .systemMedium:
+            horizontalPadding = max(12, min(18, width * 0.05))
+            compactSpacing = max(10, min(14, width * 0.025))
+            compactUsageSpacing = max(12, min(18, width * 0.04))
+            largeSectionSpacing = 12
+            rowSpacing = 8
+            compactRingSize = max(42, min(56, width * 0.18))
+            metricColumnWidth = max(124, min(172, width * 0.37))
+            rowMetricColumnWidth = max(80, min(100, width * 0.19))
+        default:
+            horizontalPadding = max(8, min(14, width * 0.025))
+            compactSpacing = 12
+            compactUsageSpacing = 14
+            largeSectionSpacing = 14
+            rowSpacing = 10
+            compactRingSize = 48
+            metricColumnWidth = max(136, min(180, width * 0.30))
+            rowMetricColumnWidth = max(84, min(112, width * 0.18))
+        }
+
+        return AccountsWidgetLayout(
+            horizontalPadding: horizontalPadding,
+            verticalPadding: defaultVerticalPadding,
+            compactSpacing: compactSpacing,
+            compactUsageSpacing: compactUsageSpacing,
+            largeSectionSpacing: largeSectionSpacing,
+            rowSpacing: rowSpacing,
+            compactRingSize: compactRingSize,
+            metricColumnWidth: metricColumnWidth,
+            rowMetricColumnWidth: rowMetricColumnWidth
+        )
+    }
 
     static let backgroundGradient = LinearGradient(
         colors: [
@@ -24,26 +69,45 @@ private enum AccountsWidgetStyle {
     )
 }
 
+private struct AccountsWidgetLayout {
+    let horizontalPadding: CGFloat
+    let verticalPadding: CGFloat
+    let compactSpacing: CGFloat
+    let compactUsageSpacing: CGFloat
+    let largeSectionSpacing: CGFloat
+    let rowSpacing: CGFloat
+    let compactRingSize: CGFloat
+    let metricColumnWidth: CGFloat
+    let rowMetricColumnWidth: CGFloat
+}
+
 struct AccountsWidgetEntryView: View {
     @Environment(\.widgetFamily) private var family
     let entry: AccountsWidgetEntry
 
     var body: some View {
-        Group {
-            switch family {
-            case .systemSmall:
-                AccountsWidgetSmallView(card: entry.snapshot.currentCard)
-            case .systemMedium:
-                AccountsWidgetMediumView(
-                    current: entry.snapshot.currentCard,
-                    secondary: entry.snapshot.secondaryCard
-                )
-            default:
-                AccountsWidgetLargeView(
-                    current: entry.snapshot.currentCard,
-                    rows: entry.snapshot.rows
-                )
+        GeometryReader { proxy in
+            let layout = AccountsWidgetStyle.layout(for: family, size: proxy.size)
+
+            Group {
+                switch family {
+                case .systemSmall:
+                    AccountsWidgetSmallView(card: entry.snapshot.currentCard, layout: layout)
+                case .systemMedium:
+                    AccountsWidgetMediumView(
+                        current: entry.snapshot.currentCard,
+                        secondary: entry.snapshot.secondaryCard,
+                        layout: layout
+                    )
+                default:
+                    AccountsWidgetLargeView(
+                        current: entry.snapshot.currentCard,
+                        rows: entry.snapshot.rows,
+                        layout: layout
+                    )
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .containerBackground(for: .widget) {
             AccountsWidgetStyle.backgroundGradient
@@ -53,29 +117,31 @@ struct AccountsWidgetEntryView: View {
 
 private struct AccountsWidgetSmallView: View {
     let card: AccountsWidgetCardSnapshot?
+    let layout: AccountsWidgetLayout
 
     var body: some View {
         Group {
             if let card {
-                AccountsWidgetCompactCardContent(card: card)
+                AccountsWidgetCompactCardContent(card: card, layout: layout)
             } else {
                 AccountsWidgetEmptyState()
             }
         }
-        .padding(.horizontal, AccountsWidgetStyle.horizontalPadding)
-        .padding(.vertical, AccountsWidgetStyle.verticalPadding)
+        .padding(.horizontal, layout.horizontalPadding)
+        .padding(.vertical, layout.verticalPadding)
     }
 }
 
 private struct AccountsWidgetMediumView: View {
     let current: AccountsWidgetCardSnapshot?
     let secondary: AccountsWidgetCardSnapshot?
+    let layout: AccountsWidgetLayout
 
     var body: some View {
-        HStack(spacing: AccountsWidgetStyle.compactSpacing) {
+        HStack(spacing: layout.compactSpacing) {
             Group {
                 if let current {
-                    AccountsWidgetCompactCardContent(card: current)
+                    AccountsWidgetCompactCardContent(card: current, layout: layout)
                 } else {
                     AccountsWidgetEmptyState()
                 }
@@ -88,42 +154,44 @@ private struct AccountsWidgetMediumView: View {
 
             Group {
                 if let secondary {
-                    AccountsWidgetCompactCardContent(card: secondary)
+                    AccountsWidgetCompactCardContent(card: secondary, layout: layout)
                 } else {
                     AccountsWidgetEmptyState()
                 }
             }
         }
-        .padding(.horizontal, AccountsWidgetStyle.horizontalPadding)
-        .padding(.vertical, AccountsWidgetStyle.verticalPadding)
+        .padding(.horizontal, layout.horizontalPadding)
+        .padding(.vertical, layout.verticalPadding)
     }
 }
 
 private struct AccountsWidgetLargeView: View {
     let current: AccountsWidgetCardSnapshot?
     let rows: [AccountsWidgetRowSnapshot]
+    let layout: AccountsWidgetLayout
 
     var body: some View {
-        VStack(alignment: .leading, spacing: AccountsWidgetStyle.largeSectionSpacing) {
+        VStack(alignment: .leading, spacing: layout.largeSectionSpacing) {
             if let current {
-                AccountsWidgetCurrentHeader(card: current)
+                AccountsWidgetCurrentHeader(card: current, layout: layout)
             } else {
                 AccountsWidgetEmptyState()
             }
 
-            VStack(alignment: .leading, spacing: AccountsWidgetStyle.rowSpacing) {
+            VStack(alignment: .leading, spacing: layout.rowSpacing) {
                 ForEach(rows) { row in
-                    AccountsWidgetAccountRow(row: row)
+                    AccountsWidgetAccountRow(row: row, layout: layout)
                 }
             }
         }
-        .padding(.horizontal, AccountsWidgetStyle.largeHorizontalPadding)
-        .padding(.vertical, AccountsWidgetStyle.verticalPadding)
+        .padding(.horizontal, layout.horizontalPadding)
+        .padding(.vertical, layout.verticalPadding)
     }
 }
 
 private struct AccountsWidgetCompactCardContent: View {
     let card: AccountsWidgetCardSnapshot
+    let layout: AccountsWidgetLayout
 
     private var workspaceOrFallbackLabel: String {
         if let workspaceLabel = card.workspaceLabel, !workspaceLabel.isEmpty {
@@ -148,9 +216,9 @@ private struct AccountsWidgetCompactCardContent: View {
                     .truncationMode(.tail)
             }
 
-            HStack(spacing: AccountsWidgetStyle.compactUsageSpacing) {
-                AccountsWidgetCompactUsageRing(window: card.fiveHour, tint: .orange)
-                AccountsWidgetCompactUsageRing(window: card.oneWeek, tint: .teal)
+            HStack(spacing: layout.compactUsageSpacing) {
+                AccountsWidgetCompactUsageRing(window: card.fiveHour, tint: .orange, layout: layout)
+                AccountsWidgetCompactUsageRing(window: card.oneWeek, tint: .teal, layout: layout)
             }
             .frame(maxWidth: .infinity, alignment: .center)
         }
@@ -160,6 +228,7 @@ private struct AccountsWidgetCompactCardContent: View {
 
 private struct AccountsWidgetCurrentHeader: View {
     let card: AccountsWidgetCardSnapshot
+    let layout: AccountsWidgetLayout
 
     private var workspaceOrFallbackLabel: String {
         if let workspaceLabel = card.workspaceLabel, !workspaceLabel.isEmpty {
@@ -176,10 +245,10 @@ private struct AccountsWidgetCurrentHeader: View {
             Spacer(minLength: 0)
 
             VStack(spacing: 10) {
-                AccountsWidgetProgressMetric(window: card.fiveHour, tint: .orange)
-                AccountsWidgetProgressMetric(window: card.oneWeek, tint: .teal)
+                AccountsWidgetProgressMetric(window: card.fiveHour, tint: .orange, layout: layout)
+                AccountsWidgetProgressMetric(window: card.oneWeek, tint: .teal, layout: layout)
             }
-            .frame(width: 150)
+            .frame(width: layout.metricColumnWidth)
         }
     }
 }
@@ -187,6 +256,7 @@ private struct AccountsWidgetCurrentHeader: View {
 private struct AccountsWidgetCompactUsageRing: View {
     let window: AccountsWidgetWindowSnapshot
     let tint: Color
+    let layout: AccountsWidgetLayout
 
     private var progress: Double {
         min(max(window.progressFraction, 0), 1)
@@ -219,7 +289,7 @@ private struct AccountsWidgetCompactUsageRing: View {
                         .foregroundStyle(.white.opacity(0.62))
                 }
             }
-            .frame(width: AccountsWidgetStyle.compactRingSize, height: AccountsWidgetStyle.compactRingSize)
+            .frame(width: layout.compactRingSize, height: layout.compactRingSize)
         }
     }
 }
@@ -227,6 +297,7 @@ private struct AccountsWidgetCompactUsageRing: View {
 private struct AccountsWidgetProgressMetric: View {
     let window: AccountsWidgetWindowSnapshot
     let tint: Color
+    let layout: AccountsWidgetLayout
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -273,12 +344,13 @@ private struct AccountsWidgetProgressMetric: View {
             }
             .foregroundStyle(.white.opacity(0.62))
         }
-        .frame(width: AccountsWidgetStyle.metricColumnWidth, alignment: .leading)
+        .frame(width: layout.metricColumnWidth, alignment: .leading)
     }
 }
 
 private struct AccountsWidgetAccountRow: View {
     let row: AccountsWidgetRowSnapshot
+    let layout: AccountsWidgetLayout
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -288,13 +360,15 @@ private struct AccountsWidgetAccountRow: View {
             AccountsWidgetRowMetricColumn(
                 title: "5h",
                 remainingText: row.fiveHourRemainingText,
-                resetText: row.fiveHourResetText
+                resetText: row.fiveHourResetText,
+                layout: layout
             )
 
             AccountsWidgetRowMetricColumn(
                 title: "1w",
                 remainingText: row.oneWeekRemainingText,
-                resetText: row.oneWeekResetText
+                resetText: row.oneWeekResetText,
+                layout: layout
             )
         }
     }
@@ -304,6 +378,7 @@ private struct AccountsWidgetRowMetricColumn: View {
     let title: String
     let remainingText: String
     let resetText: String
+    let layout: AccountsWidgetLayout
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -332,7 +407,7 @@ private struct AccountsWidgetRowMetricColumn: View {
         }
 
         .foregroundStyle(.white.opacity(0.86))
-        .frame(width: AccountsWidgetStyle.rowMetricColumnWidth, alignment: .leading)
+        .frame(width: layout.rowMetricColumnWidth, alignment: .leading)
     }
 }
 
