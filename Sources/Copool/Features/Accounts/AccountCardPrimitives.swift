@@ -5,7 +5,15 @@ private enum AccountCardOverlayLayout {
 }
 
 enum AccountCardMorphRules {
-    static let animation = Animation.spring(response: 0.34, dampingFraction: 0.84)
+    static let response = 0.34
+    static let dampingFraction = 0.84
+    static let contentSwapProgress = 0.72
+    static let animation = Animation.spring(response: response, dampingFraction: dampingFraction)
+    static let contentAnimation = Animation.easeInOut(duration: 0.12)
+
+    static var contentSwapDelay: Duration {
+        .seconds(response * contentSwapProgress)
+    }
 }
 
 enum AccountCardSwitchButtonLabelStyle {

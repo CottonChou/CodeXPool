@@ -14,9 +14,34 @@ struct AccountCardView: View {
     @Environment(\.locale) private var locale
     @State private var isHoveringCollapsedSwitch = false
     @State private var isCollapsedSwitchOverlayPresented = false
+    @State private var displayedCollapsed: Bool
+    @State private var contentSwapTask: Task<Void, Never>?
+
+    init(
+        account: AccountSummary,
+        isCollapsed: Bool,
+        switching: Bool,
+        refreshing: Bool,
+        isRefreshEnabled: Bool,
+        isUsageRefreshActive: Bool,
+        onSwitch: @escaping () -> Void,
+        onRefresh: @escaping () -> Void,
+        onDelete: @escaping () -> Void
+    ) {
+        self.account = account
+        self.isCollapsed = isCollapsed
+        self.switching = switching
+        self.refreshing = refreshing
+        self.isRefreshEnabled = isRefreshEnabled
+        self.isUsageRefreshActive = isUsageRefreshActive
+        self.onSwitch = onSwitch
+        self.onRefresh = onRefresh
+        self.onDelete = onDelete
+        _displayedCollapsed = State(initialValue: isCollapsed)
+    }
 
     private var presentation: AccountCardPresentation {
-        AccountCardPresentation(account: account, isCollapsed: isCollapsed, locale: locale)
+        AccountCardPresentation(account: account, isCollapsed: displayedCollapsed, locale: locale)
     }
 
     private var palette: AccountCardPalette {
@@ -46,7 +71,7 @@ struct AccountCardView: View {
         VStack(alignment: .leading, spacing: 8) {
             AccountCardHeaderSection(
                 presentation: presentation,
-                isCollapsed: isCollapsed,
+                isCollapsed: displayedCollapsed,
                 isCurrent: account.isCurrent,
                 palette: palette,
                 onDelete: onDelete
@@ -55,11 +80,11 @@ struct AccountCardView: View {
             Text(presentation.displayAccountName)
                 .font(.headline)
                 .foregroundStyle(account.isCurrent ? palette.toneColor : .primary)
-                .lineLimit(isCollapsed ? 1 : 2)
+                .lineLimit(displayedCollapsed ? 1 : 2)
                 .fixedSize(horizontal: false, vertical: true)
                 .truncationMode(.tail)
 
-            if isCollapsed {
+            if displayedCollapsed {
                 AccountCardCompactUsageSection(presentation: presentation)
             } else {
                 AccountCardExpandedUsageSection(presentation: presentation)
@@ -73,7 +98,7 @@ struct AccountCardView: View {
         )
         .overlay(alignment: .bottomTrailing) {
             AccountCardBottomOverlay(
-                isCollapsed: isCollapsed,
+                isCollapsed: displayedCollapsed,
                 isCurrent: account.isCurrent,
                 switching: switching,
                 refreshing: refreshing,
@@ -113,6 +138,7 @@ struct AccountCardView: View {
         }
         #endif
         .onChange(of: isCollapsed) { _, collapsed in
+            syncDisplayedCollapsed(with: collapsed)
             if !collapsed {
                 dismissCollapsedSwitchOverlay()
             }
@@ -122,12 +148,34 @@ struct AccountCardView: View {
                 dismissCollapsedSwitchOverlay()
             }
         }
+        .onDisappear {
+            contentSwapTask?.cancel()
+            contentSwapTask = nil
+        }
     }
 
     private func dismissCollapsedSwitchOverlay() {
         guard isCollapsedSwitchOverlayPresented else { return }
         withAnimation(AccountsAnimationRules.cardHoverOverlay) {
             isCollapsedSwitchOverlayPresented = false
+        }
+    }
+
+    private func syncDisplayedCollapsed(with targetCollapsed: Bool) {
+        contentSwapTask?.cancel()
+
+        guard displayedCollapsed != targetCollapsed else {
+            contentSwapTask = nil
+            return
+        }
+
+        contentSwapTask = Task { @MainActor in
+            try? await Task.sleep(for: AccountCardMorphRules.contentSwapDelay)
+            guard !Task.isCancelled else { return }
+            withAnimation(AccountCardMorphRules.contentAnimation) {
+                displayedCollapsed = targetCollapsed
+            }
+            contentSwapTask = nil
         }
     }
 }
