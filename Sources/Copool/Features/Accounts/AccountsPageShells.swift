@@ -2,9 +2,6 @@ import SwiftUI
 
 struct AccountsPageShell: View {
     let model: AccountsPageModel
-    let macActionBarPresentation: AccountsActionBarPresentation
-    let leadingToolbarButtons: [AccountsActionButtonDescriptor<AccountsPageActionIntent>]
-    let trailingToolbarButtons: [AccountsActionButtonDescriptor<AccountsPageActionIntent>]
     let currentLocale: AppLocale
     let onSelectLocale: (AppLocale) -> Void
     let areCardsPresented: Bool
@@ -18,8 +15,6 @@ struct AccountsPageShell: View {
         #if os(iOS)
         AccountsIOSPageShell(
             model: model,
-            leadingToolbarButtons: leadingToolbarButtons,
-            trailingToolbarButtons: trailingToolbarButtons,
             currentLocale: currentLocale,
             onSelectLocale: onSelectLocale,
             areCardsPresented: areCardsPresented,
@@ -32,7 +27,6 @@ struct AccountsPageShell: View {
         #else
         AccountsMacPageShell(
             model: model,
-            actionBarPresentation: macActionBarPresentation,
             areCardsPresented: areCardsPresented,
             onTriggerAction: onTriggerAction,
             onToggleCollapse: onToggleCollapse,
@@ -47,8 +41,6 @@ struct AccountsPageShell: View {
 #if os(iOS)
 private struct AccountsIOSPageShell: View {
     let model: AccountsPageModel
-    let leadingToolbarButtons: [AccountsActionButtonDescriptor<AccountsPageActionIntent>]
-    let trailingToolbarButtons: [AccountsActionButtonDescriptor<AccountsPageActionIntent>]
     let currentLocale: AppLocale
     let onSelectLocale: (AppLocale) -> Void
     let areCardsPresented: Bool
@@ -80,9 +72,8 @@ private struct AccountsIOSPageShell: View {
                 onTriggerAction(.refreshUsage)
             }
             .toolbar {
-                AccountsToolbarActions(
-                    leadingButtons: leadingToolbarButtons,
-                    trailingButtons: trailingToolbarButtons,
+                AccountsToolbarContent(
+                    model: model,
                     currentLocale: currentLocale,
                     onSelectLocale: onSelectLocale,
                     onTriggerAction: onTriggerAction,
@@ -96,7 +87,6 @@ private struct AccountsIOSPageShell: View {
 
 private struct AccountsMacPageShell: View {
     let model: AccountsPageModel
-    let actionBarPresentation: AccountsActionBarPresentation
     let areCardsPresented: Bool
     let onTriggerAction: (AccountsPageActionIntent) -> Void
     let onToggleCollapse: () -> Void
@@ -106,8 +96,8 @@ private struct AccountsMacPageShell: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: LayoutRules.sectionSpacing) {
-            AccountsActionBarView(
-                presentation: actionBarPresentation,
+            AccountsActionBarContainer(
+                model: model,
                 onTriggerAction: onTriggerAction,
                 onToggleCollapse: onToggleCollapse
             )
@@ -131,3 +121,38 @@ private struct AccountsMacPageShell: View {
         .padding(.top, LayoutRules.pagePadding)
     }
 }
+
+private struct AccountsActionBarContainer: View {
+    @ObservedObject var model: AccountsPageModel
+    let onTriggerAction: (AccountsPageActionIntent) -> Void
+    let onToggleCollapse: () -> Void
+
+    var body: some View {
+        AccountsActionBarView(
+            presentation: model.makeMacActionBarPresentation(),
+            onTriggerAction: onTriggerAction,
+            onToggleCollapse: onToggleCollapse
+        )
+    }
+}
+
+#if os(iOS)
+private struct AccountsToolbarContent: ToolbarContent {
+    @ObservedObject var model: AccountsPageModel
+    let currentLocale: AppLocale
+    let onSelectLocale: (AppLocale) -> Void
+    let onTriggerAction: (AccountsPageActionIntent) -> Void
+    let onToggleCollapse: () -> Void
+
+    var body: some ToolbarContent {
+        AccountsToolbarActions(
+            leadingButtons: model.leadingToolbarButtons,
+            trailingButtons: model.trailingToolbarButtons,
+            currentLocale: currentLocale,
+            onSelectLocale: onSelectLocale,
+            onTriggerAction: onTriggerAction,
+            onToggleCollapse: onToggleCollapse
+        )
+    }
+}
+#endif

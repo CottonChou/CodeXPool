@@ -24,9 +24,6 @@ struct AccountsPageView: View {
     var body: some View {
         AccountsPageShell(
             model: model,
-            macActionBarPresentation: model.makeMacActionBarPresentation(),
-            leadingToolbarButtons: model.leadingToolbarButtons,
-            trailingToolbarButtons: model.trailingToolbarButtons,
             currentLocale: currentLocale,
             onSelectLocale: onSelectLocale,
             areCardsPresented: areCardsPresented,
