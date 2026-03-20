@@ -1,8 +1,8 @@
 import Foundation
 
 final class DefaultUsageService: UsageService, @unchecked Sendable {
-    private enum RequestPolicy {
-        static let timeout: TimeInterval = 5
+private enum RequestPolicy {
+        static let timeout: TimeInterval = 18
         static let scope = "usage"
     }
 
