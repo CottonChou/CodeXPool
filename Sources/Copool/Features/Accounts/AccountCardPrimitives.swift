@@ -34,46 +34,9 @@ private struct AccountCardSurfaceModifier: ViewModifier {
     let cornerRadius: CGFloat
     let tint: Color?
 
-    #if os(macOS)
-    @Environment(\.colorScheme) private var colorScheme
-    #endif
-
     func body(content: Content) -> some View {
-        #if os(macOS)
-        content
-            .background {
-                ZStack {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(baseFill)
-                    if let tint {
-                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .fill(tint.opacity(0.7))
-                    }
-                }
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(borderColor, lineWidth: 1)
-            }
-        #else
         content.cardSurface(cornerRadius: cornerRadius, tint: tint)
-        #endif
     }
-
-    #if os(macOS)
-    private var baseFill: Color {
-        switch colorScheme {
-        case .dark:
-            Color.white.opacity(0.035)
-        default:
-            Color(nsColor: .controlBackgroundColor)
-        }
-    }
-
-    private var borderColor: Color {
-        Color(nsColor: .separatorColor).opacity(0.82)
-    }
-    #endif
 }
 
 extension View {
