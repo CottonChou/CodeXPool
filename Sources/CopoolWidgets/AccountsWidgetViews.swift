@@ -13,6 +13,7 @@ private enum AccountsWidgetStyle {
     static let compactRingLineWidth: CGFloat = 6
     static let metricColumnWidth: CGFloat = 156
     static let rowMetricColumnWidth: CGFloat = 88
+    static let rowTagColumnWidth: CGFloat = 128
 
     static let backgroundGradient = LinearGradient(
         colors: [
@@ -291,62 +292,57 @@ private struct AccountsWidgetAccountRow: View {
     let row: AccountsWidgetRowSnapshot
 
     var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            AccountsWidgetChip(text: row.workspaceOrAccountLabel)
+                .frame(width: AccountsWidgetStyle.rowTagColumnWidth, alignment: .leading)
+
+            AccountsWidgetRowMetricColumn(
+                title: "5h",
+                remainingText: row.fiveHourRemainingText,
+                resetText: row.fiveHourResetText
+            )
+
+            AccountsWidgetRowMetricColumn(
+                title: "1w",
+                remainingText: row.oneWeekRemainingText,
+                resetText: row.oneWeekResetText
+            )
+        }
+    }
+}
+
+private struct AccountsWidgetRowMetricColumn: View {
+    let title: String
+    let remainingText: String
+    let resetText: String
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                AccountsWidgetChip(text: row.workspaceOrAccountLabel)
-
+            HStack(spacing: 4) {
+                Image(systemName: "timer")
+                    .font(.system(size: 9, weight: .medium))
+                Text(title)
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
                 Spacer(minLength: 0)
-
-                HStack(spacing: 10) {
-                    AccountsWidgetRowMetric(title: "5h", remainingText: row.fiveHourRemainingText)
-                    AccountsWidgetRowMetric(title: "1w", remainingText: row.oneWeekRemainingText)
+                HStack(spacing: 3) {
+                    Image(systemName: "drop.halffull")
+                        .font(.system(size: 9, weight: .medium))
+                    Text(remainingText)
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
                 }
             }
 
-            HStack(spacing: 10) {
-                AccountsWidgetResetLine(text: row.fiveHourResetText)
-                AccountsWidgetResetLine(text: row.oneWeekResetText)
-            }
-        }
-    }
-}
-
-private struct AccountsWidgetRowMetric: View {
-    let title: String
-    let remainingText: String
-
-    var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "timer")
-                .font(.system(size: 9, weight: .medium))
-            Text(title)
-                .font(.system(size: 10, weight: .bold, design: .rounded))
-            Spacer(minLength: 0)
-            HStack(spacing: 3) {
-                Image(systemName: "drop.halffull")
+            HStack(spacing: 4) {
+                Image(systemName: "timer")
                     .font(.system(size: 9, weight: .medium))
-                Text(remainingText)
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                Text(resetText)
+                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
         }
+
         .foregroundStyle(.white.opacity(0.86))
-        .frame(width: AccountsWidgetStyle.rowMetricColumnWidth, alignment: .leading)
-    }
-}
-
-private struct AccountsWidgetResetLine: View {
-    let text: String
-
-    var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "timer")
-                .font(.system(size: 9, weight: .medium))
-            Text(text)
-                .font(.system(size: 9, weight: .medium, design: .rounded))
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-        }
-        .foregroundStyle(.white.opacity(0.58))
         .frame(width: AccountsWidgetStyle.rowMetricColumnWidth, alignment: .leading)
     }
 }
