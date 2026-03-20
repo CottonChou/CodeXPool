@@ -66,7 +66,7 @@ struct AccountsWidgetSnapshotBuilder {
             id: account.id,
             planLabel: account.normalizedPlanLabel,
             workspaceOrAccountLabel: workspaceLabel ?? accountLabel,
-            accountLabel: workspaceLabel == nil ? nil : accountLabel,
+            accountLabel: nil,
             fiveHourRemainingText: remainingText(for: account.usage?.fiveHour),
             oneWeekRemainingText: remainingText(for: account.usage?.oneWeek),
             fiveHourResetText: resetText(for: account.usage?.fiveHour, locale: locale, timeZone: timeZone),

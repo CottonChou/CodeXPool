@@ -1,6 +1,24 @@
 import SwiftUI
 import WidgetKit
 
+private enum AccountsWidgetStyle {
+    static let horizontalPadding: CGFloat = 14
+    static let verticalPadding: CGFloat = 14
+    static let compactSpacing: CGFloat = 12
+    static let compactUsageSpacing: CGFloat = 14
+    static let largeSectionSpacing: CGFloat = 14
+    static let rowSpacing: CGFloat = 10
+
+    static let backgroundGradient = LinearGradient(
+        colors: [
+            Color(red: 0.10, green: 0.13, blue: 0.18),
+            Color(red: 0.07, green: 0.10, blue: 0.14),
+        ],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+}
+
 struct AccountsWidgetEntryView: View {
     @Environment(\.widgetFamily) private var family
     let entry: AccountsWidgetEntry
@@ -23,14 +41,7 @@ struct AccountsWidgetEntryView: View {
             }
         }
         .containerBackground(for: .widget) {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.10, green: 0.13, blue: 0.18),
-                    Color(red: 0.07, green: 0.10, blue: 0.14),
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            AccountsWidgetStyle.backgroundGradient
         }
     }
 }
@@ -41,12 +52,13 @@ private struct AccountsWidgetSmallView: View {
     var body: some View {
         Group {
             if let card {
-                AccountsWidgetCompactCard(card: card)
+                AccountsWidgetCompactCardContent(card: card)
             } else {
                 AccountsWidgetEmptyState()
             }
         }
-        .padding(14)
+        .padding(.horizontal, AccountsWidgetStyle.horizontalPadding)
+        .padding(.vertical, AccountsWidgetStyle.verticalPadding)
     }
 }
 
@@ -55,11 +67,30 @@ private struct AccountsWidgetMediumView: View {
     let secondary: AccountsWidgetCardSnapshot?
 
     var body: some View {
-        HStack(spacing: 12) {
-            AccountsWidgetCompactCard(card: current)
-            AccountsWidgetCompactCard(card: secondary)
+        HStack(spacing: AccountsWidgetStyle.compactSpacing) {
+            Group {
+                if let current {
+                    AccountsWidgetCompactCardContent(card: current)
+                } else {
+                    AccountsWidgetEmptyState()
+                }
+            }
+
+            Rectangle()
+                .fill(Color.white.opacity(0.10))
+                .frame(width: 1)
+                .padding(.vertical, 4)
+
+            Group {
+                if let secondary {
+                    AccountsWidgetCompactCardContent(card: secondary)
+                } else {
+                    AccountsWidgetEmptyState()
+                }
+            }
         }
-        .padding(14)
+        .padding(.horizontal, AccountsWidgetStyle.horizontalPadding)
+        .padding(.vertical, AccountsWidgetStyle.verticalPadding)
     }
 }
 
@@ -68,107 +99,150 @@ private struct AccountsWidgetLargeView: View {
     let rows: [AccountsWidgetRowSnapshot]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: AccountsWidgetStyle.largeSectionSpacing) {
             if let current {
                 AccountsWidgetCurrentHeader(card: current)
             } else {
                 AccountsWidgetEmptyState()
             }
 
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: AccountsWidgetStyle.rowSpacing) {
                 ForEach(rows) { row in
                     AccountsWidgetAccountRow(row: row)
                 }
             }
         }
-        .padding(14)
+        .padding(.horizontal, AccountsWidgetStyle.horizontalPadding)
+        .padding(.vertical, AccountsWidgetStyle.verticalPadding)
     }
 }
 
-private struct AccountsWidgetCompactCard: View {
-    let card: AccountsWidgetCardSnapshot?
+private struct AccountsWidgetCompactCardContent: View {
+    let card: AccountsWidgetCardSnapshot
+
+    private var displayTitle: String {
+        if let workspaceLabel = card.workspaceLabel, !workspaceLabel.isEmpty {
+            return workspaceLabel
+        }
+        return card.accountLabel
+    }
 
     var body: some View {
-        Group {
-            if let card {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 6) {
-                        AccountsWidgetChip(text: card.planLabel)
-                        if let workspace = card.workspaceLabel, !workspace.isEmpty {
-                            AccountsWidgetChip(text: workspace)
-                        }
-                    }
+        VStack(alignment: .leading, spacing: 12) {
+            AccountsWidgetChip(text: card.planLabel)
 
-                    Text(card.accountLabel)
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
+            Text(displayTitle)
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .truncationMode(.tail)
 
-                    VStack(spacing: 8) {
-                        AccountsWidgetWindowSummary(window: card.fiveHour)
-                        AccountsWidgetWindowSummary(window: card.oneWeek)
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .padding(12)
-                .background(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(Color.white.opacity(0.08))
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.10))
-                }
-            } else {
-                AccountsWidgetEmptyState()
+            HStack(spacing: AccountsWidgetStyle.compactUsageSpacing) {
+                AccountsWidgetCompactUsageRing(window: card.fiveHour, tint: .orange)
+                AccountsWidgetCompactUsageRing(window: card.oneWeek, tint: .teal)
             }
+            .frame(maxWidth: .infinity, alignment: .center)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 
 private struct AccountsWidgetCurrentHeader: View {
     let card: AccountsWidgetCardSnapshot
 
+    private var primaryLabel: String {
+        if let workspaceLabel = card.workspaceLabel, !workspaceLabel.isEmpty {
+            return workspaceLabel
+        }
+        return card.accountLabel
+    }
+
+    private var secondaryLabel: String? {
+        guard let workspaceLabel = card.workspaceLabel, !workspaceLabel.isEmpty else {
+            return nil
+        }
+        return card.accountLabel
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
+                AccountsWidgetChip(text: card.planLabel)
+
                 HStack(spacing: 6) {
-                    AccountsWidgetChip(text: card.planLabel)
-                    if let workspace = card.workspaceLabel, !workspace.isEmpty {
-                        AccountsWidgetChip(text: workspace)
+                    Text(primaryLabel)
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+
+                    if let secondaryLabel {
+                        Text("/")
+                            .font(.system(size: 18, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.52))
+                        Text(secondaryLabel)
+                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.78))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                     }
                 }
-
-                Text(card.accountLabel)
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
             }
 
             Spacer(minLength: 0)
 
-            VStack(spacing: 8) {
-                AccountsWidgetProgressMetric(window: card.fiveHour)
-                AccountsWidgetProgressMetric(window: card.oneWeek)
+            VStack(spacing: 10) {
+                AccountsWidgetProgressMetric(window: card.fiveHour, tint: .orange)
+                AccountsWidgetProgressMetric(window: card.oneWeek, tint: .teal)
             }
-            .frame(width: 132)
+            .frame(width: 150)
         }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(Color.white.opacity(0.08))
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.10))
+    }
+}
+
+private struct AccountsWidgetCompactUsageRing: View {
+    let window: AccountsWidgetWindowSnapshot
+    let tint: Color
+
+    private var progress: Double {
+        min(max(window.progressFraction, 0), 1)
+    }
+
+    var body: some View {
+        VStack(spacing: 4) {
+            ZStack {
+                Circle()
+                    .stroke(Color.white.opacity(0.10), lineWidth: 7)
+
+                Circle()
+                    .trim(from: 0, to: progress)
+                    .stroke(
+                        AngularGradient(
+                            gradient: Gradient(colors: [tint.opacity(0.95), tint.opacity(0.65)]),
+                            center: .center
+                        ),
+                        style: StrokeStyle(lineWidth: 7, lineCap: .round)
+                    )
+                    .rotationEffect(.degrees(-90))
+
+                VStack(spacing: 1) {
+                    Text(window.usedText)
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+                    Text(window.title)
+                        .font(.system(size: 7, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.62))
+                }
+            }
+            .frame(width: 54, height: 54)
         }
     }
 }
 
 private struct AccountsWidgetProgressMetric: View {
     let window: AccountsWidgetWindowSnapshot
+    let tint: Color
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -191,7 +265,7 @@ private struct AccountsWidgetProgressMetric: View {
                     Capsule()
                         .fill(
                             LinearGradient(
-                                colors: [Color.cyan.opacity(0.95), Color.teal.opacity(0.75)],
+                                colors: [tint.opacity(0.95), tint.opacity(0.72)],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
@@ -214,54 +288,6 @@ private struct AccountsWidgetProgressMetric: View {
     }
 }
 
-private struct AccountsWidgetWindowSummary: View {
-    let window: AccountsWidgetWindowSnapshot
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Text(window.title)
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.88))
-
-                Spacer(minLength: 0)
-
-                Text(window.remainingText)
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.88))
-            }
-
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.white.opacity(0.10))
-
-                    Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.orange.opacity(0.95), Color.yellow.opacity(0.75)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: max(8, proxy.size.width * window.progressFraction))
-                }
-            }
-            .frame(height: 6)
-
-            HStack(spacing: 4) {
-                Image(systemName: "timer")
-                    .font(.system(size: 8, weight: .medium))
-                Text(window.resetText)
-                    .font(.system(size: 8, weight: .medium, design: .rounded))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-            }
-            .foregroundStyle(.white.opacity(0.55))
-        }
-    }
-}
-
 private struct AccountsWidgetAccountRow: View {
     let row: AccountsWidgetRowSnapshot
 
@@ -270,19 +296,11 @@ private struct AccountsWidgetAccountRow: View {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 AccountsWidgetChip(text: row.planLabel)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(row.workspaceOrAccountLabel)
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-
-                    if let accountLabel = row.accountLabel {
-                        Text(accountLabel)
-                            .font(.system(size: 10, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.62))
-                            .lineLimit(1)
-                    }
-                }
+                Text(row.workspaceOrAccountLabel)
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
 
                 Spacer(minLength: 0)
 
@@ -361,14 +379,5 @@ private struct AccountsWidgetEmptyState: View {
                 .foregroundStyle(.white.opacity(0.60))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.white.opacity(0.06))
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.08))
-        }
     }
 }

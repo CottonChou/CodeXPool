@@ -23,7 +23,7 @@ struct AccountsWidgetSnapshotBuilderTests {
     }
 
     @Test
-    func rowsPreferWorkspaceNameAndKeepAccountFallback() {
+    func rowsPreferWorkspaceNameAndFallbackWithoutSecondaryAccountLabel() {
         let builder = AccountsWidgetSnapshotBuilder()
         let snapshot = builder.build(
             accounts: [
@@ -44,7 +44,7 @@ struct AccountsWidgetSnapshotBuilderTests {
 
         #expect(snapshot.rows.count == 1)
         #expect(snapshot.rows[0].workspaceOrAccountLabel == "workspace")
-        #expect(snapshot.rows[0].accountLabel == "member")
+        #expect(snapshot.rows[0].accountLabel == nil)
         #expect(snapshot.rows[0].fiveHourRemainingText == "55%")
         #expect(snapshot.rows[0].oneWeekRemainingText == "45%")
     }
