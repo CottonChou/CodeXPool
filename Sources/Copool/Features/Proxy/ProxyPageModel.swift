@@ -84,6 +84,7 @@ final class ProxyPageModel: ObservableObject {
     private let coordinator: ProxyCoordinator
     private let settingsCoordinator: SettingsCoordinator
     private let proxyControlCloudSyncService: ProxyControlCloudSyncServiceProtocol?
+    private let localProxyCommandService: ProxyLocalCommandServiceProtocol?
     private let dateProvider: DateProviding
     private let runtimePlatform: RuntimePlatform
     private let noticeScheduler = NoticeAutoDismissScheduler()
@@ -130,12 +131,14 @@ final class ProxyPageModel: ObservableObject {
         coordinator: ProxyCoordinator,
         settingsCoordinator: SettingsCoordinator,
         proxyControlCloudSyncService: ProxyControlCloudSyncServiceProtocol? = nil,
+        localProxyCommandService: ProxyLocalCommandServiceProtocol? = nil,
         dateProvider: DateProviding = SystemDateProvider(),
         runtimePlatform: RuntimePlatform = PlatformCapabilities.currentPlatform
     ) {
         self.coordinator = coordinator
         self.settingsCoordinator = settingsCoordinator
         self.proxyControlCloudSyncService = proxyControlCloudSyncService
+        self.localProxyCommandService = localProxyCommandService
         self.dateProvider = dateProvider
         self.runtimePlatform = runtimePlatform
     }
@@ -268,7 +271,12 @@ final class ProxyPageModel: ObservableObject {
         }
         loading = true
         defer { loading = false }
-        await refreshStatusOnly()
+        do {
+            let snapshot = try await performLocalCommand(kind: .refreshStatus)
+            applyRemoteSnapshot(snapshot)
+        } catch {
+            notice = NoticeMessage(style: .error, text: error.localizedDescription)
+        }
     }
 
     func startProxy() async {
@@ -286,8 +294,11 @@ final class ProxyPageModel: ObservableObject {
         let preferredPort = Int(preferredPortText)
 
         do {
-            proxyStatus = try await coordinator.startProxy(preferredPort: preferredPort)
-            await refreshStatusOnly()
+            let snapshot = try await performLocalCommand(
+                kind: .startProxy,
+                preferredProxyPort: preferredPort
+            )
+            applyRemoteSnapshot(snapshot)
             notice = NoticeMessage(style: .success, text: L10n.tr("proxy.notice.api_proxy_started"))
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
@@ -305,9 +316,13 @@ final class ProxyPageModel: ObservableObject {
         loading = true
         defer { loading = false }
 
-        proxyStatus = await coordinator.stopProxy()
-        await refreshStatusOnly()
-        notice = NoticeMessage(style: .info, text: L10n.tr("proxy.notice.api_proxy_stopped"))
+        do {
+            let snapshot = try await performLocalCommand(kind: .stopProxy)
+            applyRemoteSnapshot(snapshot)
+            notice = NoticeMessage(style: .info, text: L10n.tr("proxy.notice.api_proxy_stopped"))
+        } catch {
+            notice = NoticeMessage(style: .error, text: error.localizedDescription)
+        }
     }
 
     func refreshAPIKey() async {
@@ -322,8 +337,8 @@ final class ProxyPageModel: ObservableObject {
         defer { loading = false }
 
         do {
-            proxyStatus = try await coordinator.refreshAPIKey()
-            await refreshStatusOnly()
+            let snapshot = try await performLocalCommand(kind: .refreshAPIKey)
+            applyRemoteSnapshot(snapshot)
             notice = NoticeMessage(style: .success, text: L10n.tr("proxy.notice.api_key_refreshed"))
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
@@ -342,8 +357,8 @@ final class ProxyPageModel: ObservableObject {
         defer { loading = false }
 
         do {
-            let status = try await coordinator.installCloudflared()
-            applyCloudflaredStatus(status)
+            let snapshot = try await performLocalCommand(kind: .installCloudflared)
+            applyRemoteSnapshot(snapshot)
             notice = NoticeMessage(style: .success, text: L10n.tr("proxy.notice.cloudflared_installed"))
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
@@ -369,9 +384,11 @@ final class ProxyPageModel: ObservableObject {
 
         do {
             let input = try buildCloudflaredStartInput()
-            let status = try await coordinator.startCloudflared(input: input)
-            applyCloudflaredStatus(status)
-            publicAccessEnabled = true
+            let snapshot = try await performLocalCommand(
+                kind: .startCloudflared,
+                cloudflaredInput: input
+            )
+            applyRemoteSnapshot(snapshot)
             notice = NoticeMessage(style: .success, text: L10n.tr("proxy.notice.cloudflared_started"))
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
@@ -389,9 +406,13 @@ final class ProxyPageModel: ObservableObject {
         loading = true
         defer { loading = false }
 
-        let status = await coordinator.stopCloudflared()
-        applyCloudflaredStatus(status)
-        notice = NoticeMessage(style: .info, text: L10n.tr("proxy.notice.cloudflared_stopped"))
+        do {
+            let snapshot = try await performLocalCommand(kind: .stopCloudflared)
+            applyRemoteSnapshot(snapshot)
+            notice = NoticeMessage(style: .info, text: L10n.tr("proxy.notice.cloudflared_stopped"))
+        } catch {
+            notice = NoticeMessage(style: .error, text: error.localizedDescription)
+        }
     }
 
     func refreshCloudflared() async {
@@ -399,8 +420,12 @@ final class ProxyPageModel: ObservableObject {
             await requestRemoteSnapshotRefresh(showErrors: true, showLoading: true)
             return
         }
-        let status = await coordinator.refreshCloudflared()
-        applyCloudflaredStatus(status)
+        do {
+            let snapshot = try await performLocalCommand(kind: .refreshCloudflared)
+            applyRemoteSnapshot(snapshot)
+        } catch {
+            notice = NoticeMessage(style: .error, text: error.localizedDescription)
+        }
     }
 
     func setPublicAccessEnabled(_ enabled: Bool) async {
@@ -441,8 +466,11 @@ final class ProxyPageModel: ObservableObject {
             return
         }
         do {
-            let updated = try await settingsCoordinator.updateSettings(AppSettingsPatch(autoStartApiProxy: value))
-            autoStartProxy = updated.autoStartApiProxy
+            let snapshot = try await performLocalCommand(
+                kind: .setAutoStartProxy,
+                autoStartProxy: value
+            )
+            applyRemoteSnapshot(snapshot)
             notice = NoticeMessage(style: .success, text: L10n.tr("proxy.notice.auto_start_updated"))
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
@@ -459,10 +487,11 @@ final class ProxyPageModel: ObservableObject {
             return
         }
         do {
-            let draft = RemoteServerConfiguration.makeDraft()
-            let merged = remoteServers + [draft]
-            let updated = try await settingsCoordinator.updateSettings(AppSettingsPatch(remoteServers: merged))
-            remoteServers = updated.remoteServers
+            let snapshot = try await performLocalCommand(
+                kind: .addRemoteServer,
+                remoteServer: RemoteServerConfiguration.makeDraft()
+            )
+            applyRemoteSnapshot(snapshot)
             notice = NoticeMessage(style: .success, text: L10n.tr("settings.notice.remote_servers_saved"))
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
@@ -481,9 +510,11 @@ final class ProxyPageModel: ObservableObject {
         remoteActions[server.id] = .save
         defer { remoteActions.removeValue(forKey: server.id) }
         do {
-            let merged = RemoteServerConfiguration.upsert(server, into: remoteServers)
-            let updated = try await settingsCoordinator.updateSettings(AppSettingsPatch(remoteServers: merged))
-            remoteServers = updated.remoteServers
+            let snapshot = try await performLocalCommand(
+                kind: .saveRemoteServer,
+                remoteServer: RemoteServerConfiguration.normalize(server)
+            )
+            applyRemoteSnapshot(snapshot)
             notice = NoticeMessage(style: .success, text: L10n.tr("settings.notice.remote_servers_saved"))
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
@@ -502,11 +533,11 @@ final class ProxyPageModel: ObservableObject {
         remoteActions[id] = .remove
         defer { remoteActions.removeValue(forKey: id) }
         do {
-            let merged = remoteServers.filter { $0.id != id }
-            let updated = try await settingsCoordinator.updateSettings(AppSettingsPatch(remoteServers: merged))
-            remoteServers = updated.remoteServers
-            remoteStatuses.removeValue(forKey: id)
-            remoteLogs.removeValue(forKey: id)
+            let snapshot = try await performLocalCommand(
+                kind: .removeRemoteServer,
+                remoteServerID: id
+            )
+            applyRemoteSnapshot(snapshot)
             notice = NoticeMessage(style: .success, text: L10n.tr("proxy.notice.remote_server_removed"))
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
@@ -533,8 +564,15 @@ final class ProxyPageModel: ObservableObject {
         }
         remoteActions[server.id] = .refresh
         defer { remoteActions.removeValue(forKey: server.id) }
-        let status = await coordinator.remoteStatus(server: server)
-        remoteStatuses[server.id] = status
+        do {
+            let snapshot = try await performLocalCommand(
+                kind: .refreshRemote,
+                remoteServerID: server.id
+            )
+            applyRemoteSnapshot(snapshot)
+        } catch {
+            notice = NoticeMessage(style: .error, text: error.localizedDescription)
+        }
     }
 
     func deployRemote(server: RemoteServerConfig) async {
@@ -553,8 +591,11 @@ final class ProxyPageModel: ObservableObject {
         notice = NoticeMessage(style: .info, text: L10n.tr("proxy.notice.remote_deploying_format", server.label))
 
         do {
-            let status = try await coordinator.deployRemote(server: server)
-            remoteStatuses[server.id] = status
+            let snapshot = try await performLocalCommand(
+                kind: .deployRemote,
+                remoteServerID: server.id
+            )
+            applyRemoteSnapshot(snapshot)
             notice = NoticeMessage(style: .success, text: L10n.tr("proxy.notice.remote_deploy_done_format", server.label))
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
@@ -575,8 +616,11 @@ final class ProxyPageModel: ObservableObject {
         defer { remoteActions.removeValue(forKey: server.id) }
 
         do {
-            let status = try await coordinator.startRemote(server: server)
-            remoteStatuses[server.id] = status
+            let snapshot = try await performLocalCommand(
+                kind: .startRemote,
+                remoteServerID: server.id
+            )
+            applyRemoteSnapshot(snapshot)
             notice = NoticeMessage(style: .success, text: L10n.tr("proxy.notice.remote_started_format", server.label))
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
@@ -597,8 +641,11 @@ final class ProxyPageModel: ObservableObject {
         defer { remoteActions.removeValue(forKey: server.id) }
 
         do {
-            let status = try await coordinator.stopRemote(server: server)
-            remoteStatuses[server.id] = status
+            let snapshot = try await performLocalCommand(
+                kind: .stopRemote,
+                remoteServerID: server.id
+            )
+            applyRemoteSnapshot(snapshot)
             notice = NoticeMessage(style: .info, text: L10n.tr("proxy.notice.remote_stopped_format", server.label))
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
@@ -621,8 +668,12 @@ final class ProxyPageModel: ObservableObject {
         defer { remoteActions.removeValue(forKey: server.id) }
 
         do {
-            let logs = try await coordinator.readRemoteLogs(server: server, lines: 120)
-            remoteLogs[server.id] = logs
+            let snapshot = try await performLocalCommand(
+                kind: .readRemoteLogs,
+                remoteServerID: server.id,
+                logLines: 120
+            )
+            applyRemoteSnapshot(snapshot)
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
         }
@@ -853,17 +904,9 @@ final class ProxyPageModel: ObservableObject {
             }
         }
 
-        let command = ProxyControlCommand(
-            id: UUID().uuidString,
-            createdAt: dateProvider.unixMillisecondsNow(),
+        let command = makeProxyControlCommand(
             sourceDeviceID: "ios-proxy-control",
-            kind: .refreshStatus,
-            preferredProxyPort: nil,
-            autoStartProxy: nil,
-            cloudflaredInput: nil,
-            remoteServer: nil,
-            remoteServerID: nil,
-            logLines: nil
+            kind: .refreshStatus
         )
 
         do {
@@ -898,9 +941,7 @@ final class ProxyPageModel: ObservableObject {
         loading = true
         defer { loading = false }
 
-        let command = ProxyControlCommand(
-            id: UUID().uuidString,
-            createdAt: dateProvider.unixMillisecondsNow(),
+        let command = makeProxyControlCommand(
             sourceDeviceID: "ios-proxy-control",
             kind: kind,
             preferredProxyPort: preferredProxyPort,
@@ -940,15 +981,9 @@ final class ProxyPageModel: ObservableObject {
         guard let proxyControlCloudSyncService else { return }
 
         let previousLogs = remoteLogs[serverID]
-        let command = ProxyControlCommand(
-            id: UUID().uuidString,
-            createdAt: dateProvider.unixMillisecondsNow(),
+        let command = makeProxyControlCommand(
             sourceDeviceID: "ios-proxy-control",
             kind: .readRemoteLogs,
-            preferredProxyPort: nil,
-            autoStartProxy: nil,
-            cloudflaredInput: nil,
-            remoteServer: nil,
             remoteServerID: serverID,
             logLines: logLines
         )
@@ -1005,5 +1040,55 @@ final class ProxyPageModel: ObservableObject {
         }
 
         return nil
+    }
+
+    private func performLocalCommand(
+        kind: ProxyControlCommandKind,
+        preferredProxyPort: Int? = nil,
+        autoStartProxy: Bool? = nil,
+        cloudflaredInput: StartCloudflaredTunnelInput? = nil,
+        remoteServer: RemoteServerConfig? = nil,
+        remoteServerID: String? = nil,
+        logLines: Int? = nil
+    ) async throws -> ProxyControlSnapshot {
+        guard let localProxyCommandService else {
+            throw AppError.invalidData("Local proxy command service is unavailable.")
+        }
+
+        let command = makeProxyControlCommand(
+            sourceDeviceID: "macos-proxy-control",
+            kind: kind,
+            preferredProxyPort: preferredProxyPort,
+            autoStartProxy: autoStartProxy,
+            cloudflaredInput: cloudflaredInput,
+            remoteServer: remoteServer,
+            remoteServerID: remoteServerID,
+            logLines: logLines
+        )
+        return try await localProxyCommandService.performLocalCommand(command)
+    }
+
+    private func makeProxyControlCommand(
+        sourceDeviceID: String,
+        kind: ProxyControlCommandKind,
+        preferredProxyPort: Int? = nil,
+        autoStartProxy: Bool? = nil,
+        cloudflaredInput: StartCloudflaredTunnelInput? = nil,
+        remoteServer: RemoteServerConfig? = nil,
+        remoteServerID: String? = nil,
+        logLines: Int? = nil
+    ) -> ProxyControlCommand {
+        ProxyControlCommand(
+            id: UUID().uuidString,
+            createdAt: dateProvider.unixMillisecondsNow(),
+            sourceDeviceID: sourceDeviceID,
+            kind: kind,
+            preferredProxyPort: preferredProxyPort,
+            autoStartProxy: autoStartProxy,
+            cloudflaredInput: cloudflaredInput,
+            remoteServer: remoteServer,
+            remoteServerID: remoteServerID,
+            logLines: logLines
+        )
     }
 }

@@ -105,6 +105,10 @@ protocol ProxyControlCloudSyncServiceProtocol: Sendable {
     func ensurePushSubscriptionIfNeeded() async throws
 }
 
+protocol ProxyLocalCommandServiceProtocol: Sendable {
+    func performLocalCommand(_ command: ProxyControlCommand) async throws -> ProxyControlSnapshot
+}
+
 protocol CurrentAccountSelectionSyncServiceProtocol: Sendable {
     func recordLocalSelection(accountID: String) async throws
     func pushLocalSelectionIfNeeded() async throws

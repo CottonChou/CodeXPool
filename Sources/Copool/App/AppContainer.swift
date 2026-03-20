@@ -106,7 +106,8 @@ struct AppContainer {
                 proxyModel: ProxyPageModel(
                     coordinator: proxyCoordinator,
                     settingsCoordinator: settingsCoordinator,
-                    proxyControlCloudSyncService: proxyControlCloudSyncService
+                    proxyControlCloudSyncService: proxyControlCloudSyncService,
+                    localProxyCommandService: proxyControlBridge
                 ),
                 settingsModel: settingsModel,
                 trayModel: trayModel,

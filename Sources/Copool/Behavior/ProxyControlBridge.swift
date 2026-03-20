@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-actor ProxyControlBridge {
+actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
     private enum Constants {
         static let syncInterval: Duration = .seconds(1)
         static let remoteStatusRefreshIntervalMilliseconds: Int64 = 8_000
@@ -79,6 +79,19 @@ actor ProxyControlBridge {
         remoteStatusRefreshTask?.cancel()
         remoteStatusRefreshTask = nil
         pushCancellable = nil
+    }
+
+    func performLocalCommand(_ command: ProxyControlCommand) async throws -> ProxyControlSnapshot {
+        guard runtimePlatform == .macOS else {
+            throw AppError.invalidData("Local proxy commands are only available on macOS.")
+        }
+
+        let executionResult = try await execute(command)
+        lastCommandError = nil
+
+        let snapshot = try await buildSnapshot(forceRemoteStatusRefresh: executionResult.forceRemoteStatusRefresh)
+        try await cloudSyncService?.pushLocalSnapshot(snapshot)
+        return snapshot
     }
 
     func handlePushNotification() async {

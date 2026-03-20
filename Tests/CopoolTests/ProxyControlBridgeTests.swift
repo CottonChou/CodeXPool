@@ -103,6 +103,32 @@ final class ProxyControlBridgeTests: XCTestCase {
         await bridge.stop()
     }
 
+    func testPerformLocalCommandPushesSnapshotImmediately() async throws {
+        let cloudSyncService = SpyProxyControlCloudSyncService()
+        let bridge = makeBridge(
+            cloudSyncService: cloudSyncService,
+            runtimePlatform: .macOS
+        )
+
+        let command = ProxyControlCommand(
+            id: UUID().uuidString,
+            createdAt: 1_763_216_000_000,
+            sourceDeviceID: "macos-proxy-control",
+            kind: .refreshStatus,
+            preferredProxyPort: nil,
+            autoStartProxy: nil,
+            cloudflaredInput: nil,
+            remoteServer: nil,
+            remoteServerID: nil,
+            logLines: nil
+        )
+
+        _ = try await bridge.performLocalCommand(command)
+
+        let metrics = await cloudSyncService.readMetrics()
+        XCTAssertEqual(metrics.pushLocalSnapshotCallCount, 1)
+    }
+
     private func makeBridge(
         cloudSyncService: ProxyControlCloudSyncServiceProtocol?,
         runtimePlatform: RuntimePlatform,

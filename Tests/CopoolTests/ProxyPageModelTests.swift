@@ -87,8 +87,22 @@ final class ProxyPageModelTests: XCTestCase {
         XCTAssertEqual(model.remoteStatuses, updatedSnapshot.remoteStatuses)
     }
 
+    func testLocalStartProxyUsesLocalCommandServiceForImmediateSync() async {
+        let snapshot = makeSnapshot()
+        let localCommandService = SpyProxyLocalCommandService(snapshot: snapshot)
+        let model = makeModel(localProxyCommandService: localCommandService)
+        model.preferredPortText = "8787"
+
+        await model.startProxy()
+
+        XCTAssertEqual(model.proxyStatus, snapshot.proxyStatus)
+        XCTAssertEqual(localCommandService.commands.map(\.kind), [.startProxy])
+        XCTAssertEqual(localCommandService.commands.first?.preferredProxyPort, 8787)
+    }
+
     private func makeModel(
         proxyControlCloudSyncService: ProxyControlCloudSyncServiceProtocol? = nil,
+        localProxyCommandService: ProxyLocalCommandServiceProtocol? = nil,
         runtimePlatform: RuntimePlatform = .macOS
     ) -> ProxyPageModel {
         let proxyCoordinator = ProxyCoordinator(
@@ -105,6 +119,7 @@ final class ProxyPageModelTests: XCTestCase {
             coordinator: proxyCoordinator,
             settingsCoordinator: settingsCoordinator,
             proxyControlCloudSyncService: proxyControlCloudSyncService,
+            localProxyCommandService: localProxyCommandService,
             runtimePlatform: runtimePlatform
         )
     }
@@ -240,6 +255,20 @@ private actor StubProxyControlCloudSyncService: ProxyControlCloudSyncServiceProt
 
     func readEnqueuedCommandKinds() -> [ProxyControlCommandKind] {
         enqueuedCommandKinds
+    }
+}
+
+private final class SpyProxyLocalCommandService: ProxyLocalCommandServiceProtocol, @unchecked Sendable {
+    private(set) var commands: [ProxyControlCommand] = []
+    private let snapshot: ProxyControlSnapshot
+
+    init(snapshot: ProxyControlSnapshot) {
+        self.snapshot = snapshot
+    }
+
+    func performLocalCommand(_ command: ProxyControlCommand) async throws -> ProxyControlSnapshot {
+        commands.append(command)
+        return snapshot
     }
 }
 
