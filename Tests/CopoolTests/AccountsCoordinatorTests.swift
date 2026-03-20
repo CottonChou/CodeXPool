@@ -23,12 +23,26 @@ final class AccountsCoordinatorTests: XCTestCase {
                 accountID: "account-idle",
                 isCurrent: false,
                 usage: makeUsageSnapshot(fetchedAt: now - 300, fiveHourResetAt: now + 600)
+            ),
+            AccountSummary(
+                id: "acct-error",
+                label: "acct-error",
+                email: "error@example.com",
+                accountID: "account-error",
+                planType: "pro",
+                teamName: nil,
+                teamAlias: nil,
+                addedAt: now,
+                updatedAt: now,
+                usage: makeUsageSnapshot(fetchedAt: now - 300, fiveHourResetAt: now + 600),
+                usageError: "timeout",
+                isCurrent: false
             )
         ]
 
         XCTAssertEqual(
             policy.targetAccountIDs(from: accounts, now: now),
-            ["acct-current", "acct-near-reset"]
+            ["acct-current", "acct-near-reset", "acct-error"]
         )
     }
 

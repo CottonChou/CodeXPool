@@ -67,6 +67,11 @@ struct AccountsUsageRefreshPlanningPolicy: Sendable {
         _ account: AccountSummary,
         now: Int64
     ) -> Bool {
+        if let usageError = account.usageError?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !usageError.isEmpty {
+            return true
+        }
+
         guard let usage = account.usage else { return false }
         return usage.windows.contains { window in
             guard let resetAt = window.resetAt else { return false }
