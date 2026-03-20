@@ -171,17 +171,15 @@ extension ProxyPageModel {
 
     private func refreshRemoteSnapshotAfterPush() async {
         let policy = CloudPushPullRetryPolicy.nearRealtime
+        if await refreshRemoteSnapshot(showErrors: false) {
+            return
+        }
 
-        for attempt in 0..<policy.maxAttempts {
-            let didPullSnapshot = await refreshRemoteSnapshot(showErrors: false)
-            if didPullSnapshot {
+        for retryInterval in policy.retryIntervals {
+            try? await Task.sleep(for: retryInterval)
+            if await refreshRemoteSnapshot(showErrors: false) {
                 return
             }
-
-            guard attempt + 1 < policy.maxAttempts else {
-                return
-            }
-            try? await Task.sleep(for: policy.retryInterval)
         }
     }
 

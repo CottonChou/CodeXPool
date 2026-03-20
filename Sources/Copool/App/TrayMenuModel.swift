@@ -13,17 +13,15 @@ enum ProxyControlNotificationPayloadKey {
 }
 
 struct CloudPushPullRetryPolicy: Sendable {
-    let maxAttempts: Int
-    let retryInterval: Duration
+    let retryIntervals: [Duration]
 
-    init(maxAttempts: Int, retryInterval: Duration) {
-        self.maxAttempts = max(1, maxAttempts)
-        self.retryInterval = retryInterval
+    init(retryIntervals: [Duration]) {
+        self.retryIntervals = retryIntervals
     }
 
     static let nearRealtime = CloudPushPullRetryPolicy(
-        maxAttempts: 12,
-        retryInterval: .milliseconds(250)
+        retryIntervals: Array(repeating: .milliseconds(250), count: 8)
+            + Array(repeating: .seconds(1), count: 20)
     )
 }
 
@@ -654,15 +652,15 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
             return latest
         }
 
-        guard policy.maxAttempts > 1 else {
+        guard !policy.retryIntervals.isEmpty else {
             return latest
         }
 
-        for _ in 1..<policy.maxAttempts {
+        for retryInterval in policy.retryIntervals {
             if Task.isCancelled {
                 break
             }
-            try? await Task.sleep(for: policy.retryInterval)
+            try? await Task.sleep(for: retryInterval)
             latest = try await operation()
             if stopWhen(latest) {
                 break
