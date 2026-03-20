@@ -63,6 +63,12 @@ struct SettingsPageView: View {
                 set: { model.setAutoStartProxy($0) }
             ))
             .toggleStyle(.switch)
+
+            Toggle("settings.local_proxy_host_api_only", isOn: Binding(
+                get: { model.settings.localProxyHostAPIOnly },
+                set: { model.setLocalProxyHostAPIOnly($0) }
+            ))
+            .toggleStyle(.switch)
         }
     }
 

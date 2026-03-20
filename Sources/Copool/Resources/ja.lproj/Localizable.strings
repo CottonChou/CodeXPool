@@ -21,6 +21,7 @@
 "settings.launch_at_startup" = "ログイン時に起動";
 "settings.launch_codex_after_switch" = "切替後に Codex を起動";
 "settings.auto_start_api_proxy" = "API プロキシを自動起動";
+"settings.local_proxy_host_api_only" = "ローカルプロキシ: API のみホスト";
 "settings.section.deployment" = "デプロイモード";
 "settings.deployment_mode" = "モード";
 "settings.deployment_mode.local_device" = "ローカル実行";

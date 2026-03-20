@@ -21,6 +21,7 @@
 "settings.launch_at_startup" = "로그인 시 실행";
 "settings.launch_codex_after_switch" = "전환 후 Codex 실행";
 "settings.auto_start_api_proxy" = "API 프록시 자동 시작";
+"settings.local_proxy_host_api_only" = "로컬 프록시: API만 호스팅";
 "settings.section.deployment" = "배포 모드";
 "settings.deployment_mode" = "모드";
 "settings.deployment_mode.local_device" = "로컬 실행";

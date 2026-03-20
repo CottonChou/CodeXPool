@@ -70,6 +70,10 @@ final class SettingsPageModel: ObservableObject {
         Task { await update(AppSettingsPatch(syncOpencodeOpenaiAuth: value)) }
     }
 
+    func setLocalProxyHostAPIOnly(_ value: Bool) {
+        Task { await update(AppSettingsPatch(localProxyHostAPIOnly: value)) }
+    }
+
     func setRestartEditorsOnSwitch(_ value: Bool) {
         if value && settings.restartEditorTargets.isEmpty, let first = installedEditorApps.first?.id {
             Task {

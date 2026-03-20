@@ -21,6 +21,7 @@
 "settings.launch_at_startup" = "Abrir al iniciar sesión";
 "settings.launch_codex_after_switch" = "Abrir Codex después del cambio";
 "settings.auto_start_api_proxy" = "Iniciar API Proxy automáticamente";
+"settings.local_proxy_host_api_only" = "Proxy local: solo alojar API";
 "settings.section.deployment" = "Despliegue";
 "settings.deployment_mode" = "Modo";
 "settings.deployment_mode.local_device" = "Dispositivo local";

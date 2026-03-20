@@ -21,6 +21,7 @@
 "settings.launch_at_startup" = "開機啟動";
 "settings.launch_codex_after_switch" = "切換後啟動 Codex";
 "settings.auto_start_api_proxy" = "自動啟動 API Proxy";
+"settings.local_proxy_host_api_only" = "本地代理：僅託管 API";
 "settings.section.deployment" = "部署";
 "settings.deployment_mode" = "模式";
 "settings.deployment_mode.local_device" = "本機執行";

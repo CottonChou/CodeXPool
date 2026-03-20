@@ -26,6 +26,7 @@ actor SettingsCoordinator {
         if let value = patch.launchCodexAfterSwitch { settings.launchCodexAfterSwitch = value }
         if let value = patch.autoSmartSwitch { settings.autoSmartSwitch = value }
         if let value = patch.syncOpencodeOpenaiAuth { settings.syncOpencodeOpenaiAuth = value }
+        if let value = patch.localProxyHostAPIOnly { settings.localProxyHostAPIOnly = value }
         if let value = patch.restartEditorsOnSwitch { settings.restartEditorsOnSwitch = value }
         if let value = patch.restartEditorTargets { settings.restartEditorTargets = value }
         if let value = patch.autoStartApiProxy { settings.autoStartApiProxy = value }

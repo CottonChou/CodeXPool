@@ -365,10 +365,14 @@ actor SwiftNativeProxyRuntimeService: ProxyRuntimeService {
             }
         }
 
-        if statusCode == 200 {
+        if statusCode == 200, shouldSyncCurrentAuthOnSuccessfulProxyResponse() {
             try? authRepository.writeCurrentAuth(candidate.authJSON)
         }
         return UpstreamResponse(statusCode: statusCode, body: responseBody)
+    }
+
+    static func shouldSyncCurrentAuthOnSuccessfulProxyResponse(localProxyHostAPIOnly: Bool) -> Bool {
+        !localProxyHostAPIOnly
     }
 
     static func shouldRetryWithAutoReasoningSummary(statusCode: Int, bodyText: String) -> Bool {
@@ -486,6 +490,14 @@ actor SwiftNativeProxyRuntimeService: ProxyRuntimeService {
         return candidates.sorted { lhs, rhs in
             lhs.remainingScore > rhs.remainingScore
         }
+    }
+
+    private func shouldSyncCurrentAuthOnSuccessfulProxyResponse() -> Bool {
+        let localProxyHostAPIOnly = (try? storeRepository.loadStore().settings.localProxyHostAPIOnly)
+            ?? AppSettings.defaultValue.localProxyHostAPIOnly
+        return Self.shouldSyncCurrentAuthOnSuccessfulProxyResponse(
+            localProxyHostAPIOnly: localProxyHostAPIOnly
+        )
     }
 
     private func parseJSONObject(from data: Data) throws -> [String: Any] {
