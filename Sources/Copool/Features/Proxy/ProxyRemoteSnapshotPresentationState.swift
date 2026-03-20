@@ -34,25 +34,26 @@ struct ProxyRemoteSnapshotPresentationState: Equatable {
         self.publicAccessEnabled = publicAccessEnabled
         self.remoteServers = remoteServers
         self.remoteStatuses = remoteStatuses
-        self.remoteLogs = remoteLogs
+        self.remoteLogs = ProxySyncPolicy.RemoteLogs.normalize(remoteLogs)
     }
 
     init(snapshot: ProxyControlSnapshot) {
-        proxyStatus = snapshot.proxyStatus
+        let normalizedSnapshot = ProxySyncPolicy.RemoteLogs.normalize(snapshot)
+        proxyStatus = normalizedSnapshot.proxyStatus
         preferredPortText = ProxyConfiguration.normalizePreferredPortText(
-            snapshot.preferredProxyPortText
-                ?? snapshot.preferredProxyPort.map(String.init)
-                ?? snapshot.proxyStatus.port.map(String.init)
+            normalizedSnapshot.preferredProxyPortText
+                ?? normalizedSnapshot.preferredProxyPort.map(String.init)
+                ?? normalizedSnapshot.proxyStatus.port.map(String.init)
                 ?? String(RemoteServerConfiguration.defaultProxyPort)
         )
-        autoStartProxy = snapshot.autoStartProxy
-        cloudflaredStatus = snapshot.cloudflaredStatus
-        cloudflaredTunnelMode = snapshot.cloudflaredTunnelMode
-        cloudflaredNamedHostname = snapshot.cloudflaredNamedInput.hostname
-        cloudflaredUseHTTP2 = snapshot.cloudflaredUseHTTP2
-        publicAccessEnabled = snapshot.publicAccessEnabled
-        remoteServers = snapshot.remoteServers
-        remoteStatuses = snapshot.remoteStatuses
-        remoteLogs = snapshot.remoteLogs
+        autoStartProxy = normalizedSnapshot.autoStartProxy
+        cloudflaredStatus = normalizedSnapshot.cloudflaredStatus
+        cloudflaredTunnelMode = normalizedSnapshot.cloudflaredTunnelMode
+        cloudflaredNamedHostname = normalizedSnapshot.cloudflaredNamedInput.hostname
+        cloudflaredUseHTTP2 = normalizedSnapshot.cloudflaredUseHTTP2
+        publicAccessEnabled = normalizedSnapshot.publicAccessEnabled
+        remoteServers = normalizedSnapshot.remoteServers
+        remoteStatuses = normalizedSnapshot.remoteStatuses
+        remoteLogs = normalizedSnapshot.remoteLogs
     }
 }

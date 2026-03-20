@@ -3,7 +3,6 @@ import SwiftUI
 struct AccountsPageView: View {
     @State private var areCardsPresented = false
     @State private var didRunInitialCardEntrance = false
-    @StateObject private var viewStore: AccountsPageViewStore
 
     let model: AccountsPageModel
     let currentLocale: AppLocale
@@ -17,7 +16,6 @@ struct AccountsPageView: View {
         self.model = model
         self.currentLocale = currentLocale
         self.onSelectLocale = onSelectLocale
-        _viewStore = StateObject(wrappedValue: AccountsPageViewStore(model: model))
         let hasResolvedInitialState = model.hasResolvedInitialState
         _areCardsPresented = State(initialValue: hasResolvedInitialState)
         _didRunInitialCardEntrance = State(initialValue: hasResolvedInitialState)
@@ -26,9 +24,9 @@ struct AccountsPageView: View {
     var body: some View {
         AccountsPageShell(
             model: model,
-            macActionBarPresentation: viewStore.macActionBarPresentation,
-            leadingToolbarButtons: viewStore.leadingToolbarButtons,
-            trailingToolbarButtons: viewStore.trailingToolbarButtons,
+            macActionBarPresentation: model.makeMacActionBarPresentation(),
+            leadingToolbarButtons: model.leadingToolbarButtons,
+            trailingToolbarButtons: model.trailingToolbarButtons,
             currentLocale: currentLocale,
             onSelectLocale: onSelectLocale,
             areCardsPresented: areCardsPresented,

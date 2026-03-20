@@ -14,4 +14,25 @@ enum ProxySyncPolicy {
     enum Configuration {
         static let debounceInterval: Duration = .milliseconds(350)
     }
+
+    enum RemoteLogs {
+        static let maxCharactersPerServer = 12_000
+        private static let truncationMarker = "...\n"
+
+        static func normalize(_ logs: [String: String]) -> [String: String] {
+            logs.mapValues(normalize)
+        }
+
+        static func normalize(_ log: String) -> String {
+            guard log.count > maxCharactersPerServer else { return log }
+            let suffixLength = max(0, maxCharactersPerServer - truncationMarker.count)
+            return truncationMarker + String(log.suffix(suffixLength))
+        }
+
+        static func normalize(_ snapshot: ProxyControlSnapshot) -> ProxyControlSnapshot {
+            var snapshot = snapshot
+            snapshot.remoteLogs = normalize(snapshot.remoteLogs)
+            return snapshot
+        }
+    }
 }

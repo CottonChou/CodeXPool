@@ -195,7 +195,8 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
             cloudflaredStatus: cloudflaredStatus
         )
 
-        return ProxyControlSnapshot(
+        return ProxySyncPolicy.RemoteLogs.normalize(
+            ProxyControlSnapshot(
             syncedAt: dateProvider.unixMillisecondsNow(),
             sourceDeviceID: sourceDeviceID,
             proxyStatus: proxyStatus,
@@ -221,6 +222,7 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
             lastHandledCommandID: lastHandledCommandID,
             lastCommandError: lastCommandError
         )
+        )
     }
 
     private func resolveRemoteStatuses(
@@ -236,7 +238,7 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
         do {
             guard let snapshot = try await cloudSyncService.pullRemoteSnapshot() else { return }
             cachedRemoteStatuses = snapshot.remoteStatuses
-            remoteLogs = snapshot.remoteLogs
+            remoteLogs = ProxySyncPolicy.RemoteLogs.normalize(snapshot.remoteLogs)
             lastHandledCommandID = snapshot.lastHandledCommandID
             lastCommandError = snapshot.lastCommandError
             lastRemoteStatusRefreshAt = snapshot.remoteStatusesSyncedAt
@@ -430,7 +432,7 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
                 server: server,
                 lines: command.logLines ?? 120
             )
-            remoteLogs[server.id] = logs
+            remoteLogs[server.id] = ProxySyncPolicy.RemoteLogs.normalize(logs)
             return .noRemoteStatusRefresh
         }
     }

@@ -39,19 +39,20 @@ actor CloudKitProxyControlSyncService: ProxyControlCloudSyncServiceProtocol {
         var lastCommandError: String?
 
         init(snapshot: ProxyControlSnapshot) {
-            proxyStatus = snapshot.proxyStatus
-            preferredProxyPort = snapshot.preferredProxyPort
-            autoStartProxy = snapshot.autoStartProxy
-            cloudflaredStatus = snapshot.cloudflaredStatus
-            cloudflaredTunnelMode = snapshot.cloudflaredTunnelMode
-            cloudflaredNamedInput = snapshot.cloudflaredNamedInput
-            cloudflaredUseHTTP2 = snapshot.cloudflaredUseHTTP2
-            publicAccessEnabled = snapshot.publicAccessEnabled
-            remoteServers = snapshot.remoteServers
-            remoteStatuses = snapshot.remoteStatuses
-            remoteLogs = snapshot.remoteLogs
-            lastHandledCommandID = snapshot.lastHandledCommandID
-            lastCommandError = snapshot.lastCommandError
+            let normalizedSnapshot = ProxySyncPolicy.RemoteLogs.normalize(snapshot)
+            proxyStatus = normalizedSnapshot.proxyStatus
+            preferredProxyPort = normalizedSnapshot.preferredProxyPort
+            autoStartProxy = normalizedSnapshot.autoStartProxy
+            cloudflaredStatus = normalizedSnapshot.cloudflaredStatus
+            cloudflaredTunnelMode = normalizedSnapshot.cloudflaredTunnelMode
+            cloudflaredNamedInput = normalizedSnapshot.cloudflaredNamedInput
+            cloudflaredUseHTTP2 = normalizedSnapshot.cloudflaredUseHTTP2
+            publicAccessEnabled = normalizedSnapshot.publicAccessEnabled
+            remoteServers = normalizedSnapshot.remoteServers
+            remoteStatuses = normalizedSnapshot.remoteStatuses
+            remoteLogs = normalizedSnapshot.remoteLogs
+            lastHandledCommandID = normalizedSnapshot.lastHandledCommandID
+            lastCommandError = normalizedSnapshot.lastCommandError
         }
     }
 
@@ -73,19 +74,20 @@ actor CloudKitProxyControlSyncService: ProxyControlCloudSyncServiceProtocol {
 
     func pushLocalSnapshot(_ snapshot: ProxyControlSnapshot) async throws {
         guard database != nil else { return }
+        let normalizedSnapshot = ProxySyncPolicy.RemoteLogs.normalize(snapshot)
 
-        let digest = try snapshotDigest(for: snapshot)
+        let digest = try snapshotDigest(for: normalizedSnapshot)
         guard digest != lastUploadedSnapshotDigest else { return }
 
         let payload = SnapshotPayload(
             schemaVersion: Constants.schemaVersion,
-            snapshot: snapshot
+            snapshot: normalizedSnapshot
         )
         _ = try await saveRecord(
             payload: payload,
             recordID: snapshotRecordID,
             recordType: Constants.snapshotRecordType,
-            timestamp: snapshot.syncedAt
+            timestamp: normalizedSnapshot.syncedAt
         )
         lastUploadedSnapshotDigest = digest
         lastAppliedSnapshotDigest = digest
@@ -107,13 +109,14 @@ actor CloudKitProxyControlSyncService: ProxyControlCloudSyncServiceProtocol {
             lastAppliedSnapshotDigest = nil
             return nil
         }
-        let digest = try snapshotDigest(for: payload.snapshot)
+        let normalizedSnapshot = ProxySyncPolicy.RemoteLogs.normalize(payload.snapshot)
+        let digest = try snapshotDigest(for: normalizedSnapshot)
         if digest == lastAppliedSnapshotDigest {
             return nil
         }
 
         lastAppliedSnapshotDigest = digest
-        return payload.snapshot
+        return normalizedSnapshot
     }
 
     func enqueueCommand(_ command: ProxyControlCommand) async throws {

@@ -205,6 +205,20 @@ final class ProxyPageModelTests: XCTestCase {
         XCTAssertEqual(model.cloudflaredNamedInput.hostname, "synced.example.com")
     }
 
+    func testApplyRemoteSnapshotTrimsOversizedRemoteLogsToPolicyCap() {
+        let model = makeModel()
+        var snapshot = makeSnapshot()
+        let oversizedLogs = String(repeating: "0123456789", count: 1_400)
+        snapshot.remoteLogs["server-1"] = oversizedLogs
+
+        XCTAssertTrue(model.applyRemoteSnapshot(snapshot))
+
+        let expectedLogs = ProxySyncPolicy.RemoteLogs.normalize(oversizedLogs)
+        XCTAssertEqual(model.remoteLogs["server-1"], expectedLogs)
+        XCTAssertEqual(model.lastAppliedRemoteSnapshot?.remoteLogs["server-1"], expectedLogs)
+        XCTAssertLessThanOrEqual(expectedLogs.count, ProxySyncPolicy.RemoteLogs.maxCharactersPerServer)
+    }
+
     func testUpdateCloudflaredUseHTTP2SyncsProxyConfigurationLocally() async {
         let snapshot = makeSnapshot()
         let localCommandService = SpyProxyLocalCommandService(snapshot: snapshot)

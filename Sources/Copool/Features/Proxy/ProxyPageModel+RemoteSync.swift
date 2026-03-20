@@ -77,12 +77,13 @@ extension ProxyPageModel {
 
     @discardableResult
     func applyRemoteSnapshot(_ snapshot: ProxyControlSnapshot) -> Bool {
-        lastAppliedRemoteSnapshot = snapshot
-        lastHandledRemoteCommandID = snapshot.lastHandledCommandID
-        lastRemoteCommandError = snapshot.lastCommandError
-        lastAppliedRemoteSnapshotSyncedAt = snapshot.syncedAt
-        lastAppliedRemoteStatusesSyncedAt = snapshot.remoteStatusesSyncedAt
-        let nextState = ProxyRemoteSnapshotPresentationState(snapshot: snapshot)
+        let normalizedSnapshot = ProxySyncPolicy.RemoteLogs.normalize(snapshot)
+        lastAppliedRemoteSnapshot = normalizedSnapshot
+        lastHandledRemoteCommandID = normalizedSnapshot.lastHandledCommandID
+        lastRemoteCommandError = normalizedSnapshot.lastCommandError
+        lastAppliedRemoteSnapshotSyncedAt = normalizedSnapshot.syncedAt
+        lastAppliedRemoteStatusesSyncedAt = normalizedSnapshot.remoteStatusesSyncedAt
+        let nextState = ProxyRemoteSnapshotPresentationState(snapshot: normalizedSnapshot)
         guard nextState != currentRemoteSnapshotPresentationState else {
             return false
         }
