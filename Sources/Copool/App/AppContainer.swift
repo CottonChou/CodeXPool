@@ -13,6 +13,7 @@ struct AppContainer {
             let paths = try FileSystemPaths.live()
             let storeRepository = StoreFileRepository(paths: paths)
             let authRepository = AuthFileRepository(paths: paths)
+            let initialAccounts = initialAccountsSnapshot(using: storeRepository)
             let usageService = DefaultUsageService(configPath: paths.codexConfigPath)
             let workspaceMetadataService = DefaultWorkspaceMetadataService(configPath: paths.codexConfigPath)
             let proxyService = SwiftNativeProxyRuntimeService(
@@ -69,7 +70,7 @@ struct AppContainer {
                 cloudSyncService: cloudSyncService,
                 currentAccountSelectionSyncService: currentAccountSelectionSyncService,
                 backgroundRefreshPolicy: .forPlatform(PlatformCapabilities.currentPlatform),
-                initialAccounts: []
+                initialAccounts: initialAccounts
             )
             let settingsModel = SettingsPageModel(
                 settingsCoordinator: settingsCoordinator,
@@ -96,7 +97,8 @@ struct AppContainer {
                     cloudSyncAvailabilityService: cloudSyncAvailabilityService,
                     onLocalAccountsChanged: { accounts in
                         trayModel.acceptLocalAccountsSnapshot(accounts)
-                    }
+                    },
+                    initialAccounts: initialAccounts
                 ),
                 proxyModel: ProxyPageModel(
                     coordinator: proxyCoordinator,
@@ -111,5 +113,14 @@ struct AppContainer {
         } catch {
             fatalError("Failed to bootstrap Swift migration app: \(error.localizedDescription)")
         }
+    }
+
+    private static func initialAccountsSnapshot(
+        using storeRepository: StoreFileRepository
+    ) -> [AccountSummary] {
+        guard let store = try? storeRepository.loadStore() else {
+            return []
+        }
+        return store.accountSummaries(currentAccountID: nil)
     }
 }
