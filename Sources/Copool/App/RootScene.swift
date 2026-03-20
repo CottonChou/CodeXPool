@@ -65,6 +65,9 @@ struct RootScene: View {
         }
         .task {
             await settingsModel.loadIfNeeded()
+        }
+        .task(id: settingsModel.hasLoaded) {
+            guard settingsModel.hasLoaded else { return }
             await proxyModel.bootstrapOnAppLaunch(using: settingsModel.settings)
         }
         .rootSceneNoticePresentation(currentNotice)
