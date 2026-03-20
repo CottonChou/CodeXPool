@@ -67,16 +67,7 @@ struct RootScene: View {
             await settingsModel.loadIfNeeded()
             await proxyModel.bootstrapOnAppLaunch(using: settingsModel.settings)
         }
-        #if os(iOS)
-        .animation(.easeInOut(duration: 0.2), value: currentNotice)
-        #endif
-        .safeAreaInset(edge: noticeInsetEdge, spacing: 0) {
-            NoticeBanner(notice: currentNotice)
-                .padding(.horizontal, LayoutRules.pagePadding)
-                .padding(noticeInsetPaddingEdge, 6)
-                .allowsHitTesting(false)
-                .zIndex(10)
-        }
+        .rootSceneNoticePresentation(currentNotice)
         #if os(macOS)
         .background {
             WindowSizeEnforcer(
@@ -96,22 +87,6 @@ struct RootScene: View {
         #else
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color(uiColor: .systemBackground))
-        #endif
-    }
-
-    private var noticeInsetEdge: VerticalEdge {
-        #if os(iOS)
-        .bottom
-        #else
-        .top
-        #endif
-    }
-
-    private var noticeInsetPaddingEdge: Edge.Set {
-        #if os(iOS)
-        .bottom
-        #else
-        .top
         #endif
     }
 
@@ -148,12 +123,6 @@ struct RootScene: View {
                 }
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            NoticeBanner(notice: currentNotice)
-                .allowsHitTesting(false)
-                .padding(.horizontal, LayoutRules.pagePadding)
-                .padding(.bottom, 6)
-        }
         #else
         VStack(spacing: 0) {
             AppTabToolbarSwitcher(selection: $selectedTab, tabs: visibleTabs)
@@ -184,6 +153,31 @@ struct RootScene: View {
         case .settings:
             SettingsPageView(model: settingsModel)
         }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func rootSceneNoticePresentation(_ notice: NoticeMessage?) -> some View {
+        #if os(iOS)
+        self
+            .animation(.easeInOut(duration: 0.2), value: notice)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                NoticeBanner(notice: notice)
+                    .allowsHitTesting(false)
+                    .padding(.horizontal, LayoutRules.pagePadding)
+                    .padding(.bottom, 6)
+            }
+        #else
+        self
+            .overlay(alignment: .top) {
+                NoticeBanner(notice: notice)
+                    .padding(.horizontal, LayoutRules.pagePadding)
+                    .padding(.top, 6)
+                    .allowsHitTesting(false)
+                    .zIndex(10)
+            }
+        #endif
     }
 }
 
