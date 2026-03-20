@@ -98,7 +98,9 @@ struct AccountCardView: View {
                 return
             }
             guard isHoveringCollapsedSwitch != hovering else { return }
-            isHoveringCollapsedSwitch = hovering
+            withAnimation(.easeInOut(duration: 0.16)) {
+                isHoveringCollapsedSwitch = hovering
+            }
         }
         #if os(iOS)
         .onLongPressGesture(minimumDuration: 0.35) {
