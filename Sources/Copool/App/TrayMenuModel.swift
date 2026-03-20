@@ -346,12 +346,19 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
         let selectionPullResult = try await reconcileCurrentAccountSelection(
             failOnError: failOnCloudSyncError
         )
+        let latestLocalAccounts = try await accountsCoordinator.listAccounts()
+
+        if backgroundRefreshPolicy.cloudSyncMode == .pushLocalAccounts,
+           !latestLocalAccounts.isEmpty,
+           !cloudPullResult.didUpdateAccounts {
+            try await pushCloudAccountsIfNeeded(failOnError: failOnCloudSyncError)
+        }
 
         if cloudPullResult.didUpdateAccounts || selectionPullResult.didUpdateSelection {
             return try await accountsCoordinator.listAccounts()
         }
 
-        return accounts
+        return latestLocalAccounts
     }
 
     private func refreshLocalAccounts(

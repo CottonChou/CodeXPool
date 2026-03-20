@@ -896,6 +896,54 @@ final class AccountsCoordinatorTests: XCTestCase {
             XCTFail("Expected refreshed accounts content state")
         }
     }
+
+    @MainActor
+    func testTrayMenuModelPushesInitialLocalAccountsBaselineDuringCloudReconciliation() async {
+        let now: Int64 = 1_763_216_000
+        let storeRepository = InMemoryAccountsStoreRepository(
+            store: AccountsStore(
+                accounts: [
+                    makeStoredAccount(id: "acct-1", accountID: "account-1", now: now)
+                ]
+            )
+        )
+        let coordinator = AccountsCoordinator(
+            storeRepository: storeRepository,
+            authRepository: RecordingAuthRepository(currentAccountID: "account-1"),
+            usageService: CountingUsageService(result: makeUsageSnapshot(fetchedAt: now)),
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+        let cloudSyncService = SpyAccountsCloudSyncService(pullResult: .noChange)
+        let trayModel = TrayMenuModel(
+            accountsCoordinator: coordinator,
+            settingsCoordinator: SettingsCoordinator(
+                storeRepository: storeRepository,
+                launchAtStartupService: StubLaunchAtStartupService()
+            ),
+            cloudSyncService: cloudSyncService,
+            currentAccountSelectionSyncService: nil,
+            backgroundRefreshPolicy: .init(
+                initialRefreshDelay: .zero,
+                cloudReconciliationInterval: .seconds(3),
+                usageRefreshInterval: .seconds(30),
+                refreshUsageOnRecurringTick: false,
+                cloudSyncMode: .pushLocalAccounts,
+                applyRemoteSelectionSwitchEffects: false
+            ),
+            dateProvider: FixedDateProvider(now: now),
+            initialAccounts: []
+        )
+
+        await trayModel.reconcileCloudStateNow()
+
+        let pushCallCount = await cloudSyncService.readPushCallCount()
+        XCTAssertEqual(pushCallCount, 1)
+        XCTAssertEqual(trayModel.accounts.map(\.accountID), ["account-1"])
+    }
 }
 
 private func makeAccountSummary(
@@ -1338,5 +1386,43 @@ private final class RecordingEditorAppService: EditorAppServiceProtocol, @unchec
 private final class StubOpencodeAuthSyncService: OpencodeAuthSyncServiceProtocol, @unchecked Sendable {
     func syncFromCodexAuth(_ authJSON: JSONValue) throws {
         _ = authJSON
+    }
+}
+
+private actor SpyAccountsCloudSyncService: AccountsCloudSyncServiceProtocol {
+    private(set) var pushCallCount = 0
+    private let pullResult: AccountsCloudSyncPullResult
+
+    init(pullResult: AccountsCloudSyncPullResult) {
+        self.pullResult = pullResult
+    }
+
+    func pushLocalAccountsIfNeeded() async throws {
+        pushCallCount += 1
+    }
+
+    func pullRemoteAccountsIfNeeded(
+        currentTime: Int64,
+        maximumSnapshotAgeSeconds: Int64
+    ) async throws -> AccountsCloudSyncPullResult {
+        _ = currentTime
+        _ = maximumSnapshotAgeSeconds
+        return pullResult
+    }
+
+    func ensurePushSubscriptionIfNeeded() async throws {}
+
+    func readPushCallCount() -> Int {
+        pushCallCount
+    }
+}
+
+private final class StubLaunchAtStartupService: LaunchAtStartupServiceProtocol, @unchecked Sendable {
+    func setEnabled(_ enabled: Bool) throws {
+        _ = enabled
+    }
+
+    func syncWithStoreValue(_ enabled: Bool) throws {
+        _ = enabled
     }
 }
