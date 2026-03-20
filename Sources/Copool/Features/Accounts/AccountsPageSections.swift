@@ -3,9 +3,16 @@ import SwiftUI
 struct AccountsPageContentSection: View {
     @ObservedObject var model: AccountsPageModel
     let areCardsPresented: Bool
+    let onSwitchAccount: (String) -> Void
+    let onRefreshAccountUsage: (String) -> Void
+    let onDeleteAccount: (String) -> Void
+
+    private var presentation: AccountsPageContentPresentation {
+        model.makeContentPresentation()
+    }
 
     var body: some View {
-        switch model.state {
+        switch presentation.state {
         case .loading:
             ProgressView(L10n.tr("accounts.loading.message"))
                 .frame(maxWidth: .infinity, minHeight: 180)
@@ -15,24 +22,26 @@ struct AccountsPageContentSection: View {
         case .error(let message):
             EmptyStateView(title: L10n.tr("accounts.error.load_failed"), message: message)
                 .padding(.horizontal, LayoutRules.pagePadding)
-        case .content(let accounts):
+        case .content(let cards):
             AccountsGridSection(
-                accounts: accounts,
-                model: model,
-                areCardsPresented: areCardsPresented
+                cards: cards,
+                isOverviewMode: presentation.isOverviewMode,
+                areCardsPresented: areCardsPresented,
+                onSwitchAccount: onSwitchAccount,
+                onRefreshAccountUsage: onRefreshAccountUsage,
+                onDeleteAccount: onDeleteAccount
             )
         }
     }
 }
 
 private struct AccountsGridSection: View {
-    let accounts: [AccountSummary]
-    @ObservedObject var model: AccountsPageModel
+    let cards: [AccountCardViewState]
+    let isOverviewMode: Bool
     let areCardsPresented: Bool
-
-    private var isOverviewMode: Bool {
-        model.areAllAccountsCollapsed
-    }
+    let onSwitchAccount: (String) -> Void
+    let onRefreshAccountUsage: (String) -> Void
+    let onDeleteAccount: (String) -> Void
 
     private var columns: [GridItem] {
         #if os(iOS)
@@ -48,26 +57,21 @@ private struct AccountsGridSection: View {
             alignment: .leading,
             spacing: LayoutRules.accountsRowSpacing
         ) {
-            ForEach(Array(accounts.enumerated()), id: \.element.id) { index, account in
+            ForEach(Array(cards.enumerated()), id: \.element.id) { index, card in
                 AccountCardGridItem(
-                    account: account,
-                    isCollapsed: model.isAccountCollapsed(account.id),
-                    switching: model.switchingAccountID == account.id,
-                    refreshing: model.isAccountRefreshing(account.id),
-                    isRefreshEnabled: model.canRefreshAccount(account.id),
-                    isUsageRefreshActive: model.isUsageRefreshActive(forAccountID: account.id),
+                    card: card,
                     areCardsPresented: areCardsPresented,
                     index: index,
                     isOverviewMode: isOverviewMode,
-                    onSwitch: { Task { await model.switchAccount(id: account.id) } },
-                    onRefresh: { Task { await model.refreshUsage(forAccountID: account.id) } },
-                    onDelete: { Task { await model.deleteAccount(id: account.id) } }
+                    onSwitch: { onSwitchAccount(card.id) },
+                    onRefresh: { onRefreshAccountUsage(card.id) },
+                    onDelete: { onDeleteAccount(card.id) }
                 )
             }
         }
         .animation(
             .spring(response: 0.36, dampingFraction: 0.84),
-            value: accounts.map(\.id)
+            value: cards.map(\.id)
         )
         .padding(.horizontal, LayoutRules.pagePadding)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -75,12 +79,7 @@ private struct AccountsGridSection: View {
 }
 
 private struct AccountCardGridItem: View {
-    let account: AccountSummary
-    let isCollapsed: Bool
-    let switching: Bool
-    let refreshing: Bool
-    let isRefreshEnabled: Bool
-    let isUsageRefreshActive: Bool
+    let card: AccountCardViewState
     let areCardsPresented: Bool
     let index: Int
     let isOverviewMode: Bool
@@ -90,12 +89,12 @@ private struct AccountCardGridItem: View {
 
     var body: some View {
         AccountCardView(
-            account: account,
-            isCollapsed: isCollapsed,
-            switching: switching,
-            refreshing: refreshing,
-            isRefreshEnabled: isRefreshEnabled,
-            isUsageRefreshActive: isUsageRefreshActive,
+            account: card.account,
+            isCollapsed: card.isCollapsed,
+            switching: card.switching,
+            refreshing: card.refreshing,
+            isRefreshEnabled: card.isRefreshEnabled,
+            isUsageRefreshActive: card.isUsageRefreshActive,
             onSwitch: onSwitch,
             onRefresh: onRefresh,
             onDelete: onDelete

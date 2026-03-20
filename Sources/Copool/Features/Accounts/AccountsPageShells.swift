@@ -1,31 +1,62 @@
 import SwiftUI
 
 struct AccountsPageShell: View {
-    @ObservedObject var model: AccountsPageModel
+    let model: AccountsPageModel
+    let macActionBarPresentation: AccountsActionBarPresentation
+    let leadingToolbarButtons: [AccountsActionButtonDescriptor<AccountsPageActionIntent>]
+    let trailingToolbarButtons: [AccountsActionButtonDescriptor<AccountsPageActionIntent>]
     let currentLocale: AppLocale
     let onSelectLocale: (AppLocale) -> Void
     let areCardsPresented: Bool
+    let onTriggerAction: (AccountsPageActionIntent) -> Void
+    let onToggleCollapse: () -> Void
+    let onSwitchAccount: (String) -> Void
+    let onRefreshAccountUsage: (String) -> Void
+    let onDeleteAccount: (String) -> Void
 
     var body: some View {
         #if os(iOS)
         AccountsIOSPageShell(
             model: model,
+            leadingToolbarButtons: leadingToolbarButtons,
+            trailingToolbarButtons: trailingToolbarButtons,
             currentLocale: currentLocale,
             onSelectLocale: onSelectLocale,
-            areCardsPresented: areCardsPresented
+            areCardsPresented: areCardsPresented,
+            onTriggerAction: onTriggerAction,
+            onToggleCollapse: onToggleCollapse,
+            onSwitchAccount: onSwitchAccount,
+            onRefreshAccountUsage: onRefreshAccountUsage,
+            onDeleteAccount: onDeleteAccount
         )
         #else
-        AccountsMacPageShell(model: model, areCardsPresented: areCardsPresented)
+        AccountsMacPageShell(
+            model: model,
+            actionBarPresentation: macActionBarPresentation,
+            areCardsPresented: areCardsPresented,
+            onTriggerAction: onTriggerAction,
+            onToggleCollapse: onToggleCollapse,
+            onSwitchAccount: onSwitchAccount,
+            onRefreshAccountUsage: onRefreshAccountUsage,
+            onDeleteAccount: onDeleteAccount
+        )
         #endif
     }
 }
 
 #if os(iOS)
 private struct AccountsIOSPageShell: View {
-    @ObservedObject var model: AccountsPageModel
+    let model: AccountsPageModel
+    let leadingToolbarButtons: [AccountsActionButtonDescriptor<AccountsPageActionIntent>]
+    let trailingToolbarButtons: [AccountsActionButtonDescriptor<AccountsPageActionIntent>]
     let currentLocale: AppLocale
     let onSelectLocale: (AppLocale) -> Void
     let areCardsPresented: Bool
+    let onTriggerAction: (AccountsPageActionIntent) -> Void
+    let onToggleCollapse: () -> Void
+    let onSwitchAccount: (String) -> Void
+    let onRefreshAccountUsage: (String) -> Void
+    let onDeleteAccount: (String) -> Void
 
     var body: some View {
         GeometryReader { proxy in
@@ -33,7 +64,10 @@ private struct AccountsIOSPageShell: View {
                 VStack(alignment: .leading, spacing: 0) {
                     AccountsPageContentSection(
                         model: model,
-                        areCardsPresented: areCardsPresented
+                        areCardsPresented: areCardsPresented,
+                        onSwitchAccount: onSwitchAccount,
+                        onRefreshAccountUsage: onRefreshAccountUsage,
+                        onDeleteAccount: onDeleteAccount
                     )
                 }
                 .padding(.top, LayoutRules.iOSAccountsContentTopPadding(safeAreaTop: proxy.safeAreaInsets.top))
@@ -43,13 +77,16 @@ private struct AccountsIOSPageShell: View {
             .scrollIndicators(.hidden)
             .ignoresSafeArea(edges: [.top, .bottom])
             .refreshable {
-                await model.refreshUsage()
+                onTriggerAction(.refreshUsage)
             }
             .toolbar {
                 AccountsToolbarActions(
-                    model: model,
+                    leadingButtons: leadingToolbarButtons,
+                    trailingButtons: trailingToolbarButtons,
                     currentLocale: currentLocale,
-                    onSelectLocale: onSelectLocale
+                    onSelectLocale: onSelectLocale,
+                    onTriggerAction: onTriggerAction,
+                    onToggleCollapse: onToggleCollapse
                 )
             }
         }
@@ -58,19 +95,32 @@ private struct AccountsIOSPageShell: View {
 #endif
 
 private struct AccountsMacPageShell: View {
-    @ObservedObject var model: AccountsPageModel
+    let model: AccountsPageModel
+    let actionBarPresentation: AccountsActionBarPresentation
     let areCardsPresented: Bool
+    let onTriggerAction: (AccountsPageActionIntent) -> Void
+    let onToggleCollapse: () -> Void
+    let onSwitchAccount: (String) -> Void
+    let onRefreshAccountUsage: (String) -> Void
+    let onDeleteAccount: (String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: LayoutRules.sectionSpacing) {
-            AccountsActionBarView(model: model)
+            AccountsActionBarView(
+                presentation: actionBarPresentation,
+                onTriggerAction: onTriggerAction,
+                onToggleCollapse: onToggleCollapse
+            )
                 .padding(.horizontal, LayoutRules.pagePadding)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     AccountsPageContentSection(
                         model: model,
-                        areCardsPresented: areCardsPresented
+                        areCardsPresented: areCardsPresented,
+                        onSwitchAccount: onSwitchAccount,
+                        onRefreshAccountUsage: onRefreshAccountUsage,
+                        onDeleteAccount: onDeleteAccount
                     )
                 }
                 .padding(.bottom, 12)

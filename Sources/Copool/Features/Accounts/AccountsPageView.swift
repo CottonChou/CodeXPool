@@ -3,8 +3,9 @@ import SwiftUI
 struct AccountsPageView: View {
     @State private var areCardsPresented = false
     @State private var didRunInitialCardEntrance = false
+    @StateObject private var viewStore: AccountsPageViewStore
 
-    @ObservedObject var model: AccountsPageModel
+    let model: AccountsPageModel
     let currentLocale: AppLocale
     let onSelectLocale: (AppLocale) -> Void
 
@@ -16,6 +17,7 @@ struct AccountsPageView: View {
         self.model = model
         self.currentLocale = currentLocale
         self.onSelectLocale = onSelectLocale
+        _viewStore = StateObject(wrappedValue: AccountsPageViewStore(model: model))
         let hasResolvedInitialState = model.hasResolvedInitialState
         _areCardsPresented = State(initialValue: hasResolvedInitialState)
         _didRunInitialCardEntrance = State(initialValue: hasResolvedInitialState)
@@ -24,9 +26,17 @@ struct AccountsPageView: View {
     var body: some View {
         AccountsPageShell(
             model: model,
+            macActionBarPresentation: viewStore.macActionBarPresentation,
+            leadingToolbarButtons: viewStore.leadingToolbarButtons,
+            trailingToolbarButtons: viewStore.trailingToolbarButtons,
             currentLocale: currentLocale,
             onSelectLocale: onSelectLocale,
-            areCardsPresented: areCardsPresented
+            areCardsPresented: areCardsPresented,
+            onTriggerAction: triggerAction,
+            onToggleCollapse: toggleCollapse,
+            onSwitchAccount: switchAccount,
+            onRefreshAccountUsage: refreshUsage,
+            onDeleteAccount: deleteAccount
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .task {
@@ -49,5 +59,27 @@ struct AccountsPageView: View {
         guard count != nil, !didRunInitialCardEntrance else { return }
         didRunInitialCardEntrance = true
         areCardsPresented = true
+    }
+
+    private func triggerAction(_ intent: AccountsPageActionIntent) {
+        Task { await model.handlePageAction(intent) }
+    }
+
+    private func toggleCollapse() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            model.toggleAllAccountsCollapsed()
+        }
+    }
+
+    private func switchAccount(id: String) {
+        Task { await model.switchAccount(id: id) }
+    }
+
+    private func refreshUsage(forAccountID id: String) {
+        Task { await model.refreshUsage(forAccountID: id) }
+    }
+
+    private func deleteAccount(id: String) {
+        Task { await model.deleteAccount(id: id) }
     }
 }
