@@ -14,8 +14,8 @@ struct AccountCardView: View {
     @Environment(\.locale) private var locale
     @State private var isHoveringCollapsedSwitch = false
     @State private var isCollapsedSwitchOverlayPresented = false
-    @State private var displayedCollapsed: Bool
-    @State private var contentSwapTask: Task<Void, Never>?
+    @State private var displaysExpandedTitle: Bool
+    @State private var titleExpansionTask: Task<Void, Never>?
 
     init(
         account: AccountSummary,
@@ -37,11 +37,11 @@ struct AccountCardView: View {
         self.onSwitch = onSwitch
         self.onRefresh = onRefresh
         self.onDelete = onDelete
-        _displayedCollapsed = State(initialValue: isCollapsed)
+        _displaysExpandedTitle = State(initialValue: !isCollapsed)
     }
 
     private var presentation: AccountCardPresentation {
-        AccountCardPresentation(account: account, isCollapsed: displayedCollapsed, locale: locale)
+        AccountCardPresentation(account: account, isCollapsed: isCollapsed, locale: locale)
     }
 
     private var palette: AccountCardPalette {
@@ -71,7 +71,7 @@ struct AccountCardView: View {
         VStack(alignment: .leading, spacing: 8) {
             AccountCardHeaderSection(
                 presentation: presentation,
-                isCollapsed: displayedCollapsed,
+                isCollapsed: isCollapsed,
                 isCurrent: account.isCurrent,
                 palette: palette,
                 onDelete: onDelete
@@ -80,11 +80,11 @@ struct AccountCardView: View {
             Text(presentation.displayAccountName)
                 .font(.headline)
                 .foregroundStyle(account.isCurrent ? palette.toneColor : .primary)
-                .lineLimit(displayedCollapsed ? 1 : 2)
+                .lineLimit(displaysExpandedTitle ? 2 : 1)
                 .fixedSize(horizontal: false, vertical: true)
                 .truncationMode(.tail)
 
-            if displayedCollapsed {
+            if isCollapsed {
                 AccountCardCompactUsageSection(presentation: presentation)
             } else {
                 AccountCardExpandedUsageSection(presentation: presentation)
@@ -98,7 +98,7 @@ struct AccountCardView: View {
         )
         .overlay(alignment: .bottomTrailing) {
             AccountCardBottomOverlay(
-                isCollapsed: displayedCollapsed,
+                isCollapsed: isCollapsed,
                 isCurrent: account.isCurrent,
                 switching: switching,
                 refreshing: refreshing,
@@ -138,7 +138,7 @@ struct AccountCardView: View {
         }
         #endif
         .onChange(of: isCollapsed) { _, collapsed in
-            syncDisplayedCollapsed(with: collapsed)
+            syncDisplayedExpandedTitle(with: collapsed)
             if !collapsed {
                 dismissCollapsedSwitchOverlay()
             }
@@ -149,8 +149,8 @@ struct AccountCardView: View {
             }
         }
         .onDisappear {
-            contentSwapTask?.cancel()
-            contentSwapTask = nil
+            titleExpansionTask?.cancel()
+            titleExpansionTask = nil
         }
     }
 
@@ -161,21 +161,24 @@ struct AccountCardView: View {
         }
     }
 
-    private func syncDisplayedCollapsed(with targetCollapsed: Bool) {
-        contentSwapTask?.cancel()
+    private func syncDisplayedExpandedTitle(with collapsed: Bool) {
+        titleExpansionTask?.cancel()
 
-        guard displayedCollapsed != targetCollapsed else {
-            contentSwapTask = nil
+        if collapsed {
+            withAnimation(AccountCardMorphRules.contentAnimation) {
+                displaysExpandedTitle = false
+            }
+            titleExpansionTask = nil
             return
         }
 
-        contentSwapTask = Task { @MainActor in
-            try? await Task.sleep(for: AccountCardMorphRules.contentSwapDelay)
+        titleExpansionTask = Task { @MainActor in
+            try? await Task.sleep(for: AccountCardMorphRules.titleExpansionDelay)
             guard !Task.isCancelled else { return }
             withAnimation(AccountCardMorphRules.contentAnimation) {
-                displayedCollapsed = targetCollapsed
+                displaysExpandedTitle = true
             }
-            contentSwapTask = nil
+            titleExpansionTask = nil
         }
     }
 }
