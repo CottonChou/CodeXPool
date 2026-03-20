@@ -190,22 +190,29 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
         let pair = await proxyCoordinator.loadStatus()
         let proxyStatus = pair.0
         let cloudflaredStatus = pair.1
+        let proxyConfiguration = resolveSnapshotProxyConfiguration(
+            from: settings.proxyConfiguration,
+            cloudflaredStatus: cloudflaredStatus
+        )
 
         return ProxyControlSnapshot(
             syncedAt: dateProvider.unixMillisecondsNow(),
             sourceDeviceID: sourceDeviceID,
             proxyStatus: proxyStatus,
-            preferredProxyPort: proxyStatus.port ?? RemoteServerConfiguration.defaultProxyPort,
+            preferredProxyPort: proxyConfiguration.preferredPort
+                ?? proxyStatus.port
+                ?? RemoteServerConfiguration.defaultProxyPort,
+            preferredProxyPortText: proxyConfiguration.preferredPortText,
             autoStartProxy: settings.autoStartApiProxy,
             cloudflaredStatus: cloudflaredStatus,
-            cloudflaredTunnelMode: cloudflaredStatus.tunnelMode ?? .quick,
+            cloudflaredTunnelMode: proxyConfiguration.cloudflared.tunnelMode,
             cloudflaredNamedInput: NamedCloudflaredTunnelInput(
                 apiToken: "",
                 accountID: "",
                 zoneID: "",
-                hostname: cloudflaredStatus.customHostname ?? ""
+                hostname: proxyConfiguration.cloudflared.namedHostname
             ),
-            cloudflaredUseHTTP2: cloudflaredStatus.useHTTP2,
+            cloudflaredUseHTTP2: proxyConfiguration.cloudflared.useHTTP2,
             publicAccessEnabled: cloudflaredStatus.running,
             remoteServers: settings.remoteServers,
             remoteStatusesSyncedAt: lastRemoteStatusRefreshAt,
@@ -323,7 +330,16 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
         case .refreshStatus:
             scheduleRemoteStatusRefreshIfNeeded(force: true)
             return .noRemoteStatusRefresh
+        case .updateProxyConfiguration:
+            guard let proxyConfiguration = command.proxyConfiguration else {
+                throw AppError.invalidData("Missing proxy configuration payload.")
+            }
+            try await persistProxyConfiguration(proxyConfiguration)
+            return .noRemoteStatusRefresh
         case .startProxy:
+            if let proxyConfiguration = command.proxyConfiguration {
+                try await persistProxyConfiguration(proxyConfiguration)
+            }
             _ = try await proxyCoordinator.startProxy(preferredPort: command.preferredProxyPort)
             return .noRemoteStatusRefresh
         case .stopProxy:
@@ -343,6 +359,9 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
         case .startCloudflared:
             guard let input = command.cloudflaredInput else {
                 throw AppError.invalidData("Missing cloudflared input.")
+            }
+            if let proxyConfiguration = command.proxyConfiguration {
+                try await persistProxyConfiguration(proxyConfiguration)
             }
             _ = try await proxyCoordinator.startCloudflared(input: input)
             return .noRemoteStatusRefresh
@@ -414,6 +433,33 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
             remoteLogs[server.id] = logs
             return .noRemoteStatusRefresh
         }
+    }
+
+    private func persistProxyConfiguration(_ configuration: ProxyConfiguration) async throws {
+        _ = try await settingsCoordinator.updateSettings(
+            AppSettingsPatch(proxyConfiguration: configuration.normalized())
+        )
+    }
+
+    private func resolveSnapshotProxyConfiguration(
+        from baseConfiguration: ProxyConfiguration,
+        cloudflaredStatus: CloudflaredStatus
+    ) -> ProxyConfiguration {
+        var resolved = baseConfiguration.normalized()
+
+        if cloudflaredStatus.running {
+            if let mode = cloudflaredStatus.tunnelMode {
+                resolved.cloudflared.tunnelMode = mode
+            }
+            resolved.cloudflared.useHTTP2 = cloudflaredStatus.useHTTP2
+        }
+
+        if let hostname = cloudflaredStatus.customHostname,
+           !hostname.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            resolved.cloudflared.namedHostname = CloudflaredConfiguration.normalizeHostnameDraft(hostname)
+        }
+
+        return resolved.normalized()
     }
 
     private func serverForCommand(_ command: ProxyControlCommand) async throws -> RemoteServerConfig? {

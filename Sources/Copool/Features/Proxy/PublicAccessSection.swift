@@ -43,7 +43,6 @@ struct PublicAccessSection: View {
                     isOn: Binding(
                         get: { model.publicAccessEnabled },
                         set: { value in
-                            model.publicAccessEnabled = value
                             Task { await model.setPublicAccessEnabled(value) }
                         }
                     )
@@ -115,7 +114,7 @@ struct PublicAccessSection: View {
                 message: L10n.tr("proxy.public.mode.quick_message"),
                 selected: model.cloudflaredTunnelMode == .quick
             ) {
-                model.cloudflaredTunnelMode = .quick
+                model.updateCloudflaredTunnelMode(.quick)
             }
             .frame(height: modeCardHeight > 0 ? modeCardHeight : nil, alignment: .top)
             .disabled(!model.canEditCloudflaredInput)
@@ -126,7 +125,7 @@ struct PublicAccessSection: View {
                 message: L10n.tr("proxy.public.mode.named_message"),
                 selected: model.cloudflaredTunnelMode == .named
             ) {
-                model.cloudflaredTunnelMode = .named
+                model.updateCloudflaredTunnelMode(.named)
             }
             .frame(height: modeCardHeight > 0 ? modeCardHeight : nil, alignment: .top)
             .disabled(!model.canEditCloudflaredInput)
@@ -194,7 +193,7 @@ struct PublicAccessSection: View {
                         L10n.tr("proxy.public.field.hostname_placeholder"),
                         text: Binding(
                             get: { model.cloudflaredNamedInput.hostname },
-                            set: { model.cloudflaredNamedInput.hostname = $0 }
+                            set: { model.updateCloudflaredNamedHostname($0) }
                         )
                     )
                     .frostedRoundedInput()
@@ -215,7 +214,7 @@ struct PublicAccessSection: View {
                 PublicAccessSwitchPill(
                     isOn: Binding(
                         get: { model.cloudflaredUseHTTP2 },
-                        set: { model.cloudflaredUseHTTP2 = $0 }
+                        set: { model.updateCloudflaredUseHTTP2($0) }
                     )
                 )
                 .disabled(!model.canEditCloudflaredInput)
@@ -252,7 +251,7 @@ struct PublicAccessSection: View {
                 PublicAccessSwitchPill(
                     isOn: Binding(
                         get: { model.cloudflaredUseHTTP2 },
-                        set: { model.cloudflaredUseHTTP2 = $0 }
+                        set: { model.updateCloudflaredUseHTTP2($0) }
                     )
                 )
                 .disabled(!model.canEditCloudflaredInput)

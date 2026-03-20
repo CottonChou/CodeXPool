@@ -123,6 +123,60 @@ final class ProxyPageModelTests: XCTestCase {
         XCTAssertFalse(model.publicAccessEnabled)
     }
 
+    func testApplyRemoteSnapshotPreservesLocalNamedTunnelSecrets() {
+        let model = makeModel()
+        model.cloudflaredNamedInput = NamedCloudflaredTunnelInput(
+            apiToken: "secret-token",
+            accountID: "account-secret",
+            zoneID: "zone-secret",
+            hostname: "local.example.com"
+        )
+
+        var snapshot = makeSnapshot()
+        snapshot.cloudflaredTunnelMode = .named
+        snapshot.cloudflaredNamedInput = NamedCloudflaredTunnelInput(
+            apiToken: "",
+            accountID: "",
+            zoneID: "",
+            hostname: "synced.example.com"
+        )
+
+        XCTAssertTrue(model.applyRemoteSnapshot(snapshot))
+        XCTAssertEqual(model.cloudflaredNamedInput.apiToken, "secret-token")
+        XCTAssertEqual(model.cloudflaredNamedInput.accountID, "account-secret")
+        XCTAssertEqual(model.cloudflaredNamedInput.zoneID, "zone-secret")
+        XCTAssertEqual(model.cloudflaredNamedInput.hostname, "synced.example.com")
+    }
+
+    func testUpdateCloudflaredUseHTTP2SyncsProxyConfigurationLocally() async {
+        let snapshot = makeSnapshot()
+        let localCommandService = SpyProxyLocalCommandService(snapshot: snapshot)
+        let model = makeModel(localProxyCommandService: localCommandService)
+
+        model.updateCloudflaredUseHTTP2(true)
+        try? await Task.sleep(for: .milliseconds(450))
+
+        XCTAssertEqual(localCommandService.commands.map(\.kind), [.updateProxyConfiguration])
+        XCTAssertEqual(localCommandService.commands.first?.proxyConfiguration?.cloudflared.useHTTP2, true)
+    }
+
+    func testSetPublicAccessEnabledStartsCloudflared() async {
+        var snapshot = makeSnapshot()
+        snapshot.proxyStatus.running = true
+        snapshot.proxyStatus.port = 8787
+        snapshot.cloudflaredStatus.installed = true
+        snapshot.cloudflaredStatus.running = false
+        snapshot.publicAccessEnabled = false
+
+        let localCommandService = SpyProxyLocalCommandService(snapshot: snapshot)
+        let model = makeModel(localProxyCommandService: localCommandService)
+        _ = model.applyRemoteSnapshot(snapshot)
+
+        await model.setPublicAccessEnabled(true)
+
+        XCTAssertEqual(localCommandService.commands.last?.kind, .startCloudflared)
+    }
+
     func testLocalStartProxyUsesLocalCommandServiceForImmediateSync() async {
         let snapshot = makeSnapshot()
         let localCommandService = SpyProxyLocalCommandService(snapshot: snapshot)
@@ -212,6 +266,7 @@ final class ProxyPageModelTests: XCTestCase {
             sourceDeviceID: "ios-device-1",
             proxyStatus: proxyStatus,
             preferredProxyPort: 8787,
+            preferredProxyPortText: "8787",
             autoStartProxy: true,
             cloudflaredStatus: cloudflaredStatus,
             cloudflaredTunnelMode: .quick,
@@ -239,6 +294,7 @@ private actor StubProxyControlCloudSyncService: ProxyControlCloudSyncServiceProt
     private var initialSnapshotPending = true
     private var acknowledgedCommandID: String?
     private(set) var ensurePushSubscriptionCallCount = 0
+    private(set) var enqueuedCommands: [ProxyControlCommand] = []
     private(set) var enqueuedCommandKinds: [ProxyControlCommandKind] = []
 
     init(
@@ -274,6 +330,7 @@ private actor StubProxyControlCloudSyncService: ProxyControlCloudSyncServiceProt
     }
 
     func enqueueCommand(_ command: ProxyControlCommand) async throws {
+        enqueuedCommands.append(command)
         enqueuedCommandKinds.append(command.kind)
         acknowledgedCommandID = command.id
     }
@@ -292,6 +349,10 @@ private actor StubProxyControlCloudSyncService: ProxyControlCloudSyncServiceProt
 
     func readEnqueuedCommandKinds() -> [ProxyControlCommandKind] {
         enqueuedCommandKinds
+    }
+
+    func readEnqueuedCommands() -> [ProxyControlCommand] {
+        enqueuedCommands
     }
 }
 

@@ -58,7 +58,13 @@ struct ApiProxySectionView: View {
             expandedSummaryPills
 
             HStack(spacing: 10) {
-                TextField("8787", text: $model.preferredPortText)
+                TextField(
+                    "8787",
+                    text: Binding(
+                        get: { model.preferredPortText },
+                        set: { model.updatePreferredPortText($0) }
+                    )
+                )
                     .frostedCapsuleInput()
                     .frame(width: LayoutRules.proxyHeroPortFieldWidth)
 

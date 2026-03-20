@@ -167,6 +167,41 @@ final class ProxyControlBridgeTests: XCTestCase {
         await fulfillment(of: [expectation], timeout: 1.0)
     }
 
+    func testUpdateProxyConfigurationPersistsIntoPublishedSnapshot() async throws {
+        let bridge = makeBridge(
+            cloudSyncService: nil,
+            runtimePlatform: .macOS
+        )
+        let proxyConfiguration = ProxyConfiguration(
+            preferredPortText: "9000",
+            cloudflared: CloudflaredConfiguration(
+                tunnelMode: .named,
+                useHTTP2: true,
+                namedHostname: "Proxy.Example.com/"
+            )
+        )
+        let command = ProxyControlCommand(
+            id: UUID().uuidString,
+            createdAt: 1_763_216_000_000,
+            sourceDeviceID: "macos-proxy-control",
+            kind: .updateProxyConfiguration,
+            preferredProxyPort: nil,
+            autoStartProxy: nil,
+            cloudflaredInput: nil,
+            proxyConfiguration: proxyConfiguration,
+            remoteServer: nil,
+            remoteServerID: nil,
+            logLines: nil
+        )
+
+        let snapshot = try await bridge.performLocalCommand(command)
+
+        XCTAssertEqual(snapshot.preferredProxyPortText, "9000")
+        XCTAssertEqual(snapshot.cloudflaredTunnelMode, .named)
+        XCTAssertEqual(snapshot.cloudflaredUseHTTP2, true)
+        XCTAssertEqual(snapshot.cloudflaredNamedInput.hostname, "proxy.example.com")
+    }
+
     private func makeBridge(
         cloudSyncService: ProxyControlCloudSyncServiceProtocol?,
         runtimePlatform: RuntimePlatform,

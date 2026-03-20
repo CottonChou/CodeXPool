@@ -249,6 +249,78 @@ struct RemoteServerConfig: Codable, Equatable, Identifiable, Sendable {
     var listenPort: Int
 }
 
+struct CloudflaredConfiguration: Codable, Equatable {
+    var tunnelMode: CloudflaredTunnelMode
+    var useHTTP2: Bool
+    var namedHostname: String
+
+    init(
+        tunnelMode: CloudflaredTunnelMode = .quick,
+        useHTTP2: Bool = false,
+        namedHostname: String = ""
+    ) {
+        self.tunnelMode = tunnelMode
+        self.useHTTP2 = useHTTP2
+        self.namedHostname = Self.normalizeHostnameDraft(namedHostname)
+    }
+
+    static var defaultValue: CloudflaredConfiguration {
+        CloudflaredConfiguration()
+    }
+
+    func normalized() -> CloudflaredConfiguration {
+        CloudflaredConfiguration(
+            tunnelMode: tunnelMode,
+            useHTTP2: useHTTP2,
+            namedHostname: namedHostname
+        )
+    }
+
+    static func normalizeHostnameDraft(_ value: String) -> String {
+        value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "https://", with: "")
+            .replacingOccurrences(of: "http://", with: "")
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            .lowercased()
+    }
+}
+
+struct ProxyConfiguration: Codable, Equatable {
+    var preferredPortText: String
+    var cloudflared: CloudflaredConfiguration
+
+    init(
+        preferredPortText: String = String(RemoteServerConfiguration.defaultProxyPort),
+        cloudflared: CloudflaredConfiguration = .defaultValue
+    ) {
+        self.preferredPortText = Self.normalizePreferredPortText(preferredPortText)
+        self.cloudflared = cloudflared.normalized()
+    }
+
+    static var defaultValue: ProxyConfiguration {
+        ProxyConfiguration()
+    }
+
+    var preferredPort: Int? {
+        Int(preferredPortText.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    func normalized() -> ProxyConfiguration {
+        ProxyConfiguration(
+            preferredPortText: preferredPortText,
+            cloudflared: cloudflared
+        )
+    }
+
+    static func normalizePreferredPortText(_ value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty
+            ? String(RemoteServerConfiguration.defaultProxyPort)
+            : trimmed
+    }
+}
+
 struct AppSettings: Codable, Equatable {
     var launchAtStartup: Bool
     var launchCodexAfterSwitch: Bool
@@ -257,6 +329,7 @@ struct AppSettings: Codable, Equatable {
     var restartEditorsOnSwitch: Bool
     var restartEditorTargets: [EditorAppID]
     var autoStartApiProxy: Bool
+    var proxyConfiguration: ProxyConfiguration
     var remoteServers: [RemoteServerConfig]
     var locale: String
 
@@ -268,6 +341,7 @@ struct AppSettings: Codable, Equatable {
         case restartEditorsOnSwitch
         case restartEditorTargets
         case autoStartApiProxy
+        case proxyConfiguration
         case remoteServers
         case locale
     }
@@ -280,6 +354,7 @@ struct AppSettings: Codable, Equatable {
         restartEditorsOnSwitch: Bool,
         restartEditorTargets: [EditorAppID],
         autoStartApiProxy: Bool,
+        proxyConfiguration: ProxyConfiguration = .defaultValue,
         remoteServers: [RemoteServerConfig],
         locale: String
     ) {
@@ -290,6 +365,7 @@ struct AppSettings: Codable, Equatable {
         self.restartEditorsOnSwitch = restartEditorsOnSwitch
         self.restartEditorTargets = restartEditorTargets
         self.autoStartApiProxy = autoStartApiProxy
+        self.proxyConfiguration = proxyConfiguration.normalized()
         self.remoteServers = remoteServers
         self.locale = AppLocale.resolve(locale).identifier
     }
@@ -305,6 +381,7 @@ struct AppSettings: Codable, Equatable {
         restartEditorsOnSwitch = try container.decodeIfPresent(Bool.self, forKey: .restartEditorsOnSwitch) ?? fallback.restartEditorsOnSwitch
         restartEditorTargets = try container.decodeIfPresent([EditorAppID].self, forKey: .restartEditorTargets) ?? fallback.restartEditorTargets
         autoStartApiProxy = try container.decodeIfPresent(Bool.self, forKey: .autoStartApiProxy) ?? fallback.autoStartApiProxy
+        proxyConfiguration = try container.decodeIfPresent(ProxyConfiguration.self, forKey: .proxyConfiguration) ?? fallback.proxyConfiguration
         remoteServers = try container.decodeIfPresent([RemoteServerConfig].self, forKey: .remoteServers) ?? fallback.remoteServers
 
         let rawLocale = try container.decodeIfPresent(String.self, forKey: .locale) ?? fallback.locale
@@ -320,6 +397,7 @@ struct AppSettings: Codable, Equatable {
         try container.encode(restartEditorsOnSwitch, forKey: .restartEditorsOnSwitch)
         try container.encode(restartEditorTargets, forKey: .restartEditorTargets)
         try container.encode(autoStartApiProxy, forKey: .autoStartApiProxy)
+        try container.encode(proxyConfiguration, forKey: .proxyConfiguration)
         try container.encode(remoteServers, forKey: .remoteServers)
         try container.encode(locale, forKey: .locale)
     }
@@ -333,6 +411,7 @@ struct AppSettings: Codable, Equatable {
             restartEditorsOnSwitch: false,
             restartEditorTargets: [],
             autoStartApiProxy: false,
+            proxyConfiguration: .defaultValue,
             remoteServers: [],
             locale: AppLocale.systemDefault.identifier
         )
@@ -347,6 +426,7 @@ struct AppSettingsPatch {
     var restartEditorsOnSwitch: Bool? = nil
     var restartEditorTargets: [EditorAppID]? = nil
     var autoStartApiProxy: Bool? = nil
+    var proxyConfiguration: ProxyConfiguration? = nil
     var remoteServers: [RemoteServerConfig]? = nil
     var locale: String? = nil
 }
@@ -431,6 +511,7 @@ struct ProxyControlSnapshot: Codable, Equatable {
     var sourceDeviceID: String
     var proxyStatus: ApiProxyStatus
     var preferredProxyPort: Int?
+    var preferredProxyPortText: String? = nil
     var autoStartProxy: Bool
     var cloudflaredStatus: CloudflaredStatus
     var cloudflaredTunnelMode: CloudflaredTunnelMode
@@ -447,6 +528,7 @@ struct ProxyControlSnapshot: Codable, Equatable {
 
 enum ProxyControlCommandKind: String, Codable {
     case refreshStatus
+    case updateProxyConfiguration
     case startProxy
     case stopProxy
     case refreshAPIKey
@@ -473,6 +555,7 @@ struct ProxyControlCommand: Codable, Equatable, Identifiable {
     var preferredProxyPort: Int?
     var autoStartProxy: Bool?
     var cloudflaredInput: StartCloudflaredTunnelInput?
+    var proxyConfiguration: ProxyConfiguration? = nil
     var remoteServer: RemoteServerConfig?
     var remoteServerID: String?
     var logLines: Int?

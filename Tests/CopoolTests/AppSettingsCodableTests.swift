@@ -20,6 +20,7 @@ final class AppSettingsCodableTests: XCTestCase {
         let decoded = try JSONDecoder().decode(AppSettings.self, from: Data(json.utf8))
         XCTAssertEqual(decoded.autoSmartSwitch, false)
         XCTAssertEqual(decoded.autoStartApiProxy, true)
+        XCTAssertEqual(decoded.proxyConfiguration, .defaultValue)
         XCTAssertEqual(decoded.locale, AppLocale.english.identifier)
     }
 }

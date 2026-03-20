@@ -17,7 +17,7 @@ private struct RemoteSnapshotPresentationState: Equatable {
     var autoStartProxy: Bool
     var cloudflaredStatus: CloudflaredStatus
     var cloudflaredTunnelMode: CloudflaredTunnelMode
-    var cloudflaredNamedInput: NamedCloudflaredTunnelInput
+    var cloudflaredNamedHostname: String
     var cloudflaredUseHTTP2: Bool
     var publicAccessEnabled: Bool
     var remoteServers: [RemoteServerConfig]
@@ -30,7 +30,7 @@ private struct RemoteSnapshotPresentationState: Equatable {
         autoStartProxy: Bool,
         cloudflaredStatus: CloudflaredStatus,
         cloudflaredTunnelMode: CloudflaredTunnelMode,
-        cloudflaredNamedInput: NamedCloudflaredTunnelInput,
+        cloudflaredNamedHostname: String,
         cloudflaredUseHTTP2: Bool,
         publicAccessEnabled: Bool,
         remoteServers: [RemoteServerConfig],
@@ -42,7 +42,7 @@ private struct RemoteSnapshotPresentationState: Equatable {
         self.autoStartProxy = autoStartProxy
         self.cloudflaredStatus = cloudflaredStatus
         self.cloudflaredTunnelMode = cloudflaredTunnelMode
-        self.cloudflaredNamedInput = cloudflaredNamedInput
+        self.cloudflaredNamedHostname = cloudflaredNamedHostname
         self.cloudflaredUseHTTP2 = cloudflaredUseHTTP2
         self.publicAccessEnabled = publicAccessEnabled
         self.remoteServers = remoteServers
@@ -52,15 +52,16 @@ private struct RemoteSnapshotPresentationState: Equatable {
 
     init(snapshot: ProxyControlSnapshot) {
         proxyStatus = snapshot.proxyStatus
-        preferredPortText = String(
-            snapshot.preferredProxyPort
-                ?? snapshot.proxyStatus.port
-                ?? RemoteServerConfiguration.defaultProxyPort
+        preferredPortText = ProxyConfiguration.normalizePreferredPortText(
+            snapshot.preferredProxyPortText
+                ?? snapshot.preferredProxyPort.map(String.init)
+                ?? snapshot.proxyStatus.port.map(String.init)
+                ?? String(RemoteServerConfiguration.defaultProxyPort)
         )
         autoStartProxy = snapshot.autoStartProxy
         cloudflaredStatus = snapshot.cloudflaredStatus
         cloudflaredTunnelMode = snapshot.cloudflaredTunnelMode
-        cloudflaredNamedInput = snapshot.cloudflaredNamedInput
+        cloudflaredNamedHostname = snapshot.cloudflaredNamedInput.hostname
         cloudflaredUseHTTP2 = snapshot.cloudflaredUseHTTP2
         publicAccessEnabled = snapshot.publicAccessEnabled
         remoteServers = snapshot.remoteServers
@@ -81,6 +82,10 @@ final class ProxyPageModel: ObservableObject {
         static let logAckPollInterval: Duration = .milliseconds(250)
     }
 
+    private enum ConfigurationSync {
+        static let debounceInterval: Duration = .milliseconds(350)
+    }
+
     private let coordinator: ProxyCoordinator
     private let settingsCoordinator: SettingsCoordinator
     private let proxyControlCloudSyncService: ProxyControlCloudSyncServiceProtocol?
@@ -96,6 +101,8 @@ final class ProxyPageModel: ObservableObject {
     private var lastAppliedRemoteStatusesSyncedAt: Int64?
     private var proxyPushCancellable: AnyCancellable?
     private var localSnapshotCancellable: AnyCancellable?
+    private var pendingConfigurationSyncTask: Task<Void, Never>?
+    private var lastSyncedProxyConfiguration: ProxyConfiguration?
 
     @Published var proxyStatus: ApiProxyStatus = .idle
     @Published var cloudflaredStatus: CloudflaredStatus = .idle
@@ -147,6 +154,7 @@ final class ProxyPageModel: ObservableObject {
 
     deinit {
         remoteSnapshotTask?.cancel()
+        pendingConfigurationSyncTask?.cancel()
     }
 
     var cloudflaredExpanded: Bool {
@@ -194,7 +202,7 @@ final class ProxyPageModel: ObservableObject {
         guard !didRunLaunchBootstrap else { return }
         didRunLaunchBootstrap = true
 
-        autoStartProxy = settings.autoStartApiProxy
+        applySettings(settings)
         if usesRemoteMacControl {
             configureProxyPushHandlingIfNeeded()
             await ensureProxyPushSubscriptionIfNeeded()
@@ -207,13 +215,13 @@ final class ProxyPageModel: ObservableObject {
         }
 
         stopRemoteSnapshotSync()
-        await refreshStatusOnly()
+        await refreshLocalRuntimeStatus()
 
         guard settings.autoStartApiProxy, !proxyStatus.running else { return }
 
         do {
             proxyStatus = try await coordinator.startProxy(preferredPort: nil)
-            await refreshStatusOnly()
+            await refreshLocalRuntimeStatus()
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
         }
@@ -236,7 +244,13 @@ final class ProxyPageModel: ObservableObject {
             return
         }
 
-        await refreshStatusOnly()
+        do {
+            let settings = try await settingsCoordinator.currentSettings()
+            applySettings(settings)
+            await refreshLocalRuntimeStatus()
+        } catch {
+            notice = NoticeMessage(style: .error, text: error.localizedDescription)
+        }
     }
 
     func load() async {
@@ -245,8 +259,7 @@ final class ProxyPageModel: ObservableObject {
 
         do {
             let settings = try await settingsCoordinator.currentSettings()
-            remoteServers = settings.remoteServers
-            autoStartProxy = settings.autoStartApiProxy
+            applySettings(settings)
             if usesRemoteMacControl {
                 configureProxyPushHandlingIfNeeded()
                 await ensureProxyPushSubscriptionIfNeeded()
@@ -257,7 +270,7 @@ final class ProxyPageModel: ObservableObject {
                 startRemoteSnapshotSyncIfNeeded()
             } else {
                 stopRemoteSnapshotSync()
-                await refreshStatusOnly()
+                await refreshLocalRuntimeStatus()
                 await refreshAllRemoteStatuses()
             }
             hasLoaded = true
@@ -283,11 +296,12 @@ final class ProxyPageModel: ObservableObject {
 
     func startProxy() async {
         if usesRemoteMacControl {
-            await performRemoteCommand(
-                kind: .startProxy,
-                preferredProxyPort: Int(preferredPortText),
-                successNotice: L10n.tr("proxy.notice.api_proxy_started")
-            )
+                await performRemoteCommand(
+                    kind: .startProxy,
+                    preferredProxyPort: Int(preferredPortText),
+                    proxyConfiguration: currentProxyConfiguration,
+                    successNotice: L10n.tr("proxy.notice.api_proxy_started")
+                )
             return
         }
         loading = true
@@ -298,7 +312,8 @@ final class ProxyPageModel: ObservableObject {
         do {
             let snapshot = try await performLocalCommand(
                 kind: .startProxy,
-                preferredProxyPort: preferredPort
+                preferredProxyPort: preferredPort,
+                proxyConfiguration: currentProxyConfiguration
             )
             applyRemoteSnapshot(snapshot)
             notice = NoticeMessage(style: .success, text: L10n.tr("proxy.notice.api_proxy_started"))
@@ -374,6 +389,7 @@ final class ProxyPageModel: ObservableObject {
                 await performRemoteCommand(
                     kind: .startCloudflared,
                     cloudflaredInput: input,
+                    proxyConfiguration: currentProxyConfiguration,
                     successNotice: L10n.tr("proxy.notice.cloudflared_started")
                 )
             } catch {
@@ -388,7 +404,8 @@ final class ProxyPageModel: ObservableObject {
             let input = try buildCloudflaredStartInput()
             let snapshot = try await performLocalCommand(
                 kind: .startCloudflared,
-                cloudflaredInput: input
+                cloudflaredInput: input,
+                proxyConfiguration: currentProxyConfiguration
             )
             applyRemoteSnapshot(snapshot)
             notice = NoticeMessage(style: .success, text: L10n.tr("proxy.notice.cloudflared_started"))
@@ -435,26 +452,40 @@ final class ProxyPageModel: ObservableObject {
             publicAccessEnabled = false
             return
         }
-        if usesRemoteMacControl {
-            publicAccessEnabled = enabled
-            if enabled {
-                cloudflaredSectionExpanded = true
-            } else {
-                await performRemoteCommand(
-                    kind: .stopCloudflared,
-                    successNotice: L10n.tr("proxy.notice.cloudflared_stopped")
-                )
-            }
-            return
-        }
         if enabled {
-            publicAccessEnabled = true
             cloudflaredSectionExpanded = true
-            return
+            await startCloudflared()
+        } else {
+            guard cloudflaredStatus.running else {
+                publicAccessEnabled = false
+                return
+            }
+            await stopCloudflared()
         }
-        publicAccessEnabled = false
-        guard cloudflaredStatus.running else { return }
-        await stopCloudflared()
+    }
+
+    func updatePreferredPortText(_ value: String) {
+        guard preferredPortText != value else { return }
+        preferredPortText = value
+        scheduleProxyConfigurationSync()
+    }
+
+    func updateCloudflaredTunnelMode(_ mode: CloudflaredTunnelMode) {
+        guard cloudflaredTunnelMode != mode else { return }
+        cloudflaredTunnelMode = mode
+        syncProxyConfigurationImmediately()
+    }
+
+    func updateCloudflaredUseHTTP2(_ value: Bool) {
+        guard cloudflaredUseHTTP2 != value else { return }
+        cloudflaredUseHTTP2 = value
+        syncProxyConfigurationImmediately()
+    }
+
+    func updateCloudflaredNamedHostname(_ value: String) {
+        guard cloudflaredNamedInput.hostname != value else { return }
+        cloudflaredNamedInput.hostname = value
+        scheduleProxyConfigurationSync()
     }
 
     func setAutoStartProxy(_ value: Bool) async {
@@ -681,7 +712,7 @@ final class ProxyPageModel: ObservableObject {
         }
     }
 
-    private func refreshStatusOnly() async {
+    private func refreshLocalRuntimeStatus() async {
         let pair = await coordinator.loadStatus()
         proxyStatus = pair.0
         applyCloudflaredStatus(pair.1)
@@ -690,15 +721,16 @@ final class ProxyPageModel: ObservableObject {
     private func applyCloudflaredStatus(_ status: CloudflaredStatus) {
         cloudflaredStatus = status
         publicAccessEnabled = status.running
-        cloudflaredUseHTTP2 = status.useHTTP2
-        if let mode = status.tunnelMode {
-            cloudflaredTunnelMode = mode
-        }
-        if let hostname = status.customHostname?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !hostname.isEmpty {
-            cloudflaredNamedInput.hostname = hostname
-        }
         if status.running {
+            cloudflaredUseHTTP2 = status.useHTTP2
+            if let mode = status.tunnelMode {
+                cloudflaredTunnelMode = mode
+            }
+            if let hostname = status.customHostname?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !hostname.isEmpty {
+                cloudflaredNamedInput.hostname = CloudflaredConfiguration.normalizeHostnameDraft(hostname)
+            }
+            lastSyncedProxyConfiguration = currentProxyConfiguration
             cloudflaredSectionExpanded = true
         }
     }
@@ -727,12 +759,7 @@ final class ProxyPageModel: ObservableObject {
         let apiToken = cloudflaredNamedInput.apiToken.trimmingCharacters(in: .whitespacesAndNewlines)
         let accountID = cloudflaredNamedInput.accountID.trimmingCharacters(in: .whitespacesAndNewlines)
         let zoneID = cloudflaredNamedInput.zoneID.trimmingCharacters(in: .whitespacesAndNewlines)
-        let hostname = cloudflaredNamedInput.hostname
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: "https://", with: "")
-            .replacingOccurrences(of: "http://", with: "")
-            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            .lowercased()
+        let hostname = CloudflaredConfiguration.normalizeHostnameDraft(cloudflaredNamedInput.hostname)
 
         guard !apiToken.isEmpty, !accountID.isEmpty, !zoneID.isEmpty, !hostname.isEmpty else {
             throw AppError.invalidData(L10n.tr("error.cloudflared.named_required_fields"))
@@ -747,6 +774,96 @@ final class ProxyPageModel: ObservableObject {
             zoneID: zoneID,
             hostname: hostname
         )
+    }
+
+    private var currentProxyConfiguration: ProxyConfiguration {
+        ProxyConfiguration(
+            preferredPortText: preferredPortText,
+            cloudflared: CloudflaredConfiguration(
+                tunnelMode: cloudflaredTunnelMode,
+                useHTTP2: cloudflaredUseHTTP2,
+                namedHostname: cloudflaredNamedInput.hostname
+            )
+        )
+    }
+
+    private func applySettings(_ settings: AppSettings) {
+        remoteServers = settings.remoteServers
+        autoStartProxy = settings.autoStartApiProxy
+        applyProxyConfiguration(settings.proxyConfiguration)
+    }
+
+    private func applyProxyConfiguration(_ configuration: ProxyConfiguration) {
+        let normalized = configuration.normalized()
+        preferredPortText = normalized.preferredPortText
+        cloudflaredTunnelMode = normalized.cloudflared.tunnelMode
+        cloudflaredUseHTTP2 = normalized.cloudflared.useHTTP2
+        cloudflaredNamedInput.hostname = normalized.cloudflared.namedHostname
+        lastSyncedProxyConfiguration = normalized
+    }
+
+    private func scheduleProxyConfigurationSync() {
+        pendingConfigurationSyncTask?.cancel()
+        pendingConfigurationSyncTask = Task { [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(for: ConfigurationSync.debounceInterval)
+            guard !Task.isCancelled else { return }
+            await self.syncCurrentProxyConfiguration()
+        }
+    }
+
+    private func syncProxyConfigurationImmediately() {
+        pendingConfigurationSyncTask?.cancel()
+        pendingConfigurationSyncTask = Task { [weak self] in
+            guard let self else { return }
+            await self.syncCurrentProxyConfiguration()
+        }
+    }
+
+    private func syncCurrentProxyConfiguration() async {
+        let configuration = currentProxyConfiguration
+        guard configuration != lastSyncedProxyConfiguration else { return }
+
+        if usesRemoteMacControl {
+            await syncRemoteProxyConfiguration(configuration)
+        } else {
+            await syncLocalProxyConfiguration(configuration)
+        }
+    }
+
+    private func syncRemoteProxyConfiguration(_ configuration: ProxyConfiguration) async {
+        guard let proxyControlCloudSyncService else { return }
+
+        let command = makeProxyControlCommand(
+            sourceDeviceID: "ios-proxy-control",
+            kind: .updateProxyConfiguration,
+            proxyConfiguration: configuration
+        )
+
+        do {
+            try await proxyControlCloudSyncService.enqueueCommand(command)
+            lastRemoteCommandID = command.id
+
+            if let acknowledgedSnapshot = try await waitForRemoteCommandAck(command.id) {
+                applyRemoteSnapshot(acknowledgedSnapshot)
+            } else {
+                await refreshRemoteSnapshot(showErrors: false)
+            }
+        } catch {
+            notice = NoticeMessage(style: .error, text: error.localizedDescription)
+        }
+    }
+
+    private func syncLocalProxyConfiguration(_ configuration: ProxyConfiguration) async {
+        do {
+            let snapshot = try await performLocalCommand(
+                kind: .updateProxyConfiguration,
+                proxyConfiguration: configuration
+            )
+            applyRemoteSnapshot(snapshot)
+        } catch {
+            notice = NoticeMessage(style: .error, text: error.localizedDescription)
+        }
     }
 
     private func startRemoteSnapshotSyncIfNeeded() {
@@ -852,12 +969,15 @@ final class ProxyPageModel: ObservableObject {
         setIfChanged(\.autoStartProxy, nextState.autoStartProxy)
         setIfChanged(\.cloudflaredStatus, nextState.cloudflaredStatus)
         setIfChanged(\.cloudflaredTunnelMode, nextState.cloudflaredTunnelMode)
-        setIfChanged(\.cloudflaredNamedInput, nextState.cloudflaredNamedInput)
         setIfChanged(\.cloudflaredUseHTTP2, nextState.cloudflaredUseHTTP2)
         setIfChanged(\.publicAccessEnabled, nextState.publicAccessEnabled)
         setIfChanged(\.remoteServers, nextState.remoteServers)
         setIfChanged(\.remoteStatuses, nextState.remoteStatuses)
         setIfChanged(\.remoteLogs, nextState.remoteLogs)
+        if cloudflaredNamedInput.hostname != nextState.cloudflaredNamedHostname {
+            cloudflaredNamedInput.hostname = nextState.cloudflaredNamedHostname
+        }
+        lastSyncedProxyConfiguration = currentProxyConfiguration
         return true
     }
 
@@ -868,7 +988,7 @@ final class ProxyPageModel: ObservableObject {
             autoStartProxy: autoStartProxy,
             cloudflaredStatus: cloudflaredStatus,
             cloudflaredTunnelMode: cloudflaredTunnelMode,
-            cloudflaredNamedInput: cloudflaredNamedInput,
+            cloudflaredNamedHostname: cloudflaredNamedInput.hostname,
             cloudflaredUseHTTP2: cloudflaredUseHTTP2,
             publicAccessEnabled: publicAccessEnabled,
             remoteServers: remoteServers,
@@ -946,6 +1066,7 @@ final class ProxyPageModel: ObservableObject {
         preferredProxyPort: Int? = nil,
         autoStartProxy: Bool? = nil,
         cloudflaredInput: StartCloudflaredTunnelInput? = nil,
+        proxyConfiguration: ProxyConfiguration? = nil,
         remoteServer: RemoteServerConfig? = nil,
         remoteServerID: String? = nil,
         logLines: Int? = nil,
@@ -963,6 +1084,7 @@ final class ProxyPageModel: ObservableObject {
             preferredProxyPort: preferredProxyPort,
             autoStartProxy: autoStartProxy,
             cloudflaredInput: cloudflaredInput,
+            proxyConfiguration: proxyConfiguration,
             remoteServer: remoteServer,
             remoteServerID: remoteServerID,
             logLines: logLines
@@ -1063,6 +1185,7 @@ final class ProxyPageModel: ObservableObject {
         preferredProxyPort: Int? = nil,
         autoStartProxy: Bool? = nil,
         cloudflaredInput: StartCloudflaredTunnelInput? = nil,
+        proxyConfiguration: ProxyConfiguration? = nil,
         remoteServer: RemoteServerConfig? = nil,
         remoteServerID: String? = nil,
         logLines: Int? = nil
@@ -1077,6 +1200,7 @@ final class ProxyPageModel: ObservableObject {
             preferredProxyPort: preferredProxyPort,
             autoStartProxy: autoStartProxy,
             cloudflaredInput: cloudflaredInput,
+            proxyConfiguration: proxyConfiguration,
             remoteServer: remoteServer,
             remoteServerID: remoteServerID,
             logLines: logLines
@@ -1090,6 +1214,7 @@ final class ProxyPageModel: ObservableObject {
         preferredProxyPort: Int? = nil,
         autoStartProxy: Bool? = nil,
         cloudflaredInput: StartCloudflaredTunnelInput? = nil,
+        proxyConfiguration: ProxyConfiguration? = nil,
         remoteServer: RemoteServerConfig? = nil,
         remoteServerID: String? = nil,
         logLines: Int? = nil
@@ -1102,6 +1227,7 @@ final class ProxyPageModel: ObservableObject {
             preferredProxyPort: preferredProxyPort,
             autoStartProxy: autoStartProxy,
             cloudflaredInput: cloudflaredInput,
+            proxyConfiguration: proxyConfiguration,
             remoteServer: remoteServer,
             remoteServerID: remoteServerID,
             logLines: logLines
