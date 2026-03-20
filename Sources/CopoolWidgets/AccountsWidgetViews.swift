@@ -13,7 +13,6 @@ private enum AccountsWidgetStyle {
     static let compactRingLineWidth: CGFloat = 6
     static let metricColumnWidth: CGFloat = 156
     static let rowMetricColumnWidth: CGFloat = 88
-    static let rowTagColumnWidth: CGFloat = 128
 
     static let backgroundGradient = LinearGradient(
         colors: [
@@ -58,7 +57,7 @@ private struct AccountsWidgetSmallView: View {
     var body: some View {
         Group {
             if let card {
-                AccountsWidgetCompactCardContent(card: card, roleLabel: "current")
+                AccountsWidgetCompactCardContent(card: card)
             } else {
                 AccountsWidgetEmptyState()
             }
@@ -76,7 +75,7 @@ private struct AccountsWidgetMediumView: View {
         HStack(spacing: AccountsWidgetStyle.compactSpacing) {
             Group {
                 if let current {
-                    AccountsWidgetCompactCardContent(card: current, roleLabel: "current")
+                    AccountsWidgetCompactCardContent(card: current)
                 } else {
                     AccountsWidgetEmptyState()
                 }
@@ -89,7 +88,7 @@ private struct AccountsWidgetMediumView: View {
 
             Group {
                 if let secondary {
-                    AccountsWidgetCompactCardContent(card: secondary, roleLabel: "next")
+                    AccountsWidgetCompactCardContent(card: secondary)
                 } else {
                     AccountsWidgetEmptyState()
                 }
@@ -125,7 +124,6 @@ private struct AccountsWidgetLargeView: View {
 
 private struct AccountsWidgetCompactCardContent: View {
     let card: AccountsWidgetCardSnapshot
-    let roleLabel: String
 
     private var workspaceOrFallbackLabel: String {
         if let workspaceLabel = card.workspaceLabel, !workspaceLabel.isEmpty {
@@ -134,19 +132,21 @@ private struct AccountsWidgetCompactCardContent: View {
         return card.accountLabel
     }
 
+    private var shouldShowAccountLabel: Bool {
+        card.workspaceLabel?.isEmpty ?? true
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 8) {
-                AccountsWidgetChip(text: workspaceOrFallbackLabel)
-                Spacer(minLength: 0)
-                AccountsWidgetRoleBadge(text: roleLabel)
-            }
+            AccountsWidgetChip(text: workspaceOrFallbackLabel)
 
-            Text(card.accountLabel)
-                .font(.system(size: 16, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .lineLimit(1)
-                .truncationMode(.tail)
+            if shouldShowAccountLabel {
+                Text(card.accountLabel)
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
 
             HStack(spacing: AccountsWidgetStyle.compactUsageSpacing) {
                 AccountsWidgetCompactUsageRing(window: card.fiveHour, tint: .orange)
@@ -170,19 +170,8 @@ private struct AccountsWidgetCurrentHeader: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .top, spacing: 8) {
-                    AccountsWidgetChip(text: workspaceOrFallbackLabel)
-                    Spacer(minLength: 0)
-                    AccountsWidgetRoleBadge(text: "current")
-                }
-
-                Text(card.accountLabel)
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
+            AccountsWidgetChip(text: workspaceOrFallbackLabel)
+                .fixedSize(horizontal: true, vertical: false)
 
             Spacer(minLength: 0)
 
@@ -294,7 +283,7 @@ private struct AccountsWidgetAccountRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             AccountsWidgetChip(text: row.workspaceOrAccountLabel)
-                .frame(width: AccountsWidgetStyle.rowTagColumnWidth, alignment: .leading)
+                .fixedSize(horizontal: true, vertical: false)
 
             AccountsWidgetRowMetricColumn(
                 title: "5h",
@@ -361,27 +350,6 @@ private struct AccountsWidgetChip: View {
                 Capsule(style: .continuous)
                     .fill(Color.cyan.opacity(0.14))
             )
-    }
-}
-
-private struct AccountsWidgetRoleBadge: View {
-    let text: String
-
-    var body: some View {
-        Text(text)
-            .font(.system(size: 9, weight: .bold, design: .rounded))
-            .foregroundStyle(.white.opacity(0.82))
-            .textCase(.lowercase)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(Color.white.opacity(0.08))
-            )
-            .overlay {
-                Capsule(style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.10))
-            }
     }
 }
 
