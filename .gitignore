@@ -14,3 +14,8 @@ SDKStatCaches.noindex/
 *.xcuserstate
 xcuserdata/
 Copool.xcodeproj/project.xcworkspace/xcuserdata/
+.codex-artifacts/
+artifacts/
+scripts/__pycache__/
+alfred/__pycache__/
+alfred/team654301-card-tool-src/__pycache__/
