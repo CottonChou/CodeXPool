@@ -24,9 +24,6 @@ final class DefaultWorkspaceMetadataService: WorkspaceMetadataService, @unchecke
     }
 
     func fetchWorkspaceMetadata(accessToken: String) async throws -> [WorkspaceMetadata] {
-        #if DEBUG
-        debugLog("starting workspace metadata fetch with \(resolveAccountURLs().count) candidate endpoints")
-        #endif
         do {
             let result = try await endpointCoordinator.fetchFirstSuccessful(
                 scope: RequestPolicy.scope,
@@ -48,19 +45,8 @@ final class DefaultWorkspaceMetadataService: WorkspaceMetadataService, @unchecke
                     structure: $0.structure
                 )
             }
-            #if DEBUG
-            let preview = metadata.prefix(3).map {
-                "\($0.accountID):\($0.workspaceName ?? "<nil>"):\($0.structure ?? "<nil>")"
-            }.joined(separator: ", ")
-            debugLog(
-                "workspace metadata fetch succeeded via \(result.endpoint); items=\(metadata.count); preview=[\(preview)]"
-            )
-            #endif
             return metadata
         } catch EndpointRequestError.allRequestsFailed(let errors) {
-            #if DEBUG
-            debugLog("workspace metadata fetch failed across all endpoints: \(errors.joined(separator: " | "))")
-            #endif
             let preview = errors.prefix(2).joined(separator: " | ")
             if errors.count > 2 {
                 throw AppError.network(L10n.tr("error.usage.request_failed_with_more_format", preview, String(errors.count - 2)))
@@ -68,13 +54,6 @@ final class DefaultWorkspaceMetadataService: WorkspaceMetadataService, @unchecke
             throw AppError.network(L10n.tr("error.usage.request_failed_format", preview))
         }
     }
-
-    #if DEBUG
-    private func debugLog(_ message: String) {
-        _ = message
-        // print("WorkspaceMetadataService:", message)
-    }
-    #endif
 
     private func resolveAccountURLs() -> [String] {
         let baseOrigin = ChatGPTBaseOriginResolver.resolve(configPath: configPath)

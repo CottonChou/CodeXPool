@@ -32,6 +32,7 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
     private var lastHandledCommandID: String?
     private var lastCommandError: String?
     private var remoteLogs: [String: String] = [:]
+    private var remoteDiscoveries: [String: [DiscoveredRemoteProxyInstance]] = [:]
     private var cachedRemoteStatuses: [String: RemoteProxyStatus] = [:]
     private var lastRemoteStatusRefreshAt: Int64?
     private var pushCancellable: AnyCancellable?
@@ -61,11 +62,7 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
                 try await cloudSyncService?.ensurePushSubscriptionIfNeeded()
                 await seedStateFromLatestSnapshotIfAvailable()
                 scheduleRemoteStatusRefreshIfNeeded(force: cachedRemoteStatuses.isEmpty)
-            } catch {
-                #if DEBUG
-                // print("CloudKit proxy push subscription skipped:", error.localizedDescription)
-                #endif
-            }
+            } catch {}
         }
         loopTask = Task { [weak self] in
             guard let self else { return }
@@ -101,11 +98,7 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
             if !didHandleCommand {
                 try await publishSnapshot()
             }
-        } catch {
-            #if DEBUG
-            // print("Proxy control push handling skipped:", error.localizedDescription)
-            #endif
-        }
+        } catch {}
     }
 
     private func runLoop() async {
@@ -116,11 +109,7 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
                 if !didHandleCommand {
                     try await publishSnapshot()
                 }
-            } catch {
-                #if DEBUG
-                // print("Proxy control bridge skipped:", error.localizedDescription)
-                #endif
-            }
+            } catch {}
 
             try? await Task.sleep(for: Constants.syncInterval)
         }
@@ -218,6 +207,7 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
             remoteServers: settings.remoteServers,
             remoteStatusesSyncedAt: lastRemoteStatusRefreshAt,
             remoteStatuses: remoteStatuses,
+            remoteDiscoveries: remoteDiscoveries,
             remoteLogs: remoteLogs,
             lastHandledCommandID: lastHandledCommandID,
             lastCommandError: lastCommandError
@@ -230,6 +220,7 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
     ) -> [String: RemoteProxyStatus] {
         let serverIDs = Set(remoteServers.map(\.id))
         cachedRemoteStatuses = cachedRemoteStatuses.filter { serverIDs.contains($0.key) }
+        remoteDiscoveries = remoteDiscoveries.filter { serverIDs.contains($0.key) }
         return cachedRemoteStatuses
     }
 
@@ -238,15 +229,12 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
         do {
             guard let snapshot = try await cloudSyncService.pullRemoteSnapshot() else { return }
             cachedRemoteStatuses = snapshot.remoteStatuses
+            remoteDiscoveries = snapshot.remoteDiscoveries
             remoteLogs = ProxySyncPolicy.RemoteLogs.normalize(snapshot.remoteLogs)
             lastHandledCommandID = snapshot.lastHandledCommandID
             lastCommandError = snapshot.lastCommandError
             lastRemoteStatusRefreshAt = snapshot.remoteStatusesSyncedAt
-        } catch {
-            #if DEBUG
-            // print("Proxy control snapshot seed skipped:", error.localizedDescription)
-            #endif
-        }
+        } catch {}
     }
 
     private func scheduleRemoteStatusRefreshIfNeeded(force: Bool) {
@@ -295,11 +283,7 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
                 forceRemoteStatusRefresh: false,
                 broadcastLocally: true
             )
-        } catch {
-            #if DEBUG
-            // print("Proxy control remote status refresh skipped:", error.localizedDescription)
-            #endif
-        }
+        } catch {}
     }
 
     private func refreshRemoteStatuses(
@@ -388,10 +372,21 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
                 throw AppError.invalidData("Missing remote server payload.")
             }
             let settings = try await settingsCoordinator.currentSettings()
-            let merged = RemoteServerConfiguration.upsert(remoteServer, into: settings.remoteServers)
+            let previousServerID = command.previousRemoteServerID?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let baselineServers: [RemoteServerConfig]
+            if let previousServerID, !previousServerID.isEmpty, previousServerID != remoteServer.id {
+                baselineServers = settings.remoteServers.filter { $0.id != previousServerID }
+                remoteLogs.removeValue(forKey: previousServerID)
+                remoteDiscoveries.removeValue(forKey: previousServerID)
+                cachedRemoteStatuses.removeValue(forKey: previousServerID)
+            } else {
+                baselineServers = settings.remoteServers
+            }
+            let merged = RemoteServerConfiguration.upsert(remoteServer, into: baselineServers)
             _ = try await settingsCoordinator.updateSettings(
                 AppSettingsPatch(remoteServers: merged)
             )
+            remoteDiscoveries.removeValue(forKey: remoteServer.id)
             scheduleRemoteStatusRefreshIfNeeded(force: true)
             return .noRemoteStatusRefresh
         case .removeRemoteServer:
@@ -404,7 +399,14 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
                 AppSettingsPatch(remoteServers: merged)
             )
             remoteLogs.removeValue(forKey: id)
+            remoteDiscoveries.removeValue(forKey: id)
             cachedRemoteStatuses.removeValue(forKey: id)
+            return .noRemoteStatusRefresh
+        case .discoverRemote:
+            guard let remoteServer = command.remoteServer else {
+                throw AppError.invalidData("Missing remote server payload.")
+            }
+            remoteDiscoveries[remoteServer.id] = try await proxyCoordinator.discoverRemote(server: remoteServer)
             return .noRemoteStatusRefresh
         case .refreshRemote:
             guard let server = try await serverForCommand(command) else { return .noRemoteStatusRefresh }
@@ -414,6 +416,11 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
         case .deployRemote:
             guard let server = try await serverForCommand(command) else { return .noRemoteStatusRefresh }
             cachedRemoteStatuses[server.id] = try await proxyCoordinator.deployRemote(server: server)
+            lastRemoteStatusRefreshAt = dateProvider.unixMillisecondsNow()
+            return .noRemoteStatusRefresh
+        case .syncRemoteAccounts:
+            guard let server = try await serverForCommand(command) else { return .noRemoteStatusRefresh }
+            cachedRemoteStatuses[server.id] = try await proxyCoordinator.syncRemoteAccounts(server: server)
             lastRemoteStatusRefreshAt = dateProvider.unixMillisecondsNow()
             return .noRemoteStatusRefresh
         case .startRemote:
@@ -433,6 +440,16 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
                 lines: command.logLines ?? 120
             )
             remoteLogs[server.id] = ProxySyncPolicy.RemoteLogs.normalize(logs)
+            return .noRemoteStatusRefresh
+        case .uninstallRemote:
+            guard let server = try await serverForCommand(command) else { return .noRemoteStatusRefresh }
+            cachedRemoteStatuses[server.id] = try await proxyCoordinator.uninstallRemote(
+                server: server,
+                removeRemoteDirectory: command.removeRemoteDirectory ?? false
+            )
+            remoteLogs.removeValue(forKey: server.id)
+            remoteDiscoveries.removeValue(forKey: server.id)
+            lastRemoteStatusRefreshAt = dateProvider.unixMillisecondsNow()
             return .noRemoteStatusRefresh
         }
     }

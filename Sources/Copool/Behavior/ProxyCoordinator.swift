@@ -55,6 +55,10 @@ final class ProxyCoordinator: @unchecked Sendable {
         await remoteService.status(server: server)
     }
 
+    func discoverRemote(server: RemoteServerConfig) async throws -> [DiscoveredRemoteProxyInstance] {
+        try await remoteService.discover(server: server)
+    }
+
     func remoteStatuses(for servers: [RemoteServerConfig]) async -> [String: RemoteProxyStatus] {
         await withTaskGroup(of: (String, RemoteProxyStatus).self, returning: [String: RemoteProxyStatus].self) { group in
             for server in servers {
@@ -75,6 +79,10 @@ final class ProxyCoordinator: @unchecked Sendable {
         try await remoteService.deploy(server: server)
     }
 
+    func syncRemoteAccounts(server: RemoteServerConfig) async throws -> RemoteProxyStatus {
+        try await remoteService.syncAccounts(server: server)
+    }
+
     func startRemote(server: RemoteServerConfig) async throws -> RemoteProxyStatus {
         try await remoteService.start(server: server)
     }
@@ -85,5 +93,15 @@ final class ProxyCoordinator: @unchecked Sendable {
 
     func readRemoteLogs(server: RemoteServerConfig, lines: Int) async throws -> String {
         try await remoteService.readLogs(server: server, lines: lines)
+    }
+
+    func uninstallRemote(
+        server: RemoteServerConfig,
+        removeRemoteDirectory: Bool = false
+    ) async throws -> RemoteProxyStatus {
+        try await remoteService.uninstall(
+            server: server,
+            removeRemoteDirectory: removeRemoteDirectory
+        )
     }
 }

@@ -239,3 +239,109 @@ struct RemoteServerErrorSection: View {
         }
     }
 }
+
+struct RemoteServerDiscoverySection: View {
+    let presentation: RemoteServerDiscoveryPresentation
+    let onUseInstance: (DiscoveredRemoteProxyInstance) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(presentation.title)
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.secondary)
+
+            LazyVStack(spacing: 8) {
+                ForEach(presentation.items) { item in
+                    RemoteServerDiscoveryCard(
+                        item: item,
+                        onUse: {
+                            onUseInstance(item.instance)
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+private struct RemoteServerDiscoveryCard: View {
+    let item: RemoteServerDiscoveryItemPresentation
+    let onUse: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.label)
+                        .font(.subheadline.weight(.semibold))
+                    if item.label != item.serviceName {
+                        Text(item.serviceName)
+                            .font(.caption2.monospaced())
+                            .foregroundStyle(.secondary)
+                    }
+                    Text(item.statusSummary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+                Button("proxy.remote.discovery.use_instance", action: onUse)
+                    .liquidGlassActionButtonStyle(prominent: true)
+            }
+
+            discoveryValueRow(
+                title: L10n.tr("proxy.remote.discovery.remote_dir"),
+                value: item.remoteDir
+            )
+            discoveryValueRow(
+                title: L10n.tr("proxy.remote.discovery.listen_port"),
+                value: item.listenPort
+            )
+            discoveryValueRow(
+                title: L10n.tr("proxy.remote.discovery.base_url"),
+                value: item.baseURL
+            )
+            discoveryValueRow(
+                title: L10n.tr("proxy.remote.discovery.api_key"),
+                value: item.apiKeyLabel
+            )
+        }
+        .padding(10)
+        .cardSurface(cornerRadius: 10)
+    }
+
+    private func discoveryValueRow(title: String, value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.caption)
+                .textSelection(.enabled)
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+struct RemoteServerActionHelpSection: View {
+    let descriptors: [RemoteServerActionHelpDescriptor]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("proxy.remote.help.title")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.secondary)
+
+            ForEach(descriptors) { descriptor in
+                HStack(alignment: .top, spacing: 8) {
+                    Text(LocalizedStringKey(descriptor.titleKey))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.primary)
+                    Text(LocalizedStringKey(descriptor.messageKey))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+    }
+}

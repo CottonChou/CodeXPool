@@ -1,26 +1,25 @@
 import Foundation
 
 actor SettingsCoordinator {
-    private let storeRepository: AccountsStoreRepository
+    private let settingsRepository: SettingsRepository
     private let launchAtStartupService: LaunchAtStartupServiceProtocol
 
     init(
-        storeRepository: AccountsStoreRepository,
+        settingsRepository: SettingsRepository,
         launchAtStartupService: LaunchAtStartupServiceProtocol
     ) {
-        self.storeRepository = storeRepository
+        self.settingsRepository = settingsRepository
         self.launchAtStartupService = launchAtStartupService
     }
 
     func currentSettings() throws -> AppSettings {
-        try storeRepository.loadStore().settings
+        try settingsRepository.loadSettings()
     }
 
     func updateSettings(_ patch: AppSettingsPatch) throws -> AppSettings {
         let launchAtStartupPatch = patch.launchAtStartup
 
-        var store = try storeRepository.loadStore()
-        var settings = store.settings
+        var settings = try settingsRepository.loadSettings()
 
         if let value = patch.launchAtStartup { settings.launchAtStartup = value }
         if let value = patch.launchCodexAfterSwitch { settings.launchCodexAfterSwitch = value }
@@ -34,8 +33,7 @@ actor SettingsCoordinator {
         if let value = patch.remoteServers { settings.remoteServers = value }
         if let value = patch.locale { settings.locale = AppLocale.resolve(value).identifier }
 
-        store.settings = settings
-        try storeRepository.saveStore(store)
+        try settingsRepository.saveSettings(settings)
 
         if let launchAtStartupPatch {
             try launchAtStartupService.setEnabled(launchAtStartupPatch)
@@ -45,7 +43,7 @@ actor SettingsCoordinator {
     }
 
     func syncLaunchAtStartupFromStore() throws {
-        let settings = try storeRepository.loadStore().settings
+        let settings = try settingsRepository.loadSettings()
         try launchAtStartupService.syncWithStoreValue(settings.launchAtStartup)
     }
 }

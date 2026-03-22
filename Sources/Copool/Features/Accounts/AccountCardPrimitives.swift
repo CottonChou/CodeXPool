@@ -76,17 +76,18 @@ struct AccountCardHeaderSection: View {
                         backgroundColor: palette.toneColor.opacity(0.18),
                         foregroundColor: palette.toneColor
                     )
-                    if let teamNameTag = presentation.teamNameTag, !isCollapsed {
+                    if let teamNameTag = presentation.teamNameTag {
                         AccountTagView(
                             text: teamNameTag,
                             backgroundColor: palette.toneColor.opacity(0.18),
-                            foregroundColor: palette.toneColor
+                            foregroundColor: palette.toneColor,
+                            allowsCompression: true
                         )
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    Spacer(minLength: 0)
                 }
             }
-
-            Spacer(minLength: 0)
 
             if !isCollapsed {
                 Button(role: .destructive, action: onDelete) {
@@ -127,17 +128,34 @@ struct AccountCardCompactUsageSection: View {
     let presentation: AccountCardPresentation
 
     var body: some View {
-        HStack(spacing: 14) {
-            CompactUsageRing(
-                usedPercent: presentation.compactUsage.fiveHourUsedPercent,
-                tint: .orange
-            )
-            CompactUsageRing(
-                usedPercent: presentation.compactUsage.oneWeekUsedPercent,
-                tint: .teal
-            )
-        }
-        .frame(maxWidth: .infinity, alignment: .center)
+        AccountCompactUsageRow(
+            rings: [
+                AccountCompactRingDescriptor(
+                    id: "five-hour",
+                    valueText: compactPercentText(presentation.compactUsage.fiveHourUsedPercent),
+                    subtitleText: "5h",
+                    progress: compactProgress(presentation.compactUsage.fiveHourUsedPercent),
+                    tint: .orange
+                ),
+                AccountCompactRingDescriptor(
+                    id: "one-week",
+                    valueText: compactPercentText(presentation.compactUsage.oneWeekUsedPercent),
+                    subtitleText: "1w",
+                    progress: compactProgress(presentation.compactUsage.oneWeekUsedPercent),
+                    tint: .teal
+                ),
+            ]
+        )
+    }
+
+    private func compactProgress(_ usedPercent: Double?) -> Double {
+        guard let usedPercent else { return 0 }
+        return max(0, min(1, usedPercent / 100))
+    }
+
+    private func compactPercentText(_ usedPercent: Double?) -> String {
+        guard let usedPercent else { return "--" }
+        return "\(Int(usedPercent.rounded()))%"
     }
 }
 
@@ -204,24 +222,6 @@ struct AccountCollapsedSwitchOverlay: View {
             }
             .transition(.opacity)
         }
-    }
-}
-
-struct AccountTagView: View {
-    let text: String
-    let backgroundColor: Color
-    let foregroundColor: Color
-
-    var body: some View {
-        Text(text)
-            .font(.caption2.weight(.bold))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .foregroundStyle(foregroundColor)
-            .lineLimit(1)
-            .truncationMode(.tail)
-            .fixedSize(horizontal: true, vertical: false)
-            .background(backgroundColor, in: Capsule())
     }
 }
 
@@ -363,39 +363,5 @@ private struct AccountUsageErrorOverlay: View {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .strokeBorder(.red.opacity(0.18), lineWidth: 1)
             }
-    }
-}
-
-private struct CompactUsageRing: View {
-    let usedPercent: Double?
-    let tint: Color
-
-    private var progress: Double {
-        guard let usedPercent else { return 0 }
-        return max(0, min(1, usedPercent / 100))
-    }
-
-    private var percentText: String {
-        guard let usedPercent else { return "--" }
-        return "\(Int(usedPercent.rounded()))%"
-    }
-
-    var body: some View {
-        ZStack {
-            LiquidProgressRing(
-                progress: progress,
-                tint: tint,
-                lineWidth: 7
-            )
-            VStack(spacing: 1) {
-                Text(percentText)
-                    .font(.system(size: 10, weight: .bold))
-                    .monospacedDigit()
-                Text(L10n.tr("accounts.compact.used"))
-                    .font(.system(size: 7, weight: .semibold))
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(width: 54, height: 54)
     }
 }

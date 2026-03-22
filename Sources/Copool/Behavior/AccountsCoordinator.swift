@@ -1,7 +1,7 @@
 import Foundation
 
 actor AccountsCoordinator {
-    private enum UsageRefreshPolicy {
+    enum UsageRefreshPolicy {
         static let minimumRefreshIntervalSeconds: Int64 = 25
 
         static func shouldRefresh(_ snapshot: UsageSnapshot?, now: Int64) -> Bool {
@@ -10,24 +10,21 @@ actor AccountsCoordinator {
         }
     }
 
-    private enum UsageRefreshExecutionMode {
-        case parallel
-        case serial
-    }
-
-    private let storeRepository: AccountsStoreRepository
-    private let authRepository: AuthRepository
-    private let usageService: UsageService
-    private let workspaceMetadataService: WorkspaceMetadataService?
-    private let chatGPTOAuthLoginService: ChatGPTOAuthLoginServiceProtocol
-    private let codexCLIService: CodexCLIServiceProtocol
-    private let editorAppService: EditorAppServiceProtocol
-    private let opencodeAuthSyncService: OpencodeAuthSyncServiceProtocol
-    private let dateProvider: DateProviding
-    private let runtimePlatform: RuntimePlatform
+    let storeRepository: AccountsStoreRepository
+    let settingsRepository: SettingsRepository
+    let authRepository: AuthRepository
+    let usageService: UsageService
+    let workspaceMetadataService: WorkspaceMetadataService?
+    let chatGPTOAuthLoginService: ChatGPTOAuthLoginServiceProtocol
+    let codexCLIService: CodexCLIServiceProtocol
+    let editorAppService: EditorAppServiceProtocol
+    let opencodeAuthSyncService: OpencodeAuthSyncServiceProtocol
+    let dateProvider: DateProviding
+    let runtimePlatform: RuntimePlatform
 
     init(
         storeRepository: AccountsStoreRepository,
+        settingsRepository: SettingsRepository,
         authRepository: AuthRepository,
         usageService: UsageService,
         workspaceMetadataService: WorkspaceMetadataService? = nil,
@@ -39,6 +36,7 @@ actor AccountsCoordinator {
         runtimePlatform: RuntimePlatform = PlatformCapabilities.currentPlatform
     ) {
         self.storeRepository = storeRepository
+        self.settingsRepository = settingsRepository
         self.authRepository = authRepository
         self.usageService = usageService
         self.workspaceMetadataService = workspaceMetadataService
@@ -48,103 +46,6 @@ actor AccountsCoordinator {
         self.opencodeAuthSyncService = opencodeAuthSyncService
         self.dateProvider = dateProvider
         self.runtimePlatform = runtimePlatform
-    }
-
-    func listAccounts() async throws -> [AccountSummary] {
-        var store = try storeRepository.loadStore()
-        let didReconcile = Self.reconcileStoredAccountMetadata(in: &store, authRepository: authRepository)
-        let didEnrich = await enrichStoredWorkspaceMetadataIfNeeded(in: &store, forceRemoteCheck: false)
-        if didReconcile || didEnrich {
-            try storeRepository.saveStore(store)
-        }
-        let currentAccountID = authRepository.currentAuthAccountID()
-        return store.accountSummaries(currentAccountID: currentAccountID)
-    }
-
-    @discardableResult
-    func importCurrentAuthAccount(customLabel: String?) async throws -> AccountSummary {
-        let authJSON = try authRepository.readCurrentAuth()
-        return try await importAccount(authJSON: authJSON, customLabel: customLabel)
-    }
-
-    @discardableResult
-    func importAccountFile(from url: URL, customLabel: String?, setAsCurrent: Bool) async throws -> AccountSummary {
-        let didAccess = url.startAccessingSecurityScopedResource()
-        defer {
-            if didAccess {
-                url.stopAccessingSecurityScopedResource()
-            }
-        }
-
-        let authJSON = try authRepository.readAuth(from: url)
-        if setAsCurrent {
-            if runtimePlatform == .macOS {
-                try authRepository.writeCurrentAuth(authJSON)
-            }
-        }
-        return try await importAccount(authJSON: authJSON, customLabel: customLabel)
-    }
-
-    @discardableResult
-    private func importAccount(authJSON: JSONValue, customLabel: String?) async throws -> AccountSummary {
-        var extracted = try authRepository.extractAuth(from: authJSON)
-        if let remoteWorkspaceName = await resolveRemoteWorkspaceName(for: extracted, forceRemoteCheck: true) {
-            extracted.teamName = remoteWorkspaceName
-        }
-
-        var usage: UsageSnapshot?
-        var usageError: String?
-
-        do {
-            usage = try await usageService.fetchUsage(accessToken: extracted.accessToken, accountID: extracted.accountID)
-        } catch {
-            usageError = error.localizedDescription
-        }
-
-        let now = dateProvider.unixSecondsNow()
-        let generatedLabel = customLabel?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let label = generatedLabel?.isEmpty == false
-            ? generatedLabel!
-            : (extracted.email ?? "Codex \(String(extracted.accountID.prefix(8)))")
-
-        var store = try storeRepository.loadStore()
-        let account = StoredAccount(
-            id: UUID().uuidString,
-            label: label,
-            email: extracted.email,
-            accountID: extracted.accountID,
-            planType: extracted.planType,
-            teamName: extracted.teamName,
-            teamAlias: nil,
-            authJSON: authJSON,
-            addedAt: now,
-            updatedAt: now,
-            usage: usage,
-            usageError: usageError
-        )
-
-        if let existingIndex = store.accounts.firstIndex(where: { $0.accountID == extracted.accountID }) {
-            var existing = store.accounts[existingIndex]
-            existing.label = account.label
-            existing.email = account.email
-            existing.planType = account.planType
-            if let teamName = Self.normalizedTeamName(account.teamName) {
-                existing.teamName = teamName
-            }
-            existing.authJSON = account.authJSON
-            existing.updatedAt = now
-            existing.usage = usage ?? existing.usage
-            existing.usageError = usageError
-            store.accounts[existingIndex] = existing
-        } else {
-            store.accounts.append(account)
-        }
-
-        try storeRepository.saveStore(store)
-        let savedAccount = store.accounts.first(where: { $0.accountID == extracted.accountID })!
-
-        let currentAccountID = authRepository.currentAuthAccountID()
-        return toSummary(savedAccount, currentAccountID: currentAccountID)
     }
 
     func deleteAccount(id: String) throws {
@@ -163,7 +64,7 @@ actor AccountsCoordinator {
         store.accounts[index].updatedAt = dateProvider.unixSecondsNow()
         try storeRepository.saveStore(store)
 
-        return toSummary(store.accounts[index], currentAccountID: authRepository.currentAuthAccountID())
+        return toSummary(store.accounts[index], currentAccountKey: authRepository.currentAuthAccountKey())
     }
 
     func switchAccount(id: String) throws {
@@ -182,9 +83,10 @@ actor AccountsCoordinator {
         }
 
         try updateCurrentAccountProjection(authJSON: account.authJSON)
+        let settings = try settingsRepository.loadSettings()
         return try applySwitchSideEffects(
             for: account,
-            settings: store.settings,
+            settings: settings,
             workspacePath: workspacePath
         )
     }
@@ -205,442 +107,18 @@ actor AccountsCoordinator {
         return (target, execution)
     }
 
-    func addAccountViaLogin(customLabel: String?, timeoutSeconds: TimeInterval = 10 * 60) async throws -> AccountSummary {
-        let tokens = try await chatGPTOAuthLoginService.signInWithChatGPT(timeoutSeconds: timeoutSeconds)
-        let authJSON = try authRepository.makeChatGPTAuth(from: tokens)
-        return try await importAccount(authJSON: authJSON, customLabel: customLabel)
-    }
-
-    func refreshAllUsage() async throws -> [AccountSummary] {
-        try await refreshAllUsage(
-            using: .parallel,
-            force: false,
-            targetAccountIDs: nil,
-            onPartialUpdate: nil
-        )
-    }
-
-    func refreshAllUsageSerially() async throws -> [AccountSummary] {
-        try await refreshAllUsage(
-            using: .serial,
-            force: false,
-            targetAccountIDs: nil,
-            onPartialUpdate: nil
-        )
-    }
-
-    func refreshAllUsage(force: Bool) async throws -> [AccountSummary] {
-        try await refreshAllUsage(
-            using: .parallel,
-            force: force,
-            targetAccountIDs: nil,
-            onPartialUpdate: nil
-        )
-    }
-
-    func refreshAllUsageSerially(force: Bool) async throws -> [AccountSummary] {
-        try await refreshAllUsage(
-            using: .serial,
-            force: force,
-            targetAccountIDs: nil,
-            onPartialUpdate: nil
-        )
-    }
-
-    func refreshUsage(
-        forAccountIDs accountIDs: [String],
-        force: Bool
-    ) async throws -> [AccountSummary] {
-        try await refreshAllUsage(
-            using: .parallel,
-            force: force,
-            targetAccountIDs: accountIDs,
-            onPartialUpdate: nil
-        )
-    }
-
-    func refreshUsageSerially(
-        forAccountIDs accountIDs: [String],
-        force: Bool
-    ) async throws -> [AccountSummary] {
-        try await refreshAllUsage(
-            using: .serial,
-            force: force,
-            targetAccountIDs: accountIDs,
-            onPartialUpdate: nil
-        )
-    }
-
-    func refreshAllUsage(
-        force: Bool,
-        onPartialUpdate: @escaping @Sendable ([AccountSummary]) async -> Void
-    ) async throws -> [AccountSummary] {
-        try await refreshAllUsage(
-            using: .parallel,
-            force: force,
-            targetAccountIDs: nil,
-            onPartialUpdate: onPartialUpdate
-        )
-    }
-
-    func refreshAllUsageSerially(
-        force: Bool,
-        onPartialUpdate: @escaping @Sendable ([AccountSummary]) async -> Void
-    ) async throws -> [AccountSummary] {
-        try await refreshAllUsage(
-            using: .serial,
-            force: force,
-            targetAccountIDs: nil,
-            onPartialUpdate: onPartialUpdate
-        )
-    }
-
-    func refreshUsage(
-        forAccountIDs accountIDs: [String],
-        force: Bool,
-        onPartialUpdate: @escaping @Sendable ([AccountSummary]) async -> Void
-    ) async throws -> [AccountSummary] {
-        try await refreshAllUsage(
-            using: .parallel,
-            force: force,
-            targetAccountIDs: accountIDs,
-            onPartialUpdate: onPartialUpdate
-        )
-    }
-
-    func refreshUsageSerially(
-        forAccountIDs accountIDs: [String],
-        force: Bool,
-        onPartialUpdate: @escaping @Sendable ([AccountSummary]) async -> Void
-    ) async throws -> [AccountSummary] {
-        try await refreshAllUsage(
-            using: .serial,
-            force: force,
-            targetAccountIDs: accountIDs,
-            onPartialUpdate: onPartialUpdate
-        )
-    }
-
-    private func refreshAllUsage(
-        using mode: UsageRefreshExecutionMode,
-        force: Bool,
-        targetAccountIDs: [String]?,
-        onPartialUpdate: (@Sendable ([AccountSummary]) async -> Void)?
-    ) async throws -> [AccountSummary] {
-        let now = dateProvider.unixSecondsNow()
-        let snapshot = try storeRepository.loadStore()
-        let authRepository = self.authRepository
-        let usageService = self.usageService
-        let targetIDSet = targetAccountIDs.map(Set.init)
-        let refreshTargets = snapshot.accounts.filter { account in
-            guard let targetIDSet else { return true }
-            return targetIDSet.contains(account.id)
-        }
-
-        guard !refreshTargets.isEmpty else {
-            return snapshot.accountSummaries(currentAccountID: authRepository.currentAuthAccountID())
-        }
-
-        var latest = snapshot
-        switch mode {
-        case .parallel:
-            try await withThrowingTaskGroup(of: StoredAccount.self, returning: Void.self) { group in
-                for account in refreshTargets {
-                    group.addTask {
-                        await Self.refreshAccount(
-                            account,
-                            now: now,
-                            forceRefresh: force,
-                            authRepository: authRepository,
-                            usageService: usageService
-                        )
-                    }
-                }
-                for try await refreshed in group {
-                    latest = Self.mergeRefreshedAccount(refreshed, into: latest)
-                    try storeRepository.saveStore(latest)
-                    if let onPartialUpdate {
-                        await onPartialUpdate(
-                            latest.accountSummaries(currentAccountID: authRepository.currentAuthAccountID())
-                        )
-                    }
-                }
-            }
-        case .serial:
-            for account in refreshTargets {
-                let refreshed = await Self.refreshAccount(
-                    account,
-                    now: now,
-                    forceRefresh: force,
-                    authRepository: authRepository,
-                    usageService: usageService
-                )
-                latest = Self.mergeRefreshedAccount(refreshed, into: latest)
-                try storeRepository.saveStore(latest)
-                if let onPartialUpdate {
-                    await onPartialUpdate(
-                        latest.accountSummaries(currentAccountID: authRepository.currentAuthAccountID())
-                    )
-                }
-            }
-        }
-
-        return latest.accountSummaries(currentAccountID: authRepository.currentAuthAccountID())
-    }
-
-    private static func mergeRefreshedAccount(
-        _ refreshed: StoredAccount,
-        into store: AccountsStore
-    ) -> AccountsStore {
-        var store = store
-        store.accounts = store.accounts.map { existing in
-            guard existing.accountID == refreshed.accountID else {
-                return existing
-            }
-            var merged = existing
-            merged.label = refreshed.label
-            merged.email = refreshed.email
-            merged.planType = refreshed.planType
-            merged.teamName = refreshed.teamName
-            merged.teamAlias = refreshed.teamAlias
-            merged.authJSON = refreshed.authJSON
-            merged.updatedAt = refreshed.updatedAt
-            merged.usage = refreshed.usage
-            merged.usageError = refreshed.usageError
-            return merged
-        }
-        return store
-    }
-
-    func refreshWorkspaceMetadata(forceRemoteCheck: Bool) async throws -> [AccountSummary] {
-        var store = try storeRepository.loadStore()
-        let didChange = await enrichStoredWorkspaceMetadataIfNeeded(
-            in: &store,
-            forceRemoteCheck: forceRemoteCheck
-        )
-        if didChange {
-            try storeRepository.saveStore(store)
-        }
-        return store.accountSummaries(currentAccountID: authRepository.currentAuthAccountID())
-    }
-
-    private static func refreshAccount(
-        _ account: StoredAccount,
-        now: Int64,
-        forceRefresh: Bool,
-        authRepository: AuthRepository,
-        usageService: UsageService
-    ) async -> StoredAccount {
-        var account = account
-        guard forceRefresh || UsageRefreshPolicy.shouldRefresh(account.usage, now: now) else {
-            return account
-        }
-
-        do {
-            let extracted = try authRepository.extractAuth(from: account.authJSON)
-            let usage = try await usageService.fetchUsage(
-                accessToken: extracted.accessToken,
-                accountID: extracted.accountID
-            )
-            account.usage = usage
-            account.usageError = nil
-            account.planType = extracted.planType ?? account.planType
-            if let teamName = normalizedTeamName(extracted.teamName) {
-                account.teamName = teamName
-            }
-            account.email = extracted.email ?? account.email
-        } catch {
-            account.usageError = error.localizedDescription
-        }
-
-        account.updatedAt = now
-        return account
-    }
-
-    private static func reconcileStoredAccountMetadata(
-        in store: inout AccountsStore,
-        authRepository: AuthRepository
-    ) -> Bool {
-        var didChange = false
-
-        for index in store.accounts.indices {
-            let storedAccount = store.accounts[index]
-            guard let reconciled = try? authRepository.extractAuth(from: storedAccount.authJSON) else {
-                continue
-            }
-
-            if store.accounts[index].email != reconciled.email {
-                store.accounts[index].email = reconciled.email
-                didChange = true
-            }
-
-            if store.accounts[index].planType != reconciled.planType {
-                store.accounts[index].planType = reconciled.planType
-                didChange = true
-            }
-
-            let reconciledTeamName = normalizedTeamName(reconciled.teamName)
-            let storedTeamName = normalizedTeamName(store.accounts[index].teamName)
-            if let reconciledTeamName, storedTeamName != reconciledTeamName {
-                store.accounts[index].teamName = reconciledTeamName
-                didChange = true
-            }
-        }
-
-        return didChange
-    }
-
-    private func enrichStoredWorkspaceMetadataIfNeeded(
-        in store: inout AccountsStore,
-        forceRemoteCheck: Bool
-    ) async -> Bool {
-        guard let workspaceMetadataService else { return false }
-
-        var didChange = false
-        var cachedDirectories: [String: [WorkspaceMetadata]] = [:]
-
-        for index in store.accounts.indices {
-            let storedAccount = store.accounts[index]
-            guard let extracted = try? authRepository.extractAuth(from: storedAccount.authJSON) else {
-                #if DEBUG
-                debugLog("workspace metadata lookup skipped for stored account \(storedAccount.id): failed to extract auth")
-                #endif
-                continue
-            }
-            guard shouldLookupRemoteWorkspaceName(
-                storedTeamName: storedAccount.teamName,
-                extracted: extracted,
-                forceRemoteCheck: forceRemoteCheck
-            ) else {
-                #if DEBUG
-                debugLog(
-                    "workspace metadata lookup skipped for accountID=\(storedAccount.accountID); plan=\(extracted.planType ?? "<nil>"); storedTeamName=\(storedAccount.teamName ?? "<nil>"); forceRemoteCheck=\(forceRemoteCheck)"
-                )
-                #endif
-                continue
-            }
-
-            let directory: [WorkspaceMetadata]
-            if let cached = cachedDirectories[extracted.accessToken] {
-                #if DEBUG
-                debugLog("workspace metadata lookup reused cached directory for accountID=\(extracted.accountID); items=\(cached.count)")
-                #endif
-                directory = cached
-            } else {
-                guard let fetched = try? await workspaceMetadataService.fetchWorkspaceMetadata(
-                    accessToken: extracted.accessToken
-                ) else {
-                    #if DEBUG
-                    debugLog("workspace metadata fetch failed for accountID=\(extracted.accountID)")
-                    #endif
-                    continue
-                }
-                cachedDirectories[extracted.accessToken] = fetched
-                #if DEBUG
-                debugLog("workspace metadata fetched for accountID=\(extracted.accountID); items=\(fetched.count)")
-                #endif
-                directory = fetched
-            }
-
-            guard let remoteWorkspaceName = Self.remoteWorkspaceName(
-                for: extracted.accountID,
-                in: directory
-            ) else {
-                #if DEBUG
-                debugLog("workspace metadata returned no matching non-personal workspace for accountID=\(extracted.accountID)")
-                #endif
-                continue
-            }
-
-            if store.accounts[index].teamName != remoteWorkspaceName {
-                store.accounts[index].teamName = remoteWorkspaceName
-                didChange = true
-                #if DEBUG
-                debugLog("workspace metadata updated accountID=\(extracted.accountID) teamName=\(remoteWorkspaceName)")
-                #endif
-            } else {
-                #if DEBUG
-                debugLog("workspace metadata matched accountID=\(extracted.accountID) but teamName already up to date: \(remoteWorkspaceName)")
-                #endif
-            }
-        }
-
-        return didChange
-    }
-
-    private func resolveRemoteWorkspaceName(
-        for extracted: ExtractedAuth,
-        forceRemoteCheck: Bool
-    ) async -> String? {
-        guard let workspaceMetadataService else { return nil }
-        guard shouldLookupRemoteWorkspaceName(
-            storedTeamName: extracted.teamName,
-            extracted: extracted,
-            forceRemoteCheck: forceRemoteCheck
-        ) else {
-            return extracted.teamName
-        }
-        guard let directory = try? await workspaceMetadataService.fetchWorkspaceMetadata(
-            accessToken: extracted.accessToken
-        ) else {
-            return extracted.teamName
-        }
-        return Self.remoteWorkspaceName(for: extracted.accountID, in: directory) ?? extracted.teamName
-    }
-
-    private func shouldLookupRemoteWorkspaceName(
-        storedTeamName: String?,
-        extracted: ExtractedAuth,
-        forceRemoteCheck: Bool
-    ) -> Bool {
-        let normalizedPlan = (extracted.planType ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard normalizedPlan == "team" || normalizedPlan == "business" || normalizedPlan == "enterprise" else {
-            return false
-        }
-        return forceRemoteCheck || Self.normalizedTeamName(storedTeamName) == nil
-    }
-
-    private static func normalizedTeamName(_ value: String?) -> String? {
-        guard let value else { return nil }
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
-    }
-
-    private static func remoteWorkspaceName(
-        for accountID: String,
-        in metadata: [WorkspaceMetadata]
-    ) -> String? {
-        guard let match = metadata.first(where: { $0.accountID == accountID }) else {
-            return nil
-        }
-
-        let trimmed = match.workspaceName?.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let trimmed, !trimmed.isEmpty else {
-            return nil
-        }
-
-        if match.structure?.lowercased() == "personal" {
-            return nil
-        }
-
-        return trimmed
-    }
-
-    private func toSummary(_ account: StoredAccount, currentAccountID: String?) -> AccountSummary {
-        AccountsStore(accounts: [account]).accountSummaries(currentAccountID: currentAccountID)[0]
-    }
-
     private func updateCurrentAccountProjection(authJSON: JSONValue) throws {
         let extracted = try authRepository.extractAuth(from: authJSON)
         var store = try storeRepository.loadStore()
-        guard store.accounts.contains(where: { $0.accountID == extracted.accountID }) else {
+        guard let matchedAccount = Self.matchingStoredAccount(for: extracted, in: store.accounts) else {
             throw AppError.invalidData(L10n.tr("error.accounts.account_not_found_for_switch"))
         }
 
         store.currentSelection = CurrentAccountSelection(
             accountID: extracted.accountID,
             selectedAt: dateProvider.unixMillisecondsNow(),
-            sourceDeviceID: runtimePlatform == .macOS ? "macos-local" : "ios-local"
+            sourceDeviceID: runtimePlatform == .macOS ? "macos-local" : "ios-local",
+            accountKey: matchedAccount.accountKey
         )
         try storeRepository.saveStore(store)
 
@@ -653,13 +131,6 @@ actor AccountsCoordinator {
         let trimmed = alias.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }
-
-    #if DEBUG
-    private func debugLog(_ message: String) {
-        _ = message
-        // print("AccountsCoordinator:", message)
-    }
-    #endif
 
     private func applySwitchSideEffects(
         for account: StoredAccount,
@@ -692,5 +163,22 @@ actor AccountsCoordinator {
         }
 
         return result
+    }
+
+    static func matchingStoredAccountIndex(
+        for extracted: ExtractedAuth,
+        in accounts: [StoredAccount]
+    ) -> Int? {
+        AccountIdentity.preferredMatchIndex(for: extracted, in: accounts)
+    }
+
+    static func matchingStoredAccount(
+        for extracted: ExtractedAuth,
+        in accounts: [StoredAccount]
+    ) -> StoredAccount? {
+        guard let index = matchingStoredAccountIndex(for: extracted, in: accounts) else {
+            return nil
+        }
+        return accounts[index]
     }
 }

@@ -43,18 +43,16 @@ final class ProxyControlBridgeTests: XCTestCase {
             cloudSyncService: cloudSyncService,
             runtimePlatform: .macOS,
             remoteService: slowRemoteService,
-            store: AccountsStore(
-                settings: AppSettings(
-                    launchAtStartup: false,
-                    launchCodexAfterSwitch: true,
-                    autoSmartSwitch: false,
-                    syncOpencodeOpenaiAuth: false,
-                    restartEditorsOnSwitch: false,
-                    restartEditorTargets: [],
-                    autoStartApiProxy: false,
-                    remoteServers: [makeRemoteServer()],
-                    locale: AppLocale.systemDefault.identifier
-                )
+            settings: AppSettings(
+                launchAtStartup: false,
+                launchCodexAfterSwitch: true,
+                autoSmartSwitch: false,
+                syncOpencodeOpenaiAuth: false,
+                restartEditorsOnSwitch: false,
+                restartEditorTargets: [],
+                autoStartApiProxy: false,
+                remoteServers: [makeRemoteServer()],
+                locale: AppLocale.systemDefault.identifier
             )
         )
 
@@ -74,22 +72,20 @@ final class ProxyControlBridgeTests: XCTestCase {
             cloudSyncService: cloudSyncService,
             runtimePlatform: .macOS,
             remoteService: slowRemoteService,
-            store: AccountsStore(
-                settings: AppSettings(
-                    launchAtStartup: false,
-                    launchCodexAfterSwitch: true,
-                    autoSmartSwitch: false,
-                    syncOpencodeOpenaiAuth: false,
-                    restartEditorsOnSwitch: false,
-                    restartEditorTargets: [],
-                    autoStartApiProxy: false,
-                    remoteServers: [
-                        makeRemoteServer(id: "server-1", label: "Tokyo"),
-                        makeRemoteServer(id: "server-2", label: "Seoul"),
-                        makeRemoteServer(id: "server-3", label: "Paris"),
-                    ],
-                    locale: AppLocale.systemDefault.identifier
-                )
+            settings: AppSettings(
+                launchAtStartup: false,
+                launchCodexAfterSwitch: true,
+                autoSmartSwitch: false,
+                syncOpencodeOpenaiAuth: false,
+                restartEditorsOnSwitch: false,
+                restartEditorTargets: [],
+                autoStartApiProxy: false,
+                remoteServers: [
+                    makeRemoteServer(id: "server-1", label: "Tokyo"),
+                    makeRemoteServer(id: "server-2", label: "Seoul"),
+                    makeRemoteServer(id: "server-3", label: "Paris"),
+                ],
+                locale: AppLocale.systemDefault.identifier
             )
         )
 
@@ -204,11 +200,63 @@ final class ProxyControlBridgeTests: XCTestCase {
         XCTAssertEqual(snapshot.cloudflaredNamedInput.hostname, "proxy.example.com")
     }
 
+    func testSaveRemoteServerReplacesPreviousIDWhenAdoptingDiscoveredInstance() async throws {
+        let existing = makeRemoteServer(id: "draft-server", label: "new-server")
+        let bridge = makeBridge(
+            cloudSyncService: nil,
+            runtimePlatform: .macOS,
+            settings: AppSettings(
+                launchAtStartup: false,
+                launchCodexAfterSwitch: true,
+                autoSmartSwitch: false,
+                syncOpencodeOpenaiAuth: false,
+                restartEditorsOnSwitch: false,
+                restartEditorTargets: [],
+                autoStartApiProxy: false,
+                remoteServers: [existing],
+                locale: AppLocale.systemDefault.identifier
+            )
+        )
+        let adopted = RemoteServerConfig(
+            id: "server-1",
+            label: "Tokyo",
+            host: existing.host,
+            sshPort: existing.sshPort,
+            sshUser: existing.sshUser,
+            authMode: existing.authMode,
+            identityFile: existing.identityFile,
+            privateKey: existing.privateKey,
+            password: existing.password,
+            remoteDir: "/srv/copool",
+            listenPort: 9898
+        )
+        let command = ProxyControlCommand(
+            id: UUID().uuidString,
+            createdAt: 1_763_216_000_000,
+            sourceDeviceID: "macos-proxy-control",
+            kind: .saveRemoteServer,
+            preferredProxyPort: nil,
+            autoStartProxy: nil,
+            cloudflaredInput: nil,
+            remoteServer: adopted,
+            remoteServerID: nil,
+            previousRemoteServerID: "draft-server",
+            logLines: nil
+        )
+
+        let snapshot = try await bridge.performLocalCommand(command)
+
+        XCTAssertEqual(snapshot.remoteServers.map(\.id), ["server-1"])
+        XCTAssertEqual(snapshot.remoteServers.first?.label, "Tokyo")
+        XCTAssertEqual(snapshot.remoteServers.first?.remoteDir, "/srv/copool")
+        XCTAssertEqual(snapshot.remoteServers.first?.listenPort, 9898)
+    }
+
     private func makeBridge(
         cloudSyncService: ProxyControlCloudSyncServiceProtocol?,
         runtimePlatform: RuntimePlatform,
         remoteService: RemoteProxyServiceProtocol = StubRemoteProxyService(),
-        store: AccountsStore = AccountsStore()
+        settings: AppSettings = .defaultValue
     ) -> ProxyControlBridge {
         let proxyCoordinator = ProxyCoordinator(
             proxyService: StubProxyRuntimeService(),
@@ -216,7 +264,7 @@ final class ProxyControlBridgeTests: XCTestCase {
             remoteService: remoteService
         )
         let settingsCoordinator = SettingsCoordinator(
-            storeRepository: InMemoryAccountsStoreRepository(store: store),
+            settingsRepository: TestSettingsRepository(settings: settings),
             launchAtStartupService: StubLaunchAtStartupService()
         )
 
@@ -293,22 +341,6 @@ private actor SpyProxyControlCloudSyncService: ProxyControlCloudSyncServiceProto
     }
 }
 
-private final class InMemoryAccountsStoreRepository: AccountsStoreRepository, @unchecked Sendable {
-    private var store: AccountsStore
-
-    init(store: AccountsStore) {
-        self.store = store
-    }
-
-    func loadStore() throws -> AccountsStore {
-        store
-    }
-
-    func saveStore(_ store: AccountsStore) throws {
-        self.store = store
-    }
-}
-
 private struct StubLaunchAtStartupService: LaunchAtStartupServiceProtocol {
     func setEnabled(_ enabled: Bool) throws {
         _ = enabled
@@ -365,7 +397,16 @@ private struct StubRemoteProxyService: RemoteProxyServiceProtocol {
         )
     }
 
+    func discover(server: RemoteServerConfig) async throws -> [DiscoveredRemoteProxyInstance] {
+        _ = server
+        return []
+    }
+
     func deploy(server: RemoteServerConfig) async throws -> RemoteProxyStatus {
+        await status(server: server)
+    }
+
+    func syncAccounts(server: RemoteServerConfig) async throws -> RemoteProxyStatus {
         await status(server: server)
     }
 
@@ -381,6 +422,11 @@ private struct StubRemoteProxyService: RemoteProxyServiceProtocol {
         _ = server
         _ = lines
         return ""
+    }
+
+    func uninstall(server: RemoteServerConfig, removeRemoteDirectory: Bool) async throws -> RemoteProxyStatus {
+        _ = removeRemoteDirectory
+        return await status(server: server)
     }
 }
 
@@ -411,6 +457,16 @@ private final class SlowRemoteProxyService: RemoteProxyServiceProtocol, @uncheck
         await status(server: server)
     }
 
+    func discover(server: RemoteServerConfig) async throws -> [DiscoveredRemoteProxyInstance] {
+        _ = server
+        try? await Task.sleep(for: delay)
+        return []
+    }
+
+    func syncAccounts(server: RemoteServerConfig) async throws -> RemoteProxyStatus {
+        await status(server: server)
+    }
+
     func start(server: RemoteServerConfig) async throws -> RemoteProxyStatus {
         await status(server: server)
     }
@@ -423,5 +479,10 @@ private final class SlowRemoteProxyService: RemoteProxyServiceProtocol, @uncheck
         _ = server
         _ = lines
         return ""
+    }
+
+    func uninstall(server: RemoteServerConfig, removeRemoteDirectory: Bool) async throws -> RemoteProxyStatus {
+        _ = removeRemoteDirectory
+        return await status(server: server)
     }
 }

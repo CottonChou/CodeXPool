@@ -1,29 +1,43 @@
 import Foundation
+import os
 
 struct AccountsWidgetSnapshotStore {
+    private let logger = Logger(subsystem: "Copool", category: "AccountsWidgetSnapshotStore")
     private let fileManager: FileManager
+    private let snapshotURLProvider: () -> URL?
 
-    init(fileManager: FileManager = .default) {
+    init(
+        fileManager: FileManager = .default,
+        snapshotURLProvider: @escaping () -> URL? = {
+            FileManager.default
+                .containerURL(
+                    forSecurityApplicationGroupIdentifier: AccountsWidgetConfiguration.appGroupIdentifier
+                )?
+                .appendingPathComponent(AccountsWidgetConfiguration.snapshotFilename, isDirectory: false)
+        }
+    ) {
         self.fileManager = fileManager
+        self.snapshotURLProvider = snapshotURLProvider
     }
 
     func load() -> AccountsWidgetSnapshot {
-        guard let url = snapshotURL else {
+        guard let url = snapshotURLProvider() else {
+            logger.error("Widget snapshot load failed: app group container unavailable.")
             return .empty
         }
 
-        guard let data = try? Data(contentsOf: url),
-              let snapshot = try? JSONDecoder().decode(AccountsWidgetSnapshot.self, from: data) else {
+        do {
+            let data = try Data(contentsOf: url)
+            return try JSONDecoder().decode(AccountsWidgetSnapshot.self, from: data)
+        } catch {
+            logger.error("Widget snapshot load failed at \(url.path, privacy: .public): \(error.localizedDescription, privacy: .public)")
             return .empty
         }
-
-        return snapshot
     }
 
-    @discardableResult
-    func save(_ snapshot: AccountsWidgetSnapshot) throws -> Bool {
-        guard let url = snapshotURL else {
-            return false
+    func save(_ snapshot: AccountsWidgetSnapshot) throws {
+        guard let url = snapshotURLProvider() else {
+            throw AppError.io("Widget snapshot app group container is unavailable.")
         }
 
         let parent = url.deletingLastPathComponent()
@@ -33,12 +47,5 @@ struct AccountsWidgetSnapshotStore {
         encoder.outputFormatting = [.sortedKeys]
         let data = try encoder.encode(snapshot)
         try data.write(to: url, options: .atomic)
-        return true
-    }
-
-    private var snapshotURL: URL? {
-        fileManager
-            .containerURL(forSecurityApplicationGroupIdentifier: AccountsWidgetConfiguration.appGroupIdentifier)?
-            .appendingPathComponent(AccountsWidgetConfiguration.snapshotFilename, isDirectory: false)
     }
 }

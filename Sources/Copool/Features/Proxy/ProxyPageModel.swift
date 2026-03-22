@@ -31,6 +31,7 @@ final class ProxyPageModel: ObservableObject {
     @Published var cloudflaredStatus: CloudflaredStatus = .idle
     @Published var remoteServers: [RemoteServerConfig] = []
     @Published var remoteStatuses: [String: RemoteProxyStatus] = [:]
+    @Published var remoteDiscoveries: [String: [DiscoveredRemoteProxyInstance]] = [:]
     @Published var remoteLogs: [String: String] = [:]
     @Published var remoteActions: [String: RemoteServerAction] = [:]
 
@@ -80,10 +81,6 @@ final class ProxyPageModel: ObservableObject {
     deinit {
         remoteSnapshotTask?.cancel()
         pendingConfigurationSyncTask?.cancel()
-    }
-
-    var cloudflaredExpanded: Bool {
-        cloudflaredSectionExpanded
     }
 
     var canStartCloudflared: Bool {
@@ -139,10 +136,6 @@ final class ProxyPageModel: ObservableObject {
             isLoading: loading,
             canStart: canStartCloudflared
         )
-    }
-
-    func dismissRemoteControlCallout() {
-        showsRemoteControlCallout = false
     }
 
     func handleAPIProxyAction(_ intent: ApiProxyActionIntent) async {

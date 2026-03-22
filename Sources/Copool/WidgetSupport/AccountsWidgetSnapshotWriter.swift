@@ -1,9 +1,11 @@
 import Foundation
+import os
 #if canImport(WidgetKit)
 import WidgetKit
 #endif
 
 actor AccountsWidgetSnapshotWriter {
+    private let logger = Logger(subsystem: "Copool", category: "AccountsWidgetSnapshotWriter")
     private let snapshotBuilder: AccountsWidgetSnapshotBuilder
     private let snapshotStore: AccountsWidgetSnapshotStore
     private let localeProvider: @Sendable () async -> Locale
@@ -30,7 +32,10 @@ actor AccountsWidgetSnapshotWriter {
             timeZone: timeZone
         )
 
-        guard (try? snapshotStore.save(snapshot)) == true else {
+        do {
+            try snapshotStore.save(snapshot)
+        } catch {
+            logger.error("Widget snapshot save failed: \(error.localizedDescription, privacy: .public)")
             return
         }
 

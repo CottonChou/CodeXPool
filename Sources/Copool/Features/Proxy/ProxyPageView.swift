@@ -28,7 +28,7 @@ struct ProxyPageView: View {
             headerTrailing: {
                 CloseGlassButton {
                     withAnimation(.easeInOut(duration: 0.2)) {
-                        model.dismissRemoteControlCallout()
+                        model.showsRemoteControlCallout = false
                     }
                 }
             }

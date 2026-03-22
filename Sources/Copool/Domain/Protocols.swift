@@ -5,6 +5,11 @@ protocol AccountsStoreRepository: Sendable {
     func saveStore(_ store: AccountsStore) throws
 }
 
+protocol SettingsRepository: Sendable {
+    func loadSettings() throws -> AppSettings
+    func saveSettings(_ settings: AppSettings) throws
+}
+
 protocol AuthRepository: Sendable {
     func readCurrentAuth() throws -> JSONValue
     func readCurrentAuthOptional() throws -> JSONValue?
@@ -13,7 +18,6 @@ protocol AuthRepository: Sendable {
     func removeCurrentAuth() throws
     func makeChatGPTAuth(from tokens: ChatGPTOAuthTokens) throws -> JSONValue
     func extractAuth(from auth: JSONValue) throws -> ExtractedAuth
-    func currentAuthAccountID() -> String?
 }
 
 protocol UsageService: Sendable {
@@ -35,6 +39,20 @@ extension DateProviding {
     }
 }
 
+extension AuthRepository {
+    func readCurrentExtractedAuth() -> ExtractedAuth? {
+        guard let auth = try? readCurrentAuthOptional(),
+              let extracted = try? extractAuth(from: auth) else {
+            return nil
+        }
+        return extracted
+    }
+
+    func currentAuthAccountKey() -> String? {
+        readCurrentExtractedAuth()?.accountKey
+    }
+}
+
 protocol ProxyRuntimeService: Sendable {
     func status() async -> ApiProxyStatus
     func start(preferredPort: Int?) async throws -> ApiProxyStatus
@@ -52,14 +70,17 @@ protocol CloudflaredServiceProtocol: Sendable {
 
 protocol RemoteProxyServiceProtocol: Sendable {
     func status(server: RemoteServerConfig) async -> RemoteProxyStatus
+    func discover(server: RemoteServerConfig) async throws -> [DiscoveredRemoteProxyInstance]
     func deploy(server: RemoteServerConfig) async throws -> RemoteProxyStatus
+    func syncAccounts(server: RemoteServerConfig) async throws -> RemoteProxyStatus
     func start(server: RemoteServerConfig) async throws -> RemoteProxyStatus
     func stop(server: RemoteServerConfig) async throws -> RemoteProxyStatus
     func readLogs(server: RemoteServerConfig, lines: Int) async throws -> String
+    func uninstall(server: RemoteServerConfig, removeRemoteDirectory: Bool) async throws -> RemoteProxyStatus
 }
 
-protocol UpdateCheckingService: Sendable {
-    func checkForUpdates(currentVersion: String) async throws -> PendingUpdateInfo?
+protocol RemoteAccountsMutationSyncServiceProtocol: Sendable {
+    func syncConfiguredRemoteAccounts() async -> RemoteAccountsMutationSyncReport
 }
 
 protocol CodexCLIServiceProtocol: Sendable {
@@ -91,10 +112,6 @@ protocol AccountsCloudSyncServiceProtocol: Sendable {
         maximumSnapshotAgeSeconds: Int64
     ) async throws -> AccountsCloudSyncPullResult
     func ensurePushSubscriptionIfNeeded() async throws
-}
-
-protocol CloudSyncAvailabilityServiceProtocol: Sendable {
-    func isICloudAvailable() async -> Bool
 }
 
 protocol ProxyControlCloudSyncServiceProtocol: Sendable {

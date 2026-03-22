@@ -66,10 +66,6 @@ extension AccountsPageModel {
         }
     }
 
-    func reportImportSelectionFailure(_ error: Error) {
-        notice = NoticeMessage(style: .error, text: error.localizedDescription)
-    }
-
     func deleteAccount(id: String) async {
         do {
             try await coordinator.deleteAccount(id: id)

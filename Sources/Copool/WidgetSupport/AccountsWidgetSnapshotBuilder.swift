@@ -60,17 +60,23 @@ struct AccountsWidgetSnapshotBuilder {
         timeZone: TimeZone
     ) -> AccountsWidgetRowSnapshot {
         let accountLabel = AccountDisplayNameFormatter.format(account: account, style: .localPart)
-        let workspaceLabel = account.displayTeamName
-
         return AccountsWidgetRowSnapshot(
             id: account.id,
             planLabel: account.normalizedPlanLabel,
-            workspaceOrAccountLabel: workspaceLabel ?? accountLabel,
-            accountLabel: nil,
-            fiveHourRemainingText: remainingText(for: account.usage?.fiveHour),
-            oneWeekRemainingText: remainingText(for: account.usage?.oneWeek),
-            fiveHourResetText: resetText(for: account.usage?.fiveHour, locale: locale, timeZone: timeZone),
-            oneWeekResetText: resetText(for: account.usage?.oneWeek, locale: locale, timeZone: timeZone)
+            workspaceLabel: account.displayTeamName,
+            accountLabel: accountLabel,
+            fiveHour: windowSnapshot(
+                title: "5h",
+                window: account.usage?.fiveHour,
+                locale: locale,
+                timeZone: timeZone
+            ),
+            oneWeek: windowSnapshot(
+                title: "1w",
+                window: account.usage?.oneWeek,
+                locale: locale,
+                timeZone: timeZone
+            )
         )
     }
 
@@ -90,12 +96,6 @@ struct AccountsWidgetSnapshotBuilder {
             remainingText: "\(remaining)%",
             resetText: resetText(for: window, locale: locale, timeZone: timeZone)
         )
-    }
-
-    private func remainingText(for window: UsageWindow?) -> String {
-        let usedPercent = clamped(window?.usedPercent ?? 100)
-        let remaining = max(0, 100 - Int(usedPercent.rounded()))
-        return "\(remaining)%"
     }
 
     private func resetText(

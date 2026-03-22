@@ -51,11 +51,7 @@ extension ProxyPageModel {
         guard let proxyControlCloudSyncService else { return }
         do {
             try await proxyControlCloudSyncService.ensurePushSubscriptionIfNeeded()
-        } catch {
-            #if DEBUG
-            // print("CloudKit proxy push subscription skipped:", error.localizedDescription)
-            #endif
-        }
+        } catch {}
     }
 
     @discardableResult
@@ -97,6 +93,7 @@ extension ProxyPageModel {
         setIfChanged(\.publicAccessEnabled, nextState.publicAccessEnabled)
         setIfChanged(\.remoteServers, nextState.remoteServers)
         setIfChanged(\.remoteStatuses, nextState.remoteStatuses)
+        setIfChanged(\.remoteDiscoveries, nextState.remoteDiscoveries)
         setIfChanged(\.remoteLogs, nextState.remoteLogs)
         if cloudflaredNamedInput.hostname != nextState.cloudflaredNamedHostname {
             cloudflaredNamedInput.hostname = nextState.cloudflaredNamedHostname
@@ -171,13 +168,13 @@ extension ProxyPageModel {
     }
 
     private func refreshRemoteSnapshotAfterPush() async {
-        let policy = CloudPushPullRetryPolicy.nearRealtime
         if await refreshRemoteSnapshot(showErrors: false) {
             return
         }
 
-        for retryInterval in policy.retryIntervals {
-            try? await Task.sleep(for: retryInterval)
+        for attempt in 0..<28 {
+            let delay: Duration = attempt < 8 ? .milliseconds(250) : .seconds(1)
+            try? await Task.sleep(for: delay)
             if await refreshRemoteSnapshot(showErrors: false) {
                 return
             }
@@ -196,6 +193,7 @@ extension ProxyPageModel {
             publicAccessEnabled: publicAccessEnabled,
             remoteServers: remoteServers,
             remoteStatuses: remoteStatuses,
+            remoteDiscoveries: remoteDiscoveries,
             remoteLogs: remoteLogs
         )
     }

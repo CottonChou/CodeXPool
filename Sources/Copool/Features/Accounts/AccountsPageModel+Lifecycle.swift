@@ -2,18 +2,25 @@ import Foundation
 
 extension AccountsPageModel {
     func loadIfNeeded() async {
-        if !hasLoaded {
-            await load()
-        }
+        guard !hasLoaded else { return }
+        await load()
     }
 
     func load() async {
         async let cloudSyncAvailableTask = cloudSyncAvailabilityService?.isICloudAvailable() ?? true
         do {
             let accounts = try await coordinator.listAccounts()
+
+            if accounts.isEmpty {
+                isCloudSyncAvailable = await cloudSyncAvailableTask
+            }
+
             applyAccounts(accounts)
-            isCloudSyncAvailable = await cloudSyncAvailableTask
-            applyAccounts(accounts)
+
+            if !accounts.isEmpty {
+                isCloudSyncAvailable = await cloudSyncAvailableTask
+            }
+
             hasLoaded = true
         } catch {
             state = .error(message: error.localizedDescription)

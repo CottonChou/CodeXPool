@@ -23,7 +23,7 @@ struct AccountsWidgetSnapshotBuilderTests {
     }
 
     @Test
-    func rowsPreferWorkspaceNameAndFallbackWithoutSecondaryAccountLabel() {
+    func rowsKeepWorkspaceAndAccountLabelsAndExposeWindowSnapshots() {
         let builder = AccountsWidgetSnapshotBuilder()
         let snapshot = builder.build(
             accounts: [
@@ -43,10 +43,10 @@ struct AccountsWidgetSnapshotBuilderTests {
         )
 
         #expect(snapshot.rows.count == 1)
-        #expect(snapshot.rows[0].workspaceOrAccountLabel == "workspace")
-        #expect(snapshot.rows[0].accountLabel == nil)
-        #expect(snapshot.rows[0].fiveHourRemainingText == "55%")
-        #expect(snapshot.rows[0].oneWeekRemainingText == "45%")
+        #expect(snapshot.rows[0].workspaceLabel == "workspace")
+        #expect(snapshot.rows[0].accountLabel == "member")
+        #expect(snapshot.rows[0].fiveHour.remainingText == "55%")
+        #expect(snapshot.rows[0].oneWeek.remainingText == "45%")
     }
 
     @Test
@@ -71,6 +71,25 @@ struct AccountsWidgetSnapshotBuilderTests {
 
         #expect(snapshot.currentCard?.fiveHour.resetText == "26/3/20 23:23:45")
         #expect(snapshot.currentCard?.oneWeek.resetText == "26/3/21 23:23:45")
+    }
+
+    @Test
+    func defaultBuilderLimitsLargeRowsToFourAccounts() {
+        let builder = AccountsWidgetSnapshotBuilder()
+        let snapshot = builder.build(
+            accounts: [
+                account(id: "current", isCurrent: true, email: "current@example.com", fiveHourUsed: 10, oneWeekUsed: 20),
+                account(id: "a", isCurrent: false, email: "a@example.com", fiveHourUsed: 10, oneWeekUsed: 20),
+                account(id: "b", isCurrent: false, email: "b@example.com", fiveHourUsed: 10, oneWeekUsed: 20),
+                account(id: "c", isCurrent: false, email: "c@example.com", fiveHourUsed: 10, oneWeekUsed: 20),
+                account(id: "d", isCurrent: false, email: "d@example.com", fiveHourUsed: 10, oneWeekUsed: 20),
+            ],
+            locale: Locale(identifier: "en_US"),
+            timeZone: TimeZone(secondsFromGMT: 0)!,
+            now: Date(timeIntervalSince1970: 100)
+        )
+
+        #expect(snapshot.rows.count == 4)
     }
 
     private func account(

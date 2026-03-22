@@ -165,14 +165,23 @@ final class ProxyPageModelTests: XCTestCase {
     }
 
     func testRefreshForTabEntryPreservesPublicAccessConfiguration() async {
-        var store = AccountsStore()
-        store.settings.proxyConfiguration = ProxyConfiguration(
-            cloudflared: CloudflaredConfiguration(enabled: true)
-        )
         let model = makeModel(
             cloudflaredService: StubCloudflaredService(statusValue: .idle),
             runtimePlatform: .macOS,
-            store: store
+            settings: AppSettings(
+                launchAtStartup: false,
+                launchCodexAfterSwitch: true,
+                autoSmartSwitch: false,
+                syncOpencodeOpenaiAuth: false,
+                restartEditorsOnSwitch: false,
+                restartEditorTargets: [],
+                autoStartApiProxy: false,
+                proxyConfiguration: ProxyConfiguration(
+                    cloudflared: CloudflaredConfiguration(enabled: true)
+                ),
+                remoteServers: [],
+                locale: AppLocale.systemDefault.identifier
+            )
         )
 
         await model.refreshForTabEntry()
@@ -321,9 +330,26 @@ final class ProxyPageModelTests: XCTestCase {
             activeAction: .deploy
         )
 
-        XCTAssertEqual(buttons.map(\.intent), [.save, .remove, .deploy, .refresh, .start, .logs])
+        XCTAssertEqual(
+            buttons.map(\.intent),
+            [.save, .removeLocal, .discover, .deploy, .syncAccounts, .refresh, .start, .logs, .uninstall]
+        )
         XCTAssertEqual(buttons.first(where: { $0.intent == .deploy })?.showsProgress, true)
         XCTAssertEqual(buttons.first(where: { $0.intent == .deploy })?.isEnabled, false)
+    }
+
+    func testRemoteServerActionHelpPresentationMatchesButtonOrder() {
+        let buttons = ProxyActionPresentation.remoteServerButtons(
+            isRunning: true,
+            activeAction: nil
+        )
+
+        let helpDescriptors = RemoteServerActionHelpPresentation.descriptors(from: buttons)
+
+        XCTAssertEqual(
+            helpDescriptors.map(\.action),
+            [.save, .removeLocal, .discover, .deploy, .syncAccounts, .refresh, .stop, .logs, .uninstall]
+        )
     }
 
     func testLocalStartProxyUsesLocalCommandServiceForImmediateSync() async {
@@ -339,12 +365,39 @@ final class ProxyPageModelTests: XCTestCase {
         XCTAssertEqual(localCommandService.commands.first?.preferredProxyPort, 8787)
     }
 
+    func testAdoptDiscoveredRemoteServerSavesWithPreviousIDAndRefreshesNewIdentity() async {
+        let snapshot = makeSnapshot()
+        let localCommandService = SpyProxyLocalCommandService(snapshot: snapshot)
+        let model = makeModel(localProxyCommandService: localCommandService)
+
+        let adopted = RemoteServerConfig(
+            id: "discovered-server",
+            label: "Tokyo Recovered",
+            host: "1.2.3.4",
+            sshPort: 22,
+            sshUser: "root",
+            authMode: "keyPath",
+            identityFile: "~/.ssh/id_ed25519",
+            privateKey: nil,
+            password: nil,
+            remoteDir: "/srv/copool",
+            listenPort: 9898
+        )
+
+        await model.adoptDiscoveredRemoteServer(adopted, previousServerID: "server-1")
+
+        XCTAssertEqual(localCommandService.commands.map(\.kind), [.saveRemoteServer, .refreshRemote])
+        XCTAssertEqual(localCommandService.commands.first?.remoteServer?.id, "discovered-server")
+        XCTAssertEqual(localCommandService.commands.first?.previousRemoteServerID, "server-1")
+        XCTAssertEqual(localCommandService.commands.last?.remoteServerID, "discovered-server")
+    }
+
     private func makeModel(
         proxyControlCloudSyncService: ProxyControlCloudSyncServiceProtocol? = nil,
         localProxyCommandService: ProxyLocalCommandServiceProtocol? = nil,
         cloudflaredService: CloudflaredServiceProtocol = StubCloudflaredService(),
         runtimePlatform: RuntimePlatform = .macOS,
-        store: AccountsStore = AccountsStore(),
+        settings: AppSettings = .defaultValue,
         chooseIdentityFilePath: @escaping @MainActor () -> String? = { nil }
     ) -> ProxyPageModel {
         let proxyCoordinator = ProxyCoordinator(
@@ -353,7 +406,7 @@ final class ProxyPageModelTests: XCTestCase {
             remoteService: StubRemoteProxyService()
         )
         let settingsCoordinator = SettingsCoordinator(
-            storeRepository: InMemoryAccountsStoreRepository(store: store),
+            settingsRepository: TestSettingsRepository(settings: settings),
             launchAtStartupService: StubLaunchAtStartupService()
         )
 
@@ -522,22 +575,6 @@ private final class SpyProxyLocalCommandService: ProxyLocalCommandServiceProtoco
     }
 }
 
-private final class InMemoryAccountsStoreRepository: AccountsStoreRepository, @unchecked Sendable {
-    private var store: AccountsStore
-
-    init(store: AccountsStore) {
-        self.store = store
-    }
-
-    func loadStore() throws -> AccountsStore {
-        store
-    }
-
-    func saveStore(_ store: AccountsStore) throws {
-        self.store = store
-    }
-}
-
 private struct StubLaunchAtStartupService: LaunchAtStartupServiceProtocol {
     func setEnabled(_ enabled: Bool) throws {
         _ = enabled
@@ -587,7 +624,16 @@ private struct StubRemoteProxyService: RemoteProxyServiceProtocol {
         )
     }
 
+    func discover(server: RemoteServerConfig) async throws -> [DiscoveredRemoteProxyInstance] {
+        _ = server
+        return []
+    }
+
     func deploy(server: RemoteServerConfig) async throws -> RemoteProxyStatus {
+        await status(server: server)
+    }
+
+    func syncAccounts(server: RemoteServerConfig) async throws -> RemoteProxyStatus {
         await status(server: server)
     }
 
@@ -603,5 +649,10 @@ private struct StubRemoteProxyService: RemoteProxyServiceProtocol {
         _ = server
         _ = lines
         return ""
+    }
+
+    func uninstall(server: RemoteServerConfig, removeRemoteDirectory: Bool) async throws -> RemoteProxyStatus {
+        _ = removeRemoteDirectory
+        return await status(server: server)
     }
 }

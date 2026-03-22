@@ -7,7 +7,7 @@ final class SettingsPageModelTests: XCTestCase {
         var didQuit = false
         let model = SettingsPageModel(
             settingsCoordinator: SettingsCoordinator(
-                storeRepository: InMemorySettingsStoreRepository(),
+                settingsRepository: TestSettingsRepository(),
                 launchAtStartupService: SettingsStubLaunchAtStartupService()
             ),
             editorAppService: SettingsStubEditorAppService(),
@@ -22,15 +22,19 @@ final class SettingsPageModelTests: XCTestCase {
     }
 }
 
-private final class InMemorySettingsStoreRepository: AccountsStoreRepository, @unchecked Sendable {
-    private var store = AccountsStore()
+final class TestSettingsRepository: SettingsRepository, @unchecked Sendable {
+    private var settings: AppSettings
 
-    func loadStore() throws -> AccountsStore {
-        store
+    init(settings: AppSettings = .defaultValue) {
+        self.settings = settings
     }
 
-    func saveStore(_ store: AccountsStore) throws {
-        self.store = store
+    func loadSettings() throws -> AppSettings {
+        settings
+    }
+
+    func saveSettings(_ settings: AppSettings) throws {
+        self.settings = settings
     }
 }
 

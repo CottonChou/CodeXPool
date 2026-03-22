@@ -27,12 +27,6 @@ final class StoreFileRepository: AccountsStoreRepository, @unchecked Sendable {
         do {
             return try decodeStore(from: data)
         } catch {
-            if let recoveredData = Self.extractFirstJSONObjectData(from: data),
-               let recoveredStore = try? decodeStore(from: recoveredData) {
-                try saveStore(recoveredStore)
-                return recoveredStore
-            }
-
             try backupCorruptedStore(raw: data)
             let emptyStore = AccountsStore()
             try saveStore(emptyStore)
@@ -98,59 +92,123 @@ final class StoreFileRepository: AccountsStoreRepository, @unchecked Sendable {
         }
     }
 
-    static func extractFirstJSONObjectData(from data: Data) -> Data? {
-        guard let text = String(data: data, encoding: .utf8) else { return nil }
+    private static func setPrivatePermissions(at url: URL) {
+        #if canImport(Darwin)
+        _ = chmod(url.path, S_IRUSR | S_IWUSR)
+        #endif
+    }
+}
 
-        var started = false
-        var depth = 0
-        var inString = false
-        var isEscaping = false
-        var startIndex: String.Index?
+final class SettingsFileRepository: SettingsRepository, @unchecked Sendable {
+    private struct LegacyAccountsStore: Codable {
+        var version: Int = 1
+        var accounts: [StoredAccount] = []
+        var currentSelection: CurrentAccountSelection?
+        var settings: AppSettings = .defaultValue
+    }
 
-        for index in text.indices {
-            let char = text[index]
+    private let paths: FileSystemPaths
+    private let fileManager: FileManager
 
-            if !started {
-                if char == "{" {
-                    started = true
-                    depth = 1
-                    startIndex = index
-                }
-                continue
-            }
+    init(paths: FileSystemPaths, fileManager: FileManager = .default) {
+        self.paths = paths
+        self.fileManager = fileManager
+    }
 
-            if inString {
-                if isEscaping {
-                    isEscaping = false
-                    continue
-                }
-                if char == "\\" {
-                    isEscaping = true
-                    continue
-                }
-                if char == "\"" {
-                    inString = false
-                }
-                continue
-            }
-
-            if char == "\"" {
-                inString = true
-                continue
-            }
-
-            if char == "{" {
-                depth += 1
-            } else if char == "}" {
-                depth -= 1
-                if depth == 0, let start = startIndex {
-                    let slice = text[start...index]
-                    return slice.data(using: .utf8)
-                }
-            }
+    func loadSettings() throws -> AppSettings {
+        if fileManager.fileExists(atPath: paths.settingsStorePath.path) {
+            return try decodeSettings(from: paths.settingsStorePath)
         }
 
-        return nil
+        if fileManager.fileExists(atPath: paths.accountStorePath.path),
+           let legacyStore = try decodeLegacyStore(from: paths.accountStorePath) {
+            let migratedSettings = legacyStore.settings
+            try saveSettings(migratedSettings)
+            try saveAccountsStore(
+                AccountsStore(
+                    version: legacyStore.version,
+                    accounts: legacyStore.accounts,
+                    currentSelection: legacyStore.currentSelection
+                )
+            )
+            return migratedSettings
+        }
+
+        return .defaultValue
+    }
+
+    func saveSettings(_ settings: AppSettings) throws {
+        try fileManager.createDirectory(at: paths.applicationSupportDirectory, withIntermediateDirectories: true)
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+
+        let data: Data
+        do {
+            data = try encoder.encode(settings)
+        } catch {
+            throw AppError.invalidData(L10n.tr("error.store.serialize_failed_format", error.localizedDescription))
+        }
+
+        try writeAtomically(data: data, to: paths.settingsStorePath)
+    }
+
+    private func decodeSettings(from path: URL) throws -> AppSettings {
+        let data: Data
+        do {
+            data = try Data(contentsOf: path)
+        } catch {
+            throw AppError.io(L10n.tr("error.store.read_failed_format", error.localizedDescription))
+        }
+
+        do {
+            return try JSONDecoder().decode(AppSettings.self, from: data)
+        } catch {
+            throw AppError.invalidData(L10n.tr("error.store.invalid_format_format", error.localizedDescription))
+        }
+    }
+
+    private func decodeLegacyStore(from path: URL) throws -> LegacyAccountsStore? {
+        let data = try Data(contentsOf: path)
+        return try? JSONDecoder().decode(LegacyAccountsStore.self, from: data)
+    }
+
+    private func saveAccountsStore(_ store: AccountsStore) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+
+        let data: Data
+        do {
+            data = try encoder.encode(store)
+        } catch {
+            throw AppError.invalidData(L10n.tr("error.store.serialize_failed_format", error.localizedDescription))
+        }
+
+        try writeAtomically(data: data, to: paths.accountStorePath)
+    }
+
+    private func writeAtomically(data: Data, to destination: URL) throws {
+        let tempURL = destination.deletingLastPathComponent()
+            .appendingPathComponent(".\(destination.lastPathComponent).tmp-\(UUID().uuidString)", isDirectory: false)
+
+        do {
+            try data.write(to: tempURL, options: .withoutOverwriting)
+            Self.setPrivatePermissions(at: tempURL)
+            _ = try fileManager.replaceItemAt(destination, withItemAt: tempURL)
+            Self.setPrivatePermissions(at: destination)
+        } catch {
+            try? fileManager.removeItem(at: tempURL)
+            if !fileManager.fileExists(atPath: destination.path) {
+                do {
+                    try data.write(to: destination, options: .atomic)
+                    Self.setPrivatePermissions(at: destination)
+                    return
+                } catch {
+                    throw AppError.io(L10n.tr("error.store.write_failed_format", error.localizedDescription))
+                }
+            }
+            throw AppError.io(L10n.tr("error.store.atomic_write_failed_format", error.localizedDescription))
+        }
     }
 
     private static func setPrivatePermissions(at url: URL) {

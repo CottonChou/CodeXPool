@@ -9,7 +9,9 @@ extension ProxyPageModel {
         proxyConfiguration: ProxyConfiguration? = nil,
         remoteServer: RemoteServerConfig? = nil,
         remoteServerID: String? = nil,
+        previousRemoteServerID: String? = nil,
         logLines: Int? = nil,
+        removeRemoteDirectory: Bool? = nil,
         successNotice: String? = nil,
         pendingNotice: String? = nil
     ) async {
@@ -27,7 +29,9 @@ extension ProxyPageModel {
             proxyConfiguration: proxyConfiguration,
             remoteServer: remoteServer,
             remoteServerID: remoteServerID,
-            logLines: logLines
+            previousRemoteServerID: previousRemoteServerID,
+            logLines: logLines,
+            removeRemoteDirectory: removeRemoteDirectory
         )
 
         do {
@@ -135,7 +139,9 @@ extension ProxyPageModel {
         proxyConfiguration: ProxyConfiguration? = nil,
         remoteServer: RemoteServerConfig? = nil,
         remoteServerID: String? = nil,
-        logLines: Int? = nil
+        previousRemoteServerID: String? = nil,
+        logLines: Int? = nil,
+        removeRemoteDirectory: Bool? = nil
     ) async throws -> ProxyControlSnapshot {
         guard let localProxyCommandService else {
             throw AppError.invalidData("Local proxy command service is unavailable.")
@@ -150,7 +156,9 @@ extension ProxyPageModel {
             proxyConfiguration: proxyConfiguration,
             remoteServer: remoteServer,
             remoteServerID: remoteServerID,
-            logLines: logLines
+            previousRemoteServerID: previousRemoteServerID,
+            logLines: logLines,
+            removeRemoteDirectory: removeRemoteDirectory
         )
         return try await localProxyCommandService.performLocalCommand(command)
     }
@@ -164,7 +172,9 @@ extension ProxyPageModel {
         proxyConfiguration: ProxyConfiguration? = nil,
         remoteServer: RemoteServerConfig? = nil,
         remoteServerID: String? = nil,
-        logLines: Int? = nil
+        previousRemoteServerID: String? = nil,
+        logLines: Int? = nil,
+        removeRemoteDirectory: Bool? = nil
     ) -> ProxyControlCommand {
         ProxyControlCommand(
             id: UUID().uuidString,
@@ -177,7 +187,9 @@ extension ProxyPageModel {
             proxyConfiguration: proxyConfiguration,
             remoteServer: remoteServer,
             remoteServerID: remoteServerID,
-            logLines: logLines
+            previousRemoteServerID: previousRemoteServerID,
+            logLines: logLines,
+            removeRemoteDirectory: removeRemoteDirectory
         )
     }
 }

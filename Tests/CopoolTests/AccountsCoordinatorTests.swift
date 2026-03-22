@@ -67,12 +67,12 @@ final class AccountsCoordinatorTests: XCTestCase {
                         usageError: nil
                     )
                 ],
-                currentSelection: nil,
-                settings: .defaultValue
+                currentSelection: nil
             )
         )
         let coordinator = AccountsCoordinator(
             storeRepository: storeRepository,
+            settingsRepository: TestSettingsRepository(),
             authRepository: RemoteLookupAuthRepository(),
             usageService: CountingUsageService(
                 result: UsageSnapshot(
@@ -121,12 +121,12 @@ final class AccountsCoordinatorTests: XCTestCase {
                         usageError: nil
                     )
                 ],
-                currentSelection: nil,
-                settings: .defaultValue
+                currentSelection: nil
             )
         )
         let coordinator = AccountsCoordinator(
             storeRepository: storeRepository,
+            settingsRepository: TestSettingsRepository(),
             authRepository: StubAuthRepository(),
             usageService: CountingUsageService(
                 result: UsageSnapshot(
@@ -174,12 +174,12 @@ final class AccountsCoordinatorTests: XCTestCase {
                         usageError: nil
                     )
                 ],
-                currentSelection: nil,
-                settings: .defaultValue
+                currentSelection: nil
             )
         )
         let coordinator = AccountsCoordinator(
             storeRepository: storeRepository,
+            settingsRepository: TestSettingsRepository(),
             authRepository: RemoteLookupAuthRepository(),
             usageService: CountingUsageService(
                 result: UsageSnapshot(
@@ -209,6 +209,7 @@ final class AccountsCoordinatorTests: XCTestCase {
         let storeRepository = InMemoryAccountsStoreRepository(store: AccountsStore())
         let coordinator = AccountsCoordinator(
             storeRepository: storeRepository,
+            settingsRepository: TestSettingsRepository(),
             authRepository: RemoteLookupAuthRepository(),
             usageService: CountingUsageService(
                 result: UsageSnapshot(
@@ -263,12 +264,12 @@ final class AccountsCoordinatorTests: XCTestCase {
                     usageError: nil
                 )
             ],
-            currentSelection: nil,
-            settings: .defaultValue
+            currentSelection: nil
         )
         let usageService = CountingUsageService(result: existingUsage)
         let coordinator = AccountsCoordinator(
             storeRepository: InMemoryAccountsStoreRepository(store: store),
+            settingsRepository: TestSettingsRepository(),
             authRepository: StubAuthRepository(),
             usageService: usageService,
             chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
@@ -278,10 +279,10 @@ final class AccountsCoordinatorTests: XCTestCase {
             dateProvider: FixedDateProvider(now: now)
         )
 
-        _ = try await coordinator.refreshAllUsage()
+        _ = try await coordinator.refreshUsage()
         XCTAssertEqual(usageService.callCount, 0)
 
-        _ = try await coordinator.refreshAllUsage(force: true)
+        _ = try await coordinator.refreshUsage(force: true)
         XCTAssertEqual(usageService.callCount, 1)
     }
 
@@ -294,8 +295,7 @@ final class AccountsCoordinatorTests: XCTestCase {
                 makeStoredAccount(id: "acct-2", accountID: "account-2", now: now),
                 makeStoredAccount(id: "acct-3", accountID: "account-3", now: now),
             ],
-            currentSelection: nil,
-            settings: .defaultValue
+            currentSelection: nil
         )
         let usageService = RecordingAccountUsageService(
             results: [
@@ -309,11 +309,11 @@ final class AccountsCoordinatorTests: XCTestCase {
                 "account-1": makeExtractedAuth(accountID: "account-1"),
                 "account-2": makeExtractedAuth(accountID: "account-2"),
                 "account-3": makeExtractedAuth(accountID: "account-3"),
-            ],
-            currentAccountID: "account-1"
+            ]
         )
         let coordinator = AccountsCoordinator(
             storeRepository: InMemoryAccountsStoreRepository(store: store),
+            settingsRepository: TestSettingsRepository(),
             authRepository: authRepository,
             usageService: usageService,
             chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
@@ -323,7 +323,7 @@ final class AccountsCoordinatorTests: XCTestCase {
             dateProvider: FixedDateProvider(now: now)
         )
 
-        _ = try await coordinator.refreshUsage(forAccountIDs: ["acct-1", "acct-3"], force: true)
+        _ = try await coordinator.refreshUsage(accountIDs: ["acct-1", "acct-3"], force: true)
 
         let requestedAccountIDs = await usageService.readRequestedAccountIDs()
         XCTAssertEqual(requestedAccountIDs, ["account-1", "account-3"])
@@ -356,12 +356,12 @@ final class AccountsCoordinatorTests: XCTestCase {
                     usageError: nil
                 )
             ],
-            currentSelection: nil,
-            settings: .defaultValue
+            currentSelection: nil
         )
         let storeRepository = InMemoryAccountsStoreRepository(store: store)
         let coordinator = AccountsCoordinator(
             storeRepository: storeRepository,
+            settingsRepository: TestSettingsRepository(),
             authRepository: RemoteLookupAuthRepository(),
             usageService: CountingUsageService(
                 result: UsageSnapshot(
@@ -379,7 +379,7 @@ final class AccountsCoordinatorTests: XCTestCase {
             dateProvider: FixedDateProvider(now: now)
         )
 
-        let accounts = try await coordinator.refreshAllUsage(force: true)
+        let accounts = try await coordinator.refreshUsage(force: true)
         let savedStore = try storeRepository.loadStore()
 
         XCTAssertEqual(accounts.first?.teamName, "remote-space")
@@ -406,14 +406,14 @@ final class AccountsCoordinatorTests: XCTestCase {
                     usageError: nil
                 )
             ],
-            currentSelection: nil,
-            settings: .defaultValue
+            currentSelection: nil
         )
         let metadataService = RecordingWorkspaceMetadataService(
             metadata: [WorkspaceMetadata(accountID: "account-1", workspaceName: "remote-space", structure: "workspace")]
         )
         let coordinator = AccountsCoordinator(
             storeRepository: InMemoryAccountsStoreRepository(store: store),
+            settingsRepository: TestSettingsRepository(),
             authRepository: RemoteLookupAuthRepository(),
             usageService: CountingUsageService(
                 result: UsageSnapshot(
@@ -432,7 +432,7 @@ final class AccountsCoordinatorTests: XCTestCase {
             dateProvider: FixedDateProvider(now: now)
         )
 
-        let accounts = try await coordinator.refreshAllUsage(force: true)
+        let accounts = try await coordinator.refreshUsage(force: true)
 
         XCTAssertEqual(metadataService.callCount, 0)
         XCTAssertNil(accounts.first?.teamName)
@@ -476,8 +476,7 @@ final class AccountsCoordinatorTests: XCTestCase {
                     usageError: nil
                 )
             ],
-            currentSelection: nil,
-            settings: .defaultValue
+            currentSelection: nil
         )
         let usageService = AccountIDUsageService(
             results: [
@@ -499,6 +498,7 @@ final class AccountsCoordinatorTests: XCTestCase {
         )
         let coordinator = AccountsCoordinator(
             storeRepository: InMemoryAccountsStoreRepository(store: store),
+            settingsRepository: TestSettingsRepository(),
             authRepository: MultiAccountAuthRepository(
                 extractedByAccountID: [
                     "account-1": ExtractedAuth(
@@ -515,8 +515,7 @@ final class AccountsCoordinatorTests: XCTestCase {
                         planType: "pro",
                         teamName: nil
                     )
-                ],
-                currentAccountID: "account-1"
+                ]
             ),
             usageService: usageService,
             chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
@@ -527,8 +526,9 @@ final class AccountsCoordinatorTests: XCTestCase {
         )
 
         let recorder = PartialUpdateRecorder()
-        let accounts = try await coordinator.refreshAllUsageSerially(
+        let accounts = try await coordinator.refreshUsage(
             force: true,
+            serial: true,
             onPartialUpdate: { accounts in
                 await recorder.record(accounts)
             }
@@ -563,8 +563,15 @@ final class AccountsCoordinatorTests: XCTestCase {
         let store = AccountsStore(
             version: 1,
             accounts: [account],
-            currentSelection: nil,
-            settings: AppSettings(
+            currentSelection: nil
+        )
+        let codexService = RecordingCodexCLIService()
+        let editorService = RecordingEditorAppService()
+        let authRepository = RecordingAuthRepository()
+        let storeRepository = InMemoryAccountsStoreRepository(store: store)
+        let coordinator = AccountsCoordinator(
+            storeRepository: storeRepository,
+            settingsRepository: TestSettingsRepository(settings: AppSettings(
                 launchAtStartup: false,
                 launchCodexAfterSwitch: true,
                 autoSmartSwitch: false,
@@ -574,14 +581,7 @@ final class AccountsCoordinatorTests: XCTestCase {
                 autoStartApiProxy: false,
                 remoteServers: [],
                 locale: AppLocale.english.identifier
-            )
-        )
-        let codexService = RecordingCodexCLIService()
-        let editorService = RecordingEditorAppService()
-        let authRepository = RecordingAuthRepository(currentAccountID: nil)
-        let storeRepository = InMemoryAccountsStoreRepository(store: store)
-        let coordinator = AccountsCoordinator(
-            storeRepository: storeRepository,
+            )),
             authRepository: authRepository,
             usageService: CountingUsageService(
                 result: UsageSnapshot(
@@ -626,6 +626,7 @@ final class AccountsCoordinatorTests: XCTestCase {
         )
         let coordinator = AccountsCoordinator(
             storeRepository: InMemoryAccountsStoreRepository(store: AccountsStore()),
+            settingsRepository: TestSettingsRepository(),
             authRepository: StubAuthRepository(),
             usageService: CountingUsageService(
                 result: UsageSnapshot(
@@ -655,6 +656,7 @@ final class AccountsCoordinatorTests: XCTestCase {
     func testAccountsPageModelRemoteRefreshActivityDoesNotDriveToolbarSpinner() {
         let coordinator = AccountsCoordinator(
             storeRepository: InMemoryAccountsStoreRepository(store: AccountsStore()),
+            settingsRepository: TestSettingsRepository(),
             authRepository: StubAuthRepository(),
             usageService: CountingUsageService(
                 result: UsageSnapshot(
@@ -688,9 +690,91 @@ final class AccountsCoordinatorTests: XCTestCase {
     }
 
     @MainActor
+    func testAccountsPageViewStoreDoesNotRepublishContentForNoticeChanges() async {
+        let model = makeAccountsPageModelForViewStoreTests(
+            initialAccounts: [
+                makeAccountSummary(
+                    id: "acct-1",
+                    accountID: "account-1",
+                    isCurrent: true,
+                    usage: nil
+                )
+            ]
+        )
+        let store = AccountsPageViewStore(model: model)
+        let initialContent = store.contentPresentation
+
+        model.notice = NoticeMessage(style: .info, text: "refreshed")
+        await Task.yield()
+
+        XCTAssertEqual(store.contentPresentation, initialContent)
+    }
+
+    @MainActor
+    func testAccountsPageViewStoreActionBarChangesDoNotRepublishContent() async {
+        let model = makeAccountsPageModelForViewStoreTests(
+            initialAccounts: [
+                makeAccountSummary(
+                    id: "acct-1",
+                    accountID: "account-1",
+                    isCurrent: true,
+                    usage: nil
+                )
+            ]
+        )
+        let store = AccountsPageViewStore(model: model)
+        let initialContent = store.contentPresentation
+
+        model.isAdding = true
+        await Task.yield()
+
+        XCTAssertEqual(store.contentPresentation, initialContent)
+        let addButton = store.macActionBarPresentation.descriptors.first {
+            $0.intent == AccountsPageActionIntent.addAccount
+        }
+        XCTAssertEqual(addButton?.isEnabled, false)
+    }
+
+    @MainActor
+    func testAccountsPageViewStoreRepublishesContentForCardStateChanges() async {
+        let model = makeAccountsPageModelForViewStoreTests(
+            initialAccounts: [
+                makeAccountSummary(
+                    id: "acct-1",
+                    accountID: "account-1",
+                    isCurrent: true,
+                    usage: nil
+                ),
+                makeAccountSummary(
+                    id: "acct-2",
+                    accountID: "account-2",
+                    isCurrent: false,
+                    usage: nil
+                )
+            ]
+        )
+        let store = AccountsPageViewStore(model: model)
+        let initialContent = store.contentPresentation
+
+        model.refreshingAccountIDs = ["acct-2"]
+        await Task.yield()
+
+        XCTAssertNotEqual(store.contentPresentation, initialContent)
+
+        guard case .content(let cards) = store.contentPresentation.state else {
+            return XCTFail("Expected content presentation")
+        }
+
+        XCTAssertEqual(cards.count, 2)
+        XCTAssertEqual(cards.first { $0.id == "acct-1" }?.refreshing, false)
+        XCTAssertEqual(cards.first { $0.id == "acct-2" }?.refreshing, true)
+    }
+
+    @MainActor
     func testAccountsPageModelManualRefreshShowsSpinnerAndRestoresActionState() async {
         let coordinator = AccountsCoordinator(
             storeRepository: InMemoryAccountsStoreRepository(store: AccountsStore()),
+            settingsRepository: TestSettingsRepository(),
             authRepository: StubAuthRepository(),
             usageService: CountingUsageService(
                 result: UsageSnapshot(
@@ -742,6 +826,7 @@ final class AccountsCoordinatorTests: XCTestCase {
     func testAccountsPageModelSkipsManualRefreshWhileBackgroundUsageRefreshIsActive() async {
         let coordinator = AccountsCoordinator(
             storeRepository: InMemoryAccountsStoreRepository(store: AccountsStore()),
+            settingsRepository: TestSettingsRepository(),
             authRepository: StubAuthRepository(),
             usageService: CountingUsageService(
                 result: UsageSnapshot(
@@ -801,6 +886,7 @@ final class AccountsCoordinatorTests: XCTestCase {
         )
         let coordinator = AccountsCoordinator(
             storeRepository: storeRepository,
+            settingsRepository: TestSettingsRepository(),
             authRepository: StubAuthRepository(),
             usageService: CountingUsageService(
                 result: UsageSnapshot(
@@ -854,12 +940,12 @@ final class AccountsCoordinatorTests: XCTestCase {
         )
         let coordinator = AccountsCoordinator(
             storeRepository: storeRepository,
+            settingsRepository: TestSettingsRepository(),
             authRepository: MultiAccountAuthRepository(
                 extractedByAccountID: [
                     "account-1": makeExtractedAuth(accountID: "account-1"),
                     "account-2": makeExtractedAuth(accountID: "account-2"),
-                ],
-                currentAccountID: "account-1"
+                ]
             ),
             usageService: usageService,
             chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
@@ -909,7 +995,8 @@ final class AccountsCoordinatorTests: XCTestCase {
         )
         let coordinator = AccountsCoordinator(
             storeRepository: storeRepository,
-            authRepository: RecordingAuthRepository(currentAccountID: "account-1"),
+            settingsRepository: TestSettingsRepository(),
+            authRepository: RecordingAuthRepository(),
             usageService: CountingUsageService(result: makeUsageSnapshot(fetchedAt: now)),
             chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
             codexCLIService: StubCodexCLIService(),
@@ -921,7 +1008,7 @@ final class AccountsCoordinatorTests: XCTestCase {
         let trayModel = TrayMenuModel(
             accountsCoordinator: coordinator,
             settingsCoordinator: SettingsCoordinator(
-                storeRepository: storeRepository,
+                settingsRepository: TestSettingsRepository(),
                 launchAtStartupService: StubLaunchAtStartupService()
             ),
             cloudSyncService: cloudSyncService,
@@ -944,6 +1031,58 @@ final class AccountsCoordinatorTests: XCTestCase {
         XCTAssertEqual(pushCallCount, 1)
         XCTAssertEqual(trayModel.accounts.map(\.accountID), ["account-1"])
     }
+
+    @MainActor
+    func testTrayMenuModelSyncLocalMutationAlsoSyncsConfiguredRemoteAccounts() async {
+        let now: Int64 = 1_763_216_000
+        let storeRepository = InMemoryAccountsStoreRepository(
+            store: AccountsStore(
+                accounts: [
+                    makeStoredAccount(id: "acct-1", accountID: "account-1", now: now)
+                ]
+            )
+        )
+        let coordinator = AccountsCoordinator(
+            storeRepository: storeRepository,
+            settingsRepository: TestSettingsRepository(),
+            authRepository: RecordingAuthRepository(),
+            usageService: CountingUsageService(result: makeUsageSnapshot(fetchedAt: now)),
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+        let cloudSyncService = SpyAccountsCloudSyncService(pullResult: .noChange)
+        let remoteSyncService = SpyRemoteAccountsMutationSyncService()
+        let trayModel = TrayMenuModel(
+            accountsCoordinator: coordinator,
+            settingsCoordinator: SettingsCoordinator(
+                settingsRepository: TestSettingsRepository(),
+                launchAtStartupService: StubLaunchAtStartupService()
+            ),
+            cloudSyncService: cloudSyncService,
+            currentAccountSelectionSyncService: nil,
+            remoteAccountsMutationSyncService: remoteSyncService,
+            backgroundRefreshPolicy: .init(
+                initialRefreshDelay: .zero,
+                cloudReconciliationInterval: .seconds(3),
+                usageRefreshInterval: .seconds(30),
+                refreshUsageOnRecurringTick: false,
+                cloudSyncMode: .pushLocalAccounts,
+                applyRemoteSelectionSwitchEffects: false
+            ),
+            dateProvider: FixedDateProvider(now: now),
+            initialAccounts: []
+        )
+
+        await trayModel.syncLocalAccountsMutationNow()
+
+        let pushCallCount = await cloudSyncService.readPushCallCount()
+        XCTAssertEqual(pushCallCount, 1)
+        let remoteSyncCallCount = await remoteSyncService.readCallCount()
+        XCTAssertEqual(remoteSyncCallCount, 1)
+    }
 }
 
 private func makeAccountSummary(
@@ -965,6 +1104,36 @@ private func makeAccountSummary(
         usage: usage,
         usageError: nil,
         isCurrent: isCurrent
+    )
+}
+
+@MainActor
+private func makeAccountsPageModelForViewStoreTests(
+    initialAccounts: [AccountSummary]
+) -> AccountsPageModel {
+    let coordinator = AccountsCoordinator(
+        storeRepository: InMemoryAccountsStoreRepository(store: AccountsStore()),
+        settingsRepository: TestSettingsRepository(),
+        authRepository: StubAuthRepository(),
+        usageService: CountingUsageService(
+            result: UsageSnapshot(
+                fetchedAt: 1,
+                planType: "pro",
+                fiveHour: nil,
+                oneWeek: nil,
+                credits: nil
+            )
+        ),
+        chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+        codexCLIService: StubCodexCLIService(),
+        editorAppService: StubEditorAppService(),
+        opencodeAuthSyncService: StubOpencodeAuthSyncService()
+    )
+
+    return AccountsPageModel(
+        coordinator: coordinator,
+        onLocalAccountsChanged: nil,
+        initialAccounts: initialAccounts
     )
 }
 
@@ -1138,6 +1307,19 @@ private final class StubAccountsManualRefreshService: AccountsManualRefreshServi
     }
 }
 
+private actor SpyRemoteAccountsMutationSyncService: RemoteAccountsMutationSyncServiceProtocol {
+    private var callCount = 0
+
+    func syncConfiguredRemoteAccounts() async -> RemoteAccountsMutationSyncReport {
+        callCount += 1
+        return .empty
+    }
+
+    func readCallCount() -> Int {
+        callCount
+    }
+}
+
 @MainActor
 private final class SpyAccountsLocalMutationSyncService: AccountsLocalMutationSyncServiceProtocol {
     private(set) var acceptedSnapshots: [[AccountSummary]] = []
@@ -1226,7 +1408,6 @@ private final class StubAuthRepository: AuthRepository, @unchecked Sendable {
             teamName: "workspace-x"
         )
     }
-    func currentAuthAccountID() -> String? { "account-1" }
 }
 
 private final class RemoteLookupAuthRepository: AuthRepository, @unchecked Sendable {
@@ -1254,16 +1435,10 @@ private final class RemoteLookupAuthRepository: AuthRepository, @unchecked Senda
             teamName: nil
         )
     }
-    func currentAuthAccountID() -> String? { "account-1" }
 }
 
 private final class RecordingAuthRepository: AuthRepository, @unchecked Sendable {
     private(set) var writtenAccountCount = 0
-    private let currentAccountIDValue: String?
-
-    init(currentAccountID: String?) {
-        self.currentAccountIDValue = currentAccountID
-    }
 
     func readCurrentAuth() throws -> JSONValue { .null }
     func readCurrentAuthOptional() throws -> JSONValue? { nil }
@@ -1290,16 +1465,13 @@ private final class RecordingAuthRepository: AuthRepository, @unchecked Sendable
             teamName: "workspace-x"
         )
     }
-    func currentAuthAccountID() -> String? { currentAccountIDValue }
 }
 
 private final class MultiAccountAuthRepository: AuthRepository, @unchecked Sendable {
     private let extractedByAccountID: [String: ExtractedAuth]
-    private let currentAccountIDValue: String?
 
-    init(extractedByAccountID: [String: ExtractedAuth], currentAccountID: String?) {
+    init(extractedByAccountID: [String: ExtractedAuth]) {
         self.extractedByAccountID = extractedByAccountID
-        self.currentAccountIDValue = currentAccountID
     }
 
     func readCurrentAuth() throws -> JSONValue { .null }
@@ -1324,7 +1496,6 @@ private final class MultiAccountAuthRepository: AuthRepository, @unchecked Senda
         }
         return extracted
     }
-    func currentAuthAccountID() -> String? { currentAccountIDValue }
 }
 
 private actor PartialUpdateRecorder {

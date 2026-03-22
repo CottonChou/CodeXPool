@@ -56,6 +56,22 @@ enum RemoteServerConfiguration {
         return merged
     }
 
+    static func adoptingDiscoveredInstance(
+        _ instance: DiscoveredRemoteProxyInstance,
+        into server: RemoteServerConfig
+    ) -> RemoteServerConfig {
+        var adopted = server
+        if let serverID = trimmed(instance.serverID) {
+            adopted.id = serverID
+        }
+        if let label = trimmed(instance.label) {
+            adopted.label = label
+        }
+        adopted.remoteDir = instance.remoteDir
+        adopted.listenPort = instance.listenPort
+        return adopted
+    }
+
     static func statusLabel(_ status: RemoteProxyStatus?) -> String {
         guard let status else { return "Unknown" }
         return status.running ? L10n.tr("proxy.status.running") : L10n.tr("proxy.status.stopped")

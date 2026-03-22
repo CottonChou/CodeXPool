@@ -1,13 +1,17 @@
 import SwiftUI
 
 struct RemoteServerCardActions {
-    let onSave: (RemoteServerConfig) -> Void
+    let onSave: (String, RemoteServerConfig) -> Void
     let onRemove: (String) -> Void
+    let onDiscover: (RemoteServerConfig) -> Void
+    let onUseDiscoveredInstance: (String, RemoteServerConfig) -> Void
     let onRefresh: () -> Void
     let onDeploy: () -> Void
+    let onSyncAccounts: () -> Void
     let onStart: () -> Void
     let onStop: () -> Void
     let onLogs: () -> Void
+    let onUninstall: () -> Void
     let onChooseIdentityFile: () -> String?
 }
 
@@ -75,17 +79,26 @@ extension ProxyPageModel {
 
     func remoteServerCardActions(for server: RemoteServerConfig) -> RemoteServerCardActions {
         RemoteServerCardActions(
-            onSave: { updated in
-                Task { await self.saveRemoteServer(updated) }
+            onSave: { originalID, updated in
+                Task { await self.saveRemoteServer(updated, previousServerID: originalID) }
             },
             onRemove: { id in
                 Task { await self.removeRemoteServer(id: id) }
+            },
+            onDiscover: { candidate in
+                Task { await self.discoverRemote(server: candidate) }
+            },
+            onUseDiscoveredInstance: { originalID, updated in
+                Task { await self.adoptDiscoveredRemoteServer(updated, previousServerID: originalID) }
             },
             onRefresh: {
                 Task { await self.refreshRemote(server: server) }
             },
             onDeploy: {
                 Task { await self.deployRemote(server: server) }
+            },
+            onSyncAccounts: {
+                Task { await self.syncRemoteAccounts(server: server) }
             },
             onStart: {
                 Task { await self.startRemote(server: server) }
@@ -95,6 +108,9 @@ extension ProxyPageModel {
             },
             onLogs: {
                 Task { await self.readRemoteLogs(server: server) }
+            },
+            onUninstall: {
+                Task { await self.uninstallRemote(server: server) }
             },
             onChooseIdentityFile: chooseIdentityFilePath
         )

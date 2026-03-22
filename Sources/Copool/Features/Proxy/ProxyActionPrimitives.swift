@@ -63,6 +63,14 @@ struct ProxyActionButtonDescriptor<Intent: Hashable>: Identifiable, Equatable {
     var id: Intent { intent }
 }
 
+struct RemoteServerActionHelpDescriptor: Identifiable, Equatable {
+    let action: RemoteServerAction
+    let titleKey: String
+    let messageKey: String
+
+    var id: RemoteServerAction { action }
+}
+
 enum ProxyActionStripLayout: Equatable {
     case row(scrollable: Bool)
     case adaptiveGrid(minimumColumnWidth: CGFloat)
@@ -128,8 +136,8 @@ enum ProxyActionPresentation {
         activeAction: RemoteServerAction?
     ) -> [ProxyActionButtonDescriptor<RemoteServerAction>] {
         let intents: [RemoteServerAction] = isRunning
-            ? [.save, .remove, .deploy, .refresh, .stop, .logs]
-            : [.save, .remove, .deploy, .refresh, .start, .logs]
+            ? [.save, .removeLocal, .discover, .deploy, .syncAccounts, .refresh, .stop, .logs, .uninstall]
+            : [.save, .removeLocal, .discover, .deploy, .syncAccounts, .refresh, .start, .logs, .uninstall]
 
         return intents.map { intent in
             ProxyActionButtonDescriptor(
@@ -148,8 +156,12 @@ enum ProxyActionPresentation {
         switch intent {
         case .save:
             "common.save"
-        case .remove:
-            "common.remove"
+        case .removeLocal:
+            "proxy.remote.action.remove_local"
+        case .discover:
+            "proxy.remote.action.discover"
+        case .syncAccounts:
+            "proxy.remote.action.sync_accounts"
         case .refresh:
             "common.refresh"
         case .deploy:
@@ -160,12 +172,14 @@ enum ProxyActionPresentation {
             "common.stop"
         case .logs:
             "common.logs"
+        case .uninstall:
+            "proxy.remote.action.uninstall_remote"
         }
     }
 
     private static func role(for intent: RemoteServerAction) -> ProxyActionRole {
         switch intent {
-        case .remove, .stop:
+        case .removeLocal, .stop, .uninstall:
             .destructive
         default:
             .standard
@@ -174,10 +188,51 @@ enum ProxyActionPresentation {
 
     private static func surfaceStyle(for intent: RemoteServerAction) -> ProxyActionSurfaceStyle {
         switch intent {
-        case .save, .deploy:
+        case .save, .deploy, .syncAccounts:
             .prominent
+        case .uninstall:
+            .dangerProminent
         default:
             .regular
+        }
+    }
+}
+
+enum RemoteServerActionHelpPresentation {
+    static func descriptors(
+        from buttons: [ProxyActionButtonDescriptor<RemoteServerAction>]
+    ) -> [RemoteServerActionHelpDescriptor] {
+        buttons.map { button in
+            RemoteServerActionHelpDescriptor(
+                action: button.intent,
+                titleKey: button.titleKey,
+                messageKey: messageKey(for: button.intent)
+            )
+        }
+    }
+
+    private static func messageKey(for action: RemoteServerAction) -> String {
+        switch action {
+        case .save:
+            "proxy.remote.help.save"
+        case .removeLocal:
+            "proxy.remote.help.remove_local"
+        case .discover:
+            "proxy.remote.help.discover"
+        case .deploy:
+            "proxy.remote.help.deploy"
+        case .syncAccounts:
+            "proxy.remote.help.sync_accounts"
+        case .refresh:
+            "proxy.remote.help.refresh"
+        case .start:
+            "proxy.remote.help.start"
+        case .stop:
+            "proxy.remote.help.stop"
+        case .logs:
+            "proxy.remote.help.logs"
+        case .uninstall:
+            "proxy.remote.help.uninstall_remote"
         }
     }
 }

@@ -159,6 +159,7 @@ struct RemoteServersSectionView: View {
                             RemoteServerCardView(
                                 server: server,
                                 status: model.remoteStatuses[server.id],
+                                discoveredInstances: model.remoteDiscoveries[server.id] ?? [],
                                 logs: model.remoteLogs[server.id],
                                 activeAction: model.remoteActions[server.id],
                                 actions: model.remoteServerCardActions(for: server)

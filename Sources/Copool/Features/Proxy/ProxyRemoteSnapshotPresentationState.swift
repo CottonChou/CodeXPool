@@ -9,6 +9,7 @@ struct ProxyRemoteSnapshotPresentationState: Equatable {
     var publicAccessEnabled: Bool
     var remoteServers: [RemoteServerConfig]
     var remoteStatuses: [String: RemoteProxyStatus]
+    var remoteDiscoveries: [String: [DiscoveredRemoteProxyInstance]]
     var remoteLogs: [String: String]
 
     init(
@@ -22,6 +23,7 @@ struct ProxyRemoteSnapshotPresentationState: Equatable {
         publicAccessEnabled: Bool,
         remoteServers: [RemoteServerConfig],
         remoteStatuses: [String: RemoteProxyStatus],
+        remoteDiscoveries: [String: [DiscoveredRemoteProxyInstance]],
         remoteLogs: [String: String]
     ) {
         self.proxyStatus = proxyStatus
@@ -34,6 +36,7 @@ struct ProxyRemoteSnapshotPresentationState: Equatable {
         self.publicAccessEnabled = publicAccessEnabled
         self.remoteServers = remoteServers
         self.remoteStatuses = remoteStatuses
+        self.remoteDiscoveries = remoteDiscoveries
         self.remoteLogs = ProxySyncPolicy.RemoteLogs.normalize(remoteLogs)
     }
 
@@ -54,6 +57,7 @@ struct ProxyRemoteSnapshotPresentationState: Equatable {
         publicAccessEnabled = normalizedSnapshot.publicAccessEnabled
         remoteServers = normalizedSnapshot.remoteServers
         remoteStatuses = normalizedSnapshot.remoteStatuses
+        remoteDiscoveries = normalizedSnapshot.remoteDiscoveries
         remoteLogs = normalizedSnapshot.remoteLogs
     }
 }

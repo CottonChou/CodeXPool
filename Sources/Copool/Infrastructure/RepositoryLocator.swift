@@ -1,9 +1,22 @@
 import Foundation
 
 enum RepositoryLocator {
-    static let proxydManifestRelativePath = "src-tauri/proxyd/Cargo.toml"
+    static let proxydManifestRelativePaths = [
+        "Sources/Copool/Resources/proxyd-src/proxyd/Cargo.toml",
+        "src-tauri/proxyd/Cargo.toml",
+    ]
     static let proxydBundledManifestRelativePath = "proxyd-src/proxyd/Cargo.toml"
     static let proxydBinaryName = "codex-tools-proxyd"
+
+    static func proxydManifestURL(in root: URL) -> URL? {
+        for relativePath in proxydManifestRelativePaths {
+            let candidate = root.appendingPathComponent(relativePath, isDirectory: false)
+            if FileManager.default.fileExists(atPath: candidate.path) {
+                return candidate
+            }
+        }
+        return nil
+    }
 
     static func findRepoRoot(startingAt start: URL = URL(fileURLWithPath: #filePath)) -> URL? {
         var current = start
@@ -12,8 +25,7 @@ enum RepositoryLocator {
         }
 
         for _ in 0..<12 {
-            let marker = current.appendingPathComponent(proxydManifestRelativePath, isDirectory: false)
-            if FileManager.default.fileExists(atPath: marker.path) {
+            if proxydManifestURL(in: current) != nil {
                 return current
             }
             let next = current.deletingLastPathComponent()
@@ -25,8 +37,7 @@ enum RepositoryLocator {
 
         var cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
         for _ in 0..<8 {
-            let marker = cwd.appendingPathComponent(proxydManifestRelativePath, isDirectory: false)
-            if FileManager.default.fileExists(atPath: marker.path) {
+            if proxydManifestURL(in: cwd) != nil {
                 return cwd
             }
             let next = cwd.deletingLastPathComponent()

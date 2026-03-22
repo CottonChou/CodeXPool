@@ -76,6 +76,33 @@ final class AuthFileRepositoryTests: XCTestCase {
         XCTAssertEqual(extracted.teamName, "kqikiy")
     }
 
+    func testExtractAuthResolvesPrincipalIDFromJWTSubject() throws {
+        let fixture = try makeRepositoryFixture()
+        defer { fixture.cleanup() }
+
+        let repository = fixture.repository
+        let token = makeJWT(payload: [
+            "sub": "user_123",
+            "email": "dev@example.com",
+            "https://api.openai.com/auth": [
+                "chatgpt_account_id": "acct_12345"
+            ]
+        ])
+
+        let auth = JSONValue.object([
+            "auth_mode": .string("chatgpt"),
+            "tokens": .object([
+                "access_token": .string("access-token"),
+                "id_token": .string(token)
+            ])
+        ])
+
+        let extracted = try repository.extractAuth(from: auth)
+
+        XCTAssertEqual(extracted.principalID, "user_123")
+        XCTAssertEqual(extracted.accountKey, "user_123|acct_12345")
+    }
+
     func testMakeChatGPTAuthBuildsCodexCompatibleShape() throws {
         let fixture = try makeRepositoryFixture()
         defer { fixture.cleanup() }
@@ -210,6 +237,7 @@ final class AuthFileRepositoryTests: XCTestCase {
         let paths = FileSystemPaths(
             applicationSupportDirectory: tempDir,
             accountStorePath: tempDir.appendingPathComponent("accounts.json"),
+            settingsStorePath: tempDir.appendingPathComponent("settings.json"),
             codexAuthPath: authPath,
             codexConfigPath: configPath,
             proxyDaemonDataDirectory: tempDir.appendingPathComponent("proxyd", isDirectory: true),

@@ -87,6 +87,15 @@ private final class TrackingRemoteProxyService: RemoteProxyServiceProtocol, @unc
         await status(server: server)
     }
 
+    func discover(server: RemoteServerConfig) async throws -> [DiscoveredRemoteProxyInstance] {
+        _ = server
+        return []
+    }
+
+    func syncAccounts(server: RemoteServerConfig) async throws -> RemoteProxyStatus {
+        await status(server: server)
+    }
+
     func start(server: RemoteServerConfig) async throws -> RemoteProxyStatus {
         await status(server: server)
     }
@@ -99,6 +108,11 @@ private final class TrackingRemoteProxyService: RemoteProxyServiceProtocol, @unc
         _ = server
         _ = lines
         return ""
+    }
+
+    func uninstall(server: RemoteServerConfig, removeRemoteDirectory: Bool) async throws -> RemoteProxyStatus {
+        _ = removeRemoteDirectory
+        return await status(server: server)
     }
 }
 

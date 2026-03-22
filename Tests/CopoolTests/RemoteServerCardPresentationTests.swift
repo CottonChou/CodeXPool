@@ -7,13 +7,13 @@ final class RemoteServerCardPresentationTests: XCTestCase {
             label: "",
             sshUser: "root",
             host: "1.2.3.4",
-            listenPort: 8787,
+            sshPort: 2222,
             isExpanded: false,
             status: nil
         )
 
         XCTAssertEqual(presentation.title, RemoteServerConfiguration.defaultLabel)
-        XCTAssertEqual(presentation.subtitle, "root@1.2.3.4:8787")
+        XCTAssertEqual(presentation.subtitle, "root@1.2.3.4:2222")
         XCTAssertFalse(presentation.isRunning)
     }
 

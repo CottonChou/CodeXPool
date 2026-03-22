@@ -7,13 +7,13 @@ struct PublicAccessSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             PublicAccessHeader(
-                isExpanded: model.cloudflaredExpanded,
+                isExpanded: model.cloudflaredSectionExpanded,
                 isEnabled: model.publicAccessEnabledBinding,
                 onToggleExpanded: toggleExpanded,
                 onToggleEnabled: model.dispatchPublicAccessEnabledUpdate
             )
 
-            if model.cloudflaredExpanded {
+            if model.cloudflaredSectionExpanded {
                 expandedContent
             }
         }

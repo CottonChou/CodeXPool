@@ -39,16 +39,17 @@ struct AccountsWidgetTimelineProvider: TimelineProvider {
         completion(
             AccountsWidgetEntry(
                 date: .now,
-                snapshot: snapshot.currentCard == nil ? sampleSnapshot : snapshot
+                snapshot: snapshot
             )
         )
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<AccountsWidgetEntry>) -> Void) {
+        _ = context
         let snapshot = store.load()
         let entry = AccountsWidgetEntry(
             date: .now,
-            snapshot: snapshot.currentCard == nil ? sampleSnapshot : snapshot
+            snapshot: snapshot
         )
         completion(
             Timeline(
@@ -105,22 +106,42 @@ struct AccountsWidgetTimelineProvider: TimelineProvider {
                 AccountsWidgetRowSnapshot(
                     id: "row-1",
                     planLabel: "TEAM",
-                    workspaceOrAccountLabel: "abcdefg",
+                    workspaceLabel: "abcdefg",
                     accountLabel: "account_name",
-                    fiveHourRemainingText: "50%",
-                    oneWeekRemainingText: "98%",
-                    fiveHourResetText: "26/3/21 01:23:45",
-                    oneWeekResetText: "26/3/27 01:23:45"
+                    fiveHour: AccountsWidgetWindowSnapshot(
+                        title: "5h",
+                        progressFraction: 0.50,
+                        usedText: "50%",
+                        remainingText: "50%",
+                        resetText: "26/3/21 01:23:45"
+                    ),
+                    oneWeek: AccountsWidgetWindowSnapshot(
+                        title: "1w",
+                        progressFraction: 0.02,
+                        usedText: "2%",
+                        remainingText: "98%",
+                        resetText: "26/3/27 01:23:45"
+                    )
                 ),
                 AccountsWidgetRowSnapshot(
                     id: "row-2",
                     planLabel: "PLUS",
-                    workspaceOrAccountLabel: "plus_account",
-                    accountLabel: nil,
-                    fiveHourRemainingText: "82%",
-                    oneWeekRemainingText: "64%",
-                    fiveHourResetText: "26/3/21 08:54:12",
-                    oneWeekResetText: "26/3/25 18:22:09"
+                    workspaceLabel: nil,
+                    accountLabel: "plus_account",
+                    fiveHour: AccountsWidgetWindowSnapshot(
+                        title: "5h",
+                        progressFraction: 0.18,
+                        usedText: "18%",
+                        remainingText: "82%",
+                        resetText: "26/3/21 08:54:12"
+                    ),
+                    oneWeek: AccountsWidgetWindowSnapshot(
+                        title: "1w",
+                        progressFraction: 0.36,
+                        usedText: "36%",
+                        remainingText: "64%",
+                        resetText: "26/3/25 18:22:09"
+                    )
                 ),
             ]
         )

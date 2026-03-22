@@ -3,6 +3,7 @@ import SwiftUI
 struct RemoteServerCardView: View {
     let server: RemoteServerConfig
     let status: RemoteProxyStatus?
+    let discoveredInstances: [DiscoveredRemoteProxyInstance]
     let logs: String?
     let activeAction: RemoteServerAction?
     let actions: RemoteServerCardActions
@@ -13,12 +14,14 @@ struct RemoteServerCardView: View {
     init(
         server: RemoteServerConfig,
         status: RemoteProxyStatus?,
+        discoveredInstances: [DiscoveredRemoteProxyInstance],
         logs: String?,
         activeAction: RemoteServerAction?,
         actions: RemoteServerCardActions
     ) {
         self.server = server
         self.status = status
+        self.discoveredInstances = discoveredInstances
         self.logs = logs
         self.activeAction = activeAction
         self.actions = actions
@@ -27,13 +30,18 @@ struct RemoteServerCardView: View {
     }
 
     var body: some View {
+        let actionButtons = ProxyActionPresentation.remoteServerButtons(
+            isRunning: status?.running == true,
+            activeAction: activeAction
+        )
+
         VStack(alignment: .leading, spacing: 10) {
             RemoteServerHeader(
                 presentation: RemoteServerCardPresentation.header(
                     label: draft.label,
                     sshUser: draft.sshUser,
                     host: draft.host,
-                    listenPort: draft.listenPort,
+                    sshPort: draft.sshPort,
                     isExpanded: isExpanded,
                     status: status
                 ),
@@ -48,15 +56,20 @@ struct RemoteServerCardView: View {
                     onChooseIdentityFile: actions.onChooseIdentityFile
                 )
                 ProxyActionStrip(
-                    buttons: ProxyActionPresentation.remoteServerButtons(
-                        isRunning: status?.running == true,
-                        activeAction: activeAction
-                    ),
+                    buttons: actionButtons,
                     layout: .adaptiveGrid(
                         minimumColumnWidth: LayoutRules.proxyRemoteActionGridMinWidth
                     ),
                     onAction: handleRemoteAction
                 )
+                if let discoveryPresentation = RemoteServerCardPresentation.discovery(
+                    instances: discoveredInstances
+                ) {
+                    RemoteServerDiscoverySection(
+                        presentation: discoveryPresentation,
+                        onUseInstance: useDiscoveredInstance
+                    )
+                }
                 RemoteServerStatusGrid(
                     descriptors: RemoteServerCardPresentation.metrics(status: status)
                 )
@@ -68,6 +81,11 @@ struct RemoteServerCardView: View {
                 )
                 RemoteServerErrorSection(
                     message: status?.lastError ?? L10n.tr("common.none")
+                )
+                RemoteServerActionHelpSection(
+                    descriptors: RemoteServerActionHelpPresentation.descriptors(
+                        from: actionButtons
+                    )
                 )
             }
         }
@@ -90,9 +108,13 @@ struct RemoteServerCardView: View {
     private func handleRemoteAction(_ intent: RemoteServerAction) async {
         switch intent {
         case .save:
-            actions.onSave(draft)
-        case .remove:
+            actions.onSave(server.id, draft)
+        case .removeLocal:
             actions.onRemove(server.id)
+        case .discover:
+            actions.onDiscover(draft)
+        case .syncAccounts:
+            actions.onSyncAccounts()
         case .refresh:
             actions.onRefresh()
         case .deploy:
@@ -103,6 +125,13 @@ struct RemoteServerCardView: View {
             actions.onStop()
         case .logs:
             actions.onLogs()
+        case .uninstall:
+            actions.onUninstall()
         }
+    }
+
+    private func useDiscoveredInstance(_ instance: DiscoveredRemoteProxyInstance) {
+        draft = RemoteServerConfiguration.adoptingDiscoveredInstance(instance, into: draft)
+        actions.onUseDiscoveredInstance(server.id, draft)
     }
 }

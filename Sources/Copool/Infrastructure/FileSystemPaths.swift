@@ -3,6 +3,7 @@ import Foundation
 struct FileSystemPaths {
     var applicationSupportDirectory: URL
     var accountStorePath: URL
+    var settingsStorePath: URL
     var codexAuthPath: URL
     var codexConfigPath: URL
     var proxyDaemonDataDirectory: URL
@@ -31,6 +32,7 @@ struct FileSystemPaths {
         return FileSystemPaths(
             applicationSupportDirectory: appSupportDirectory,
             accountStorePath: appSupportDirectory.appendingPathComponent("accounts.json", isDirectory: false),
+            settingsStorePath: appSupportDirectory.appendingPathComponent("settings.json", isDirectory: false),
             codexAuthPath: codexDirectory.appendingPathComponent("auth.json", isDirectory: false),
             codexConfigPath: codexDirectory.appendingPathComponent("config.toml", isDirectory: false),
             proxyDaemonDataDirectory: proxyDaemonDataDirectory,

@@ -10,34 +10,11 @@ final class AppContainer {
     let settingsModel: SettingsPageModel
     let trayModel: TrayMenuModel
 
-    private let paths: FileSystemPaths
-    private let storeRepository: StoreFileRepository
-    private let authRepository: AuthFileRepository
     private let settingsCoordinator: SettingsCoordinator
     private let accountsWidgetSnapshotWriter: AccountsWidgetSnapshotWriter
+    private let proxyCoordinator: ProxyCoordinator
+    private let proxyControlCloudSyncService: CloudKitProxyControlSyncService
     private var accountsWidgetSnapshotCancellable: AnyCancellable?
-
-    private lazy var proxyService = SwiftNativeProxyRuntimeService(
-        paths: paths,
-        storeRepository: storeRepository,
-        authRepository: authRepository
-    )
-
-    private lazy var cloudflaredService = CloudflaredService(paths: paths)
-
-    private lazy var remoteService = RemoteProxyService(
-        repoRoot: RepositoryLocator.findRepoRoot(startingAt: URL(fileURLWithPath: #filePath)),
-        sourceAccountStorePath: paths.accountStorePath,
-        sourceAuthPath: paths.codexAuthPath
-    )
-
-    private lazy var proxyCoordinator = ProxyCoordinator(
-        proxyService: proxyService,
-        cloudflaredService: cloudflaredService,
-        remoteService: remoteService
-    )
-
-    private lazy var proxyControlCloudSyncService = CloudKitProxyControlSyncService()
 
     lazy var proxyControlBridge: ProxyControlBridge = ProxyControlBridge(
         proxyCoordinator: proxyCoordinator,
@@ -70,8 +47,9 @@ final class AppContainer {
         do {
             let paths = try FileSystemPaths.live()
             let storeRepository = StoreFileRepository(paths: paths)
+            let settingsRepository = SettingsFileRepository(paths: paths)
             let authRepository = AuthFileRepository(paths: paths)
-            let initialAccounts = initialAccountsSnapshot(using: storeRepository)
+            let initialAccounts = try initialAccountsSnapshot(using: storeRepository)
             let usageService = DefaultUsageService(configPath: paths.codexConfigPath)
             let workspaceMetadataService = DefaultWorkspaceMetadataService(configPath: paths.codexConfigPath)
             let chatGPTOAuthLoginService = OpenAIChatGPTOAuthLoginService(configPath: paths.codexConfigPath)
@@ -85,11 +63,26 @@ final class AppContainer {
                 storeRepository: storeRepository,
                 authRepository: authRepository
             )
+            let proxyCoordinator = ProxyCoordinator(
+                proxyService: SwiftNativeProxyRuntimeService(
+                    paths: paths,
+                    storeRepository: storeRepository,
+                    settingsRepository: settingsRepository,
+                    authRepository: authRepository
+                ),
+                cloudflaredService: CloudflaredService(paths: paths),
+                remoteService: RemoteProxyService(
+                    repoRoot: RepositoryLocator.findRepoRoot(startingAt: URL(fileURLWithPath: #filePath)),
+                    sourceAccountStorePath: paths.accountStorePath
+                )
+            )
+            let proxyControlCloudSyncService = CloudKitProxyControlSyncService()
 
             let settingsCoordinator = SettingsCoordinator(
-                storeRepository: storeRepository,
+                settingsRepository: settingsRepository,
                 launchAtStartupService: launchAtStartupService
             )
+            try launchAtStartupService.syncWithStoreValue(settingsRepository.loadSettings().launchAtStartup)
             let accountsWidgetSnapshotWriter = AccountsWidgetSnapshotWriter(
                 localeProvider: {
                     let identifier = (try? await settingsCoordinator.currentSettings().locale)
@@ -99,6 +92,7 @@ final class AppContainer {
             )
             let accountsCoordinator = AccountsCoordinator(
                 storeRepository: storeRepository,
+                settingsRepository: settingsRepository,
                 authRepository: authRepository,
                 usageService: usageService,
                 workspaceMetadataService: workspaceMetadataService,
@@ -107,11 +101,16 @@ final class AppContainer {
                 editorAppService: editorAppService,
                 opencodeAuthSyncService: opencodeSyncService
             )
+            let remoteAccountsMutationSyncService = RemoteAccountsMutationSyncService(
+                settingsCoordinator: settingsCoordinator,
+                proxyCoordinator: proxyCoordinator
+            )
             let trayModel = TrayMenuModel(
                 accountsCoordinator: accountsCoordinator,
                 settingsCoordinator: settingsCoordinator,
                 cloudSyncService: cloudSyncService,
                 currentAccountSelectionSyncService: currentAccountSelectionSyncService,
+                remoteAccountsMutationSyncService: remoteAccountsMutationSyncService,
                 backgroundRefreshPolicy: .forPlatform(PlatformCapabilities.currentPlatform),
                 initialAccounts: initialAccounts
             )
@@ -131,20 +130,11 @@ final class AppContainer {
                 }
             )
 
-            Task {
-                do {
-                    try await settingsCoordinator.syncLaunchAtStartupFromStore()
-                } catch {
-                    // Keep launch non-blocking even if system login item sync fails.
-                }
-            }
-
             return AppContainer(
-                paths: paths,
-                storeRepository: storeRepository,
-                authRepository: authRepository,
                 settingsCoordinator: settingsCoordinator,
                 accountsWidgetSnapshotWriter: accountsWidgetSnapshotWriter,
+                proxyCoordinator: proxyCoordinator,
+                proxyControlCloudSyncService: proxyControlCloudSyncService,
                 accountsModel: AccountsPageModel(
                     coordinator: accountsCoordinator,
                     manualRefreshService: trayModel,
@@ -165,20 +155,18 @@ final class AppContainer {
     }
 
     private init(
-        paths: FileSystemPaths,
-        storeRepository: StoreFileRepository,
-        authRepository: AuthFileRepository,
         settingsCoordinator: SettingsCoordinator,
         accountsWidgetSnapshotWriter: AccountsWidgetSnapshotWriter,
+        proxyCoordinator: ProxyCoordinator,
+        proxyControlCloudSyncService: CloudKitProxyControlSyncService,
         accountsModel: AccountsPageModel,
         settingsModel: SettingsPageModel,
         trayModel: TrayMenuModel
     ) {
-        self.paths = paths
-        self.storeRepository = storeRepository
-        self.authRepository = authRepository
         self.settingsCoordinator = settingsCoordinator
         self.accountsWidgetSnapshotWriter = accountsWidgetSnapshotWriter
+        self.proxyCoordinator = proxyCoordinator
+        self.proxyControlCloudSyncService = proxyControlCloudSyncService
         self.accountsModel = accountsModel
         self.settingsModel = settingsModel
         self.trayModel = trayModel
@@ -196,10 +184,8 @@ final class AppContainer {
 
     private static func initialAccountsSnapshot(
         using storeRepository: StoreFileRepository
-    ) -> [AccountSummary] {
-        guard let store = try? storeRepository.loadStore() else {
-            return []
-        }
-        return store.accountSummaries(currentAccountID: nil)
+    ) throws -> [AccountSummary] {
+        let store = try storeRepository.loadStore()
+        return store.accountSummaries(currentAccountKey: nil)
     }
 }

@@ -7,7 +7,7 @@ final class AccountsPageModel: ObservableObject {
     let manualRefreshService: AccountsManualRefreshServiceProtocol?
     let localAccountsMutationSyncService: AccountsLocalMutationSyncServiceProtocol?
     let currentAccountSelectionSyncService: CurrentAccountSelectionSyncServiceProtocol?
-    let cloudSyncAvailabilityService: CloudSyncAvailabilityServiceProtocol?
+    let cloudSyncAvailabilityService: CloudSyncAvailabilityService?
     let onLocalAccountsChanged: (([AccountSummary]) -> Void)?
 
     private let noticeScheduler = NoticeAutoDismissScheduler()
@@ -36,7 +36,7 @@ final class AccountsPageModel: ObservableObject {
         manualRefreshService: AccountsManualRefreshServiceProtocol? = nil,
         localAccountsMutationSyncService: AccountsLocalMutationSyncServiceProtocol? = nil,
         currentAccountSelectionSyncService: CurrentAccountSelectionSyncServiceProtocol? = nil,
-        cloudSyncAvailabilityService: CloudSyncAvailabilityServiceProtocol? = nil,
+        cloudSyncAvailabilityService: CloudSyncAvailabilityService? = nil,
         onLocalAccountsChanged: (([AccountSummary]) -> Void)? = nil,
         initialAccounts: [AccountSummary]? = nil
     ) {
@@ -47,20 +47,11 @@ final class AccountsPageModel: ObservableObject {
         self.cloudSyncAvailabilityService = cloudSyncAvailabilityService
         self.onLocalAccountsChanged = onLocalAccountsChanged
         self.state = initialAccounts.map { initialAccounts in
-            Self.makeViewState(accounts: initialAccounts, cloudSyncAvailable: true)
+            Self.makeViewState(
+                accounts: AccountRanking.sortForDisplay(initialAccounts),
+                cloudSyncAvailable: true
+            )
         } ?? .loading
-    }
-
-    var canImportCurrentAuthAction: Bool {
-        !isImporting && !isAdding
-    }
-
-    var canAddAccountAction: Bool {
-        !isImporting && !isAdding
-    }
-
-    var canSmartSwitchAction: Bool {
-        !isImporting && !isAdding && switchingAccountID == nil
     }
 
     var canRefreshUsageAction: Bool {
@@ -129,7 +120,7 @@ final class AccountsPageModel: ObservableObject {
     }
 
     func canRefreshAccount(_ id: String) -> Bool {
-        !isRefreshing && !refreshingAccountIDs.contains(id)
+        !isRefreshing
     }
 
     func isUsageRefreshActive(forAccountID id: String) -> Bool {

@@ -1,88 +1,275 @@
 import SwiftUI
 import WidgetKit
+import Foundation
+import os
 
 private enum AccountsWidgetStyle {
-    static let defaultVerticalPadding: CGFloat = 14
-    static let compactRingLineWidth: CGFloat = 6
+    static func backgroundGradient(for colorScheme: ColorScheme) -> LinearGradient {
+        switch colorScheme {
+        case .dark:
+            LinearGradient(
+                colors: [
+                    Color(red: 0.10, green: 0.13, blue: 0.18),
+                    Color(red: 0.07, green: 0.10, blue: 0.14),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        default:
+            LinearGradient(
+                colors: [
+                    Color(red: 0.91, green: 0.93, blue: 0.96),
+                    Color(red: 0.85, green: 0.88, blue: 0.93),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+    }
+
+    static func primaryTextColor(for colorScheme: ColorScheme) -> Color {
+        switch colorScheme {
+        case .dark:
+            .white
+        default:
+            Color(red: 0.12, green: 0.16, blue: 0.22)
+        }
+    }
+
+    static func secondaryTextColor(for colorScheme: ColorScheme) -> Color {
+        switch colorScheme {
+        case .dark:
+            Color.white.opacity(0.62)
+        default:
+            Color(red: 0.33, green: 0.39, blue: 0.48)
+        }
+    }
+
+    static func dividerColor(for colorScheme: ColorScheme) -> Color {
+        switch colorScheme {
+        case .dark:
+            Color.white.opacity(0.18)
+        default:
+            Color.black.opacity(0.14)
+        }
+    }
 
     static func layout(for family: WidgetFamily, size: CGSize) -> AccountsWidgetLayout {
         let width = size.width
+        let scale = layoutScale(for: family, size: size)
+        func scaled(_ value: CGFloat) -> CGFloat {
+            (value * scale).rounded(.toNearestOrEven)
+        }
+
         let horizontalPadding: CGFloat
+        let verticalPadding: CGFloat
         let compactSpacing: CGFloat
+        let compactSectionSpacing: CGFloat
         let compactUsageSpacing: CGFloat
         let largeSectionSpacing: CGFloat
         let rowSpacing: CGFloat
         let compactRingSize: CGFloat
+        let compactRingLineWidth: CGFloat
         let metricColumnWidth: CGFloat
         let rowMetricColumnWidth: CGFloat
+        let chipFontSize: CGFloat
+        let compactTitleFontSize: CGFloat
+        let compactSubtitleFontSize: CGFloat
+        let compactRingValueFontSize: CGFloat
+        let compactRingTitleFontSize: CGFloat
+        let metricValueFontSize: CGFloat
+        let metricLabelFontSize: CGFloat
+        let metricIconSize: CGFloat
+        let metricResetFontSize: CGFloat
+        let metricResetIconSize: CGFloat
+        let rowMetricValueFontSize: CGFloat
+        let rowMetricLabelFontSize: CGFloat
+        let rowMetricIconSize: CGFloat
+        let rowResetFontSize: CGFloat
+        let rowResetIconSize: CGFloat
+        let currentHeaderTitleFontSize: CGFloat
+        let currentHeaderDetailFontSize: CGFloat
 
         switch family {
         case .systemSmall:
-            horizontalPadding = max(10, min(16, width * 0.08))
-            compactSpacing = 10
-            compactUsageSpacing = max(10, min(16, width * 0.08))
-            largeSectionSpacing = 12
-            rowSpacing = 8
-            compactRingSize = max(40, min(52, width * 0.26))
-            metricColumnWidth = max(118, min(160, width * 0.72))
-            rowMetricColumnWidth = max(76, min(96, width * 0.30))
+            horizontalPadding = 0
+            verticalPadding = 0
+            let contentWidth = max(width - (horizontalPadding * 2), 1)
+            compactSpacing = scaled(14)
+            compactSectionSpacing = scaled(8)
+            compactUsageSpacing = scaled(8)
+            largeSectionSpacing = scaled(14)
+            rowSpacing = scaled(10)
+            compactRingSize = min(max(contentWidth * 0.40, scaled(64)), scaled(82))
+            compactRingLineWidth = scaled(7)
+            metricColumnWidth = contentWidth
+            rowMetricColumnWidth = contentWidth
+            chipFontSize = scaled(11)
+            compactTitleFontSize = scaled(15)
+            compactSubtitleFontSize = scaled(11)
+            compactRingValueFontSize = scaled(18)
+            compactRingTitleFontSize = scaled(11)
+            metricValueFontSize = scaled(14)
+            metricLabelFontSize = scaled(13)
+            metricIconSize = scaled(11)
+            metricResetFontSize = scaled(11)
+            metricResetIconSize = scaled(10)
+            rowMetricValueFontSize = scaled(13)
+            rowMetricLabelFontSize = scaled(12)
+            rowMetricIconSize = scaled(10)
+            rowResetFontSize = scaled(10)
+            rowResetIconSize = scaled(9)
+            currentHeaderTitleFontSize = scaled(17)
+            currentHeaderDetailFontSize = scaled(12)
         case .systemMedium:
-            horizontalPadding = max(12, min(18, width * 0.05))
-            compactSpacing = max(10, min(14, width * 0.025))
-            compactUsageSpacing = max(12, min(18, width * 0.04))
-            largeSectionSpacing = 12
-            rowSpacing = 8
-            compactRingSize = max(42, min(56, width * 0.18))
-            metricColumnWidth = max(124, min(172, width * 0.37))
-            rowMetricColumnWidth = max(80, min(100, width * 0.19))
+            horizontalPadding = 0
+            verticalPadding = 0
+            let contentWidth = max(width - (horizontalPadding * 2), 1)
+            compactSpacing = scaled(14)
+            compactSectionSpacing = scaled(8)
+            compactUsageSpacing = scaled(10)
+            largeSectionSpacing = scaled(14)
+            rowSpacing = scaled(10)
+            compactRingSize = min(max(contentWidth * 0.24, scaled(62)), scaled(80))
+            compactRingLineWidth = scaled(7)
+            metricColumnWidth = contentWidth
+            rowMetricColumnWidth = contentWidth
+            chipFontSize = scaled(11)
+            compactTitleFontSize = scaled(15)
+            compactSubtitleFontSize = scaled(11)
+            compactRingValueFontSize = scaled(18)
+            compactRingTitleFontSize = scaled(11)
+            metricValueFontSize = scaled(14)
+            metricLabelFontSize = scaled(13)
+            metricIconSize = scaled(11)
+            metricResetFontSize = scaled(11)
+            metricResetIconSize = scaled(10)
+            rowMetricValueFontSize = scaled(13)
+            rowMetricLabelFontSize = scaled(12)
+            rowMetricIconSize = scaled(10)
+            rowResetFontSize = scaled(10)
+            rowResetIconSize = scaled(9)
+            currentHeaderTitleFontSize = scaled(18)
+            currentHeaderDetailFontSize = scaled(12)
         default:
-            horizontalPadding = max(8, min(14, width * 0.025))
-            compactSpacing = 12
-            compactUsageSpacing = 14
-            largeSectionSpacing = 14
-            rowSpacing = 10
-            compactRingSize = 48
-            metricColumnWidth = max(136, min(180, width * 0.30))
-            rowMetricColumnWidth = max(84, min(112, width * 0.18))
+            horizontalPadding = 0
+            verticalPadding = 0
+            let contentWidth = max(width - (horizontalPadding * 2), 1)
+            compactSpacing = scaled(14)
+            compactSectionSpacing = scaled(12)
+            compactUsageSpacing = scaled(16)
+            largeSectionSpacing = scaled(16)
+            rowSpacing = scaled(14)
+            compactRingSize = min(max(contentWidth * 0.17, scaled(52)), scaled(68))
+            compactRingLineWidth = scaled(7)
+            metricColumnWidth = contentWidth
+            rowMetricColumnWidth = contentWidth
+            chipFontSize = scaled(12)
+            compactTitleFontSize = scaled(18)
+            compactSubtitleFontSize = scaled(13)
+            compactRingValueFontSize = scaled(16)
+            compactRingTitleFontSize = scaled(11)
+            metricValueFontSize = scaled(15)
+            metricLabelFontSize = scaled(14)
+            metricIconSize = scaled(12)
+            metricResetFontSize = scaled(11)
+            metricResetIconSize = scaled(10)
+            rowMetricValueFontSize = scaled(14)
+            rowMetricLabelFontSize = scaled(13)
+            rowMetricIconSize = scaled(11)
+            rowResetFontSize = scaled(11)
+            rowResetIconSize = scaled(10)
+            currentHeaderTitleFontSize = scaled(19)
+            currentHeaderDetailFontSize = scaled(13)
         }
 
         return AccountsWidgetLayout(
+            family: family,
             horizontalPadding: horizontalPadding,
-            verticalPadding: defaultVerticalPadding,
+            verticalPadding: verticalPadding,
             compactSpacing: compactSpacing,
+            compactSectionSpacing: compactSectionSpacing,
             compactUsageSpacing: compactUsageSpacing,
             largeSectionSpacing: largeSectionSpacing,
             rowSpacing: rowSpacing,
             compactRingSize: compactRingSize,
+            compactRingLineWidth: compactRingLineWidth,
             metricColumnWidth: metricColumnWidth,
-            rowMetricColumnWidth: rowMetricColumnWidth
+            rowMetricColumnWidth: rowMetricColumnWidth,
+            chipFontSize: chipFontSize,
+            compactTitleFontSize: compactTitleFontSize,
+            compactSubtitleFontSize: compactSubtitleFontSize,
+            compactRingValueFontSize: compactRingValueFontSize,
+            compactRingTitleFontSize: compactRingTitleFontSize,
+            metricValueFontSize: metricValueFontSize,
+            metricLabelFontSize: metricLabelFontSize,
+            metricIconSize: metricIconSize,
+            metricResetFontSize: metricResetFontSize,
+            metricResetIconSize: metricResetIconSize,
+            rowMetricValueFontSize: rowMetricValueFontSize,
+            rowMetricLabelFontSize: rowMetricLabelFontSize,
+            rowMetricIconSize: rowMetricIconSize,
+            rowResetFontSize: rowResetFontSize,
+            rowResetIconSize: rowResetIconSize,
+            currentHeaderTitleFontSize: currentHeaderTitleFontSize,
+            currentHeaderDetailFontSize: currentHeaderDetailFontSize
         )
     }
 
-    static let backgroundGradient = LinearGradient(
-        colors: [
-            Color(red: 0.10, green: 0.13, blue: 0.18),
-            Color(red: 0.07, green: 0.10, blue: 0.14),
-        ],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
+    private static func layoutScale(for family: WidgetFamily, size: CGSize) -> CGFloat {
+        let referenceSize: CGSize
+
+        switch family {
+        case .systemSmall:
+            referenceSize = CGSize(width: 158, height: 158)
+        case .systemMedium:
+            referenceSize = CGSize(width: 338, height: 158)
+        default:
+            referenceSize = CGSize(width: 338, height: 354)
+        }
+
+        let widthScale = size.width / max(referenceSize.width, 1)
+        let heightScale = size.height / max(referenceSize.height, 1)
+        return min(max(min(widthScale, heightScale), 0.72), 1.20)
+    }
+
 }
 
 private struct AccountsWidgetLayout {
+    let family: WidgetFamily
     let horizontalPadding: CGFloat
     let verticalPadding: CGFloat
     let compactSpacing: CGFloat
+    let compactSectionSpacing: CGFloat
     let compactUsageSpacing: CGFloat
     let largeSectionSpacing: CGFloat
     let rowSpacing: CGFloat
     let compactRingSize: CGFloat
+    let compactRingLineWidth: CGFloat
     let metricColumnWidth: CGFloat
     let rowMetricColumnWidth: CGFloat
+    let chipFontSize: CGFloat
+    let compactTitleFontSize: CGFloat
+    let compactSubtitleFontSize: CGFloat
+    let compactRingValueFontSize: CGFloat
+    let compactRingTitleFontSize: CGFloat
+    let metricValueFontSize: CGFloat
+    let metricLabelFontSize: CGFloat
+    let metricIconSize: CGFloat
+    let metricResetFontSize: CGFloat
+    let metricResetIconSize: CGFloat
+    let rowMetricValueFontSize: CGFloat
+    let rowMetricLabelFontSize: CGFloat
+    let rowMetricIconSize: CGFloat
+    let rowResetFontSize: CGFloat
+    let rowResetIconSize: CGFloat
+    let currentHeaderTitleFontSize: CGFloat
+    let currentHeaderDetailFontSize: CGFloat
 }
 
 struct AccountsWidgetEntryView: View {
     @Environment(\.widgetFamily) private var family
+    @Environment(\.colorScheme) private var colorScheme
     let entry: AccountsWidgetEntry
 
     var body: some View {
@@ -110,7 +297,7 @@ struct AccountsWidgetEntryView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .containerBackground(for: .widget) {
-            AccountsWidgetStyle.backgroundGradient
+            AccountsWidgetStyle.backgroundGradient(for: colorScheme)
         }
     }
 }
@@ -127,18 +314,22 @@ private struct AccountsWidgetSmallView: View {
                 AccountsWidgetEmptyState()
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         .padding(.horizontal, layout.horizontalPadding)
         .padding(.vertical, layout.verticalPadding)
     }
 }
 
 private struct AccountsWidgetMediumView: View {
+    @Environment(\.widgetContentMargins) private var widgetContentMargins
     let current: AccountsWidgetCardSnapshot?
     let secondary: AccountsWidgetCardSnapshot?
     let layout: AccountsWidgetLayout
 
     var body: some View {
-        HStack(spacing: layout.compactSpacing) {
+        let dividerSpacing = max(widgetContentMargins.leading, widgetContentMargins.trailing)
+
+        return HStack(spacing: dividerSpacing) {
             Group {
                 if let current {
                     AccountsWidgetCompactCardContent(card: current, layout: layout)
@@ -146,11 +337,9 @@ private struct AccountsWidgetMediumView: View {
                     AccountsWidgetEmptyState()
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            Rectangle()
-                .fill(Color.white.opacity(0.10))
-                .frame(width: 1)
-                .padding(.vertical, 4)
+            AccountsWidgetMediumDivider()
 
             Group {
                 if let secondary {
@@ -159,33 +348,95 @@ private struct AccountsWidgetMediumView: View {
                     AccountsWidgetEmptyState()
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         .padding(.horizontal, layout.horizontalPadding)
         .padding(.vertical, layout.verticalPadding)
     }
 }
 
 private struct AccountsWidgetLargeView: View {
+    @Environment(\.colorScheme) private var colorScheme
     let current: AccountsWidgetCardSnapshot?
     let rows: [AccountsWidgetRowSnapshot]
     let layout: AccountsWidgetLayout
 
     var body: some View {
-        VStack(alignment: .leading, spacing: layout.largeSectionSpacing) {
-            if let current {
-                AccountsWidgetCurrentHeader(card: current, layout: layout)
-            } else {
-                AccountsWidgetEmptyState()
-            }
+        GeometryReader { proxy in
+            let groups = largeGroups
 
-            VStack(alignment: .leading, spacing: layout.rowSpacing) {
-                ForEach(rows) { row in
-                    AccountsWidgetAccountRow(row: row, layout: layout)
+            if groups.isEmpty {
+                AccountsWidgetEmptyState()
+            } else {
+                let size = proxy.size
+                let groupUnitHeight = size.height / CGFloat(max(groups.count, 1))
+                let tagFontSize = min(max(groupUnitHeight * 0.13, 9), 12)
+                let tagHorizontalPadding = min(max(size.width * 0.009, 5), 8)
+                let tagVerticalPadding = min(max(groupUnitHeight * 0.045, 2), 3)
+                let topRowSpacing = min(max(groupUnitHeight * 0.04, 2), 4)
+                let metricSpacing = min(max(size.width * 0.028, 10), 18)
+                let detailFontSize = min(max(groupUnitHeight * 0.12, 10), 13)
+                let iconSize = min(max(groupUnitHeight * 0.11, 10), 13)
+                let progressHeight = min(max(groupUnitHeight * 0.10, 7), 10)
+
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(groups.enumerated()), id: \.element.id) { index, group in
+                        AccountsWidgetLargeGroupView(
+                            group: group,
+                            tagFontSize: tagFontSize,
+                            tagHorizontalPadding: tagHorizontalPadding,
+                            tagVerticalPadding: tagVerticalPadding,
+                            topRowSpacing: topRowSpacing,
+                            metricSpacing: metricSpacing,
+                            detailFontSize: detailFontSize,
+                            iconSize: iconSize,
+                            progressHeight: progressHeight
+                        )
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+
+                        if index < groups.count - 1 {
+                            Spacer(minLength: 0)
+                        }
+                    }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
         }
         .padding(.horizontal, layout.horizontalPadding)
         .padding(.vertical, layout.verticalPadding)
+    }
+
+    private var largeGroups: [AccountsWidgetLargeGroup] {
+        var groups: [AccountsWidgetLargeGroup] = []
+
+        if let current {
+            groups.append(
+                AccountsWidgetLargeGroup(
+                    id: current.id,
+                    planLabel: current.planLabel,
+                    workspaceLabel: current.workspaceLabel,
+                    accountLabel: current.accountLabel,
+                    fiveHour: current.fiveHour,
+                    oneWeek: current.oneWeek
+                )
+            )
+        }
+
+        groups.append(
+            contentsOf: rows.map {
+                AccountsWidgetLargeGroup(
+                    id: $0.id,
+                    planLabel: $0.planLabel,
+                    workspaceLabel: $0.workspaceLabel,
+                    accountLabel: $0.accountLabel,
+                    fiveHour: $0.fiveHour,
+                    oneWeek: $0.oneWeek
+                )
+            }
+        )
+
+        return Array(groups.prefix(5))
     }
 }
 
@@ -193,250 +444,340 @@ private struct AccountsWidgetCompactCardContent: View {
     let card: AccountsWidgetCardSnapshot
     let layout: AccountsWidgetLayout
 
-    private var workspaceOrFallbackLabel: String {
-        if let workspaceLabel = card.workspaceLabel, !workspaceLabel.isEmpty {
-            return workspaceLabel
+    private var accentColor: Color {
+        switch card.planLabel {
+        case "PRO":
+            .orange
+        case "PLUS":
+            .pink
+        case "FREE":
+            .gray
+        case "ENTERPRISE", "BUSINESS":
+            .indigo
+        default:
+            .teal
         }
-        return card.accountLabel
     }
 
-    private var shouldShowAccountLabel: Bool {
-        card.workspaceLabel?.isEmpty ?? true
+    private var workspaceLabel: String? {
+        guard let workspaceLabel = card.workspaceLabel, !workspaceLabel.isEmpty else {
+            return nil
+        }
+        return workspaceLabel
+    }
+
+    private var displayAccountName: String {
+        card.accountLabel
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            AccountsWidgetChip(text: workspaceOrFallbackLabel)
+        GeometryReader { proxy in
+            let size = proxy.size
+            let hasWorkspaceLabel = workspaceLabel != nil
+            let groupSpacing = min(max(size.height * 0.045, 6), 10)
+            let tagFontSize = min(max(size.height * 0.085, 11), 14)
+            let tagHorizontalPadding = min(max(size.width * 0.04, 6), 12)
+            let tagVerticalPadding = min(max(size.height * 0.024, 3), 6)
+            let ringSpacing = min(max(size.width * 0.06, 10), 18)
+            let ringAreaHeight = size.height * (hasWorkspaceLabel ? 0.47 : 0.56)
+            let ringSize = min((size.width - ringSpacing) / 2, ringAreaHeight)
+            let ringLineWidth = min(max(ringSize * 0.13, 7), 12)
+            let ringValueFontSize = min(max(ringSize * 0.21, 13), 21)
+            let ringSubtitleFontSize = min(max(ringSize * 0.10, 9), 12)
 
-            if shouldShowAccountLabel {
-                Text(card.accountLabel)
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
+            VStack(alignment: .leading, spacing: groupSpacing) {
+                AccountsWidgetTag(
+                    text: card.planLabel,
+                    backgroundColor: accentColor.opacity(0.18),
+                    foregroundColor: accentColor,
+                    font: Font.system(size: tagFontSize, weight: .bold, design: .rounded),
+                    horizontalPadding: tagHorizontalPadding,
+                    verticalPadding: tagVerticalPadding
+                )
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack(spacing: layout.compactUsageSpacing) {
-                AccountsWidgetCompactUsageRing(window: card.fiveHour, tint: .orange, layout: layout)
-                AccountsWidgetCompactUsageRing(window: card.oneWeek, tint: .teal, layout: layout)
-            }
-            .frame(maxWidth: .infinity, alignment: .center)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-}
-
-private struct AccountsWidgetCurrentHeader: View {
-    let card: AccountsWidgetCardSnapshot
-    let layout: AccountsWidgetLayout
-
-    private var workspaceOrFallbackLabel: String {
-        if let workspaceLabel = card.workspaceLabel, !workspaceLabel.isEmpty {
-            return workspaceLabel
-        }
-        return card.accountLabel
-    }
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 14) {
-            AccountsWidgetChip(text: workspaceOrFallbackLabel)
-                .fixedSize(horizontal: true, vertical: false)
-
-            Spacer(minLength: 0)
-
-            VStack(spacing: 10) {
-                AccountsWidgetProgressMetric(window: card.fiveHour, tint: .orange, layout: layout)
-                AccountsWidgetProgressMetric(window: card.oneWeek, tint: .teal, layout: layout)
-            }
-            .frame(width: layout.metricColumnWidth)
-        }
-    }
-}
-
-private struct AccountsWidgetCompactUsageRing: View {
-    let window: AccountsWidgetWindowSnapshot
-    let tint: Color
-    let layout: AccountsWidgetLayout
-
-    private var progress: Double {
-        min(max(window.progressFraction, 0), 1)
-    }
-
-    var body: some View {
-        VStack(spacing: 4) {
-            ZStack {
-                Circle()
-                    .stroke(Color.white.opacity(0.10), lineWidth: AccountsWidgetStyle.compactRingLineWidth)
-
-                Circle()
-                    .trim(from: 0, to: progress)
-                    .stroke(
-                        AngularGradient(
-                            gradient: Gradient(colors: [tint.opacity(0.95), tint.opacity(0.65)]),
-                            center: .center
-                        ),
-                        style: StrokeStyle(lineWidth: AccountsWidgetStyle.compactRingLineWidth, lineCap: .round)
+                if let workspaceLabel {
+                    AccountsWidgetTag(
+                        text: workspaceLabel,
+                        backgroundColor: accentColor.opacity(0.18),
+                        foregroundColor: accentColor,
+                        font: Font.system(size: tagFontSize, weight: .bold, design: .rounded),
+                        horizontalPadding: tagHorizontalPadding,
+                        verticalPadding: tagVerticalPadding
                     )
-                    .rotationEffect(.degrees(-90))
-
-                VStack(spacing: 1) {
-                    Text(window.usedText)
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(.white)
-                    Text(window.title)
-                        .font(.system(size: 7, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.62))
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
+
+                AccountsWidgetTag(
+                    text: displayAccountName,
+                    backgroundColor: Color.orange.opacity(0.18),
+                    foregroundColor: Color.orange,
+                    font: Font.system(size: tagFontSize, weight: .bold, design: .rounded),
+                    horizontalPadding: tagHorizontalPadding,
+                    verticalPadding: tagVerticalPadding
+                )
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                HStack(spacing: ringSpacing) {
+                    AccountsWidgetCompactRing(
+                        valueText: card.fiveHour.usedText,
+                        subtitleText: card.fiveHour.title,
+                        progress: card.fiveHour.progressFraction,
+                        tint: .orange,
+                        size: ringSize,
+                        lineWidth: ringLineWidth,
+                        valueFontSize: ringValueFontSize,
+                        subtitleFontSize: ringSubtitleFontSize
+                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    AccountsWidgetCompactRing(
+                        valueText: card.oneWeek.usedText,
+                        subtitleText: card.oneWeek.title,
+                        progress: card.oneWeek.progressFraction,
+                        tint: .teal,
+                        size: ringSize,
+                        lineWidth: ringLineWidth,
+                        valueFontSize: ringValueFontSize,
+                        subtitleFontSize: ringSubtitleFontSize
+                    )
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+                .frame(height: ringAreaHeight, alignment: .center)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(width: layout.compactRingSize, height: layout.compactRingSize)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxHeight: .infinity, alignment: .center)
         }
     }
 }
 
-private struct AccountsWidgetProgressMetric: View {
-    let window: AccountsWidgetWindowSnapshot
-    let tint: Color
-    let layout: AccountsWidgetLayout
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 6) {
-                Image(systemName: "timer")
-                    .font(.system(size: 10, weight: .semibold))
-                Text(window.title)
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                Spacer(minLength: 0)
-                HStack(spacing: 4) {
-                    Image(systemName: "drop.halffull")
-                        .font(.system(size: 10, weight: .semibold))
-                    Text(window.remainingText)
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                }
-            }
-            .foregroundStyle(.white.opacity(0.88))
-
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.white.opacity(0.10))
-
-                    Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [tint.opacity(0.95), tint.opacity(0.72)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: max(10, proxy.size.width * window.progressFraction))
-                }
-            }
-            .frame(height: 8)
-
-            HStack(spacing: 4) {
-                Image(systemName: "timer")
-                    .font(.system(size: 9, weight: .medium))
-                Text(window.resetText)
-                    .font(.system(size: 9, weight: .medium, design: .rounded))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
-            .foregroundStyle(.white.opacity(0.62))
-        }
-        .frame(width: layout.metricColumnWidth, alignment: .leading)
-    }
-}
-
-private struct AccountsWidgetAccountRow: View {
-    let row: AccountsWidgetRowSnapshot
-    let layout: AccountsWidgetLayout
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            AccountsWidgetChip(text: row.workspaceOrAccountLabel)
-                .fixedSize(horizontal: true, vertical: false)
-
-            AccountsWidgetRowMetricColumn(
-                title: "5h",
-                remainingText: row.fiveHourRemainingText,
-                resetText: row.fiveHourResetText,
-                layout: layout
-            )
-
-            AccountsWidgetRowMetricColumn(
-                title: "1w",
-                remainingText: row.oneWeekRemainingText,
-                resetText: row.oneWeekResetText,
-                layout: layout
-            )
-        }
-    }
-}
-
-private struct AccountsWidgetRowMetricColumn: View {
-    let title: String
-    let remainingText: String
-    let resetText: String
-    let layout: AccountsWidgetLayout
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 4) {
-                Image(systemName: "timer")
-                    .font(.system(size: 9, weight: .medium))
-                Text(title)
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                Spacer(minLength: 0)
-                HStack(spacing: 3) {
-                    Image(systemName: "drop.halffull")
-                        .font(.system(size: 9, weight: .medium))
-                    Text(remainingText)
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
-                }
-            }
-
-            HStack(spacing: 4) {
-                Image(systemName: "timer")
-                    .font(.system(size: 9, weight: .medium))
-                Text(resetText)
-                    .font(.system(size: 9, weight: .medium, design: .rounded))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
-        }
-
-        .foregroundStyle(.white.opacity(0.86))
-        .frame(width: layout.rowMetricColumnWidth, alignment: .leading)
-    }
-}
-
-private struct AccountsWidgetChip: View {
+private struct AccountsWidgetTag: View {
     let text: String
+    let backgroundColor: Color
+    let foregroundColor: Color
+    let font: Font
+    let horizontalPadding: CGFloat
+    let verticalPadding: CGFloat
 
     var body: some View {
         Text(text)
-            .font(.system(size: 9, weight: .bold, design: .rounded))
-            .foregroundStyle(Color.cyan.opacity(0.92))
+            .font(font)
+            .foregroundStyle(foregroundColor)
             .lineLimit(1)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(Color.cyan.opacity(0.14))
+            .minimumScaleFactor(0.72)
+            .truncationMode(.tail)
+            .padding(.horizontal, horizontalPadding)
+            .padding(.vertical, verticalPadding)
+            .background(backgroundColor, in: Capsule())
+    }
+}
+
+private struct AccountsWidgetMediumDivider: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        Rectangle()
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0),
+                        AccountsWidgetStyle.dividerColor(for: colorScheme).opacity(0.4),
+                        AccountsWidgetStyle.dividerColor(for: colorScheme),
+                        AccountsWidgetStyle.dividerColor(for: colorScheme).opacity(0.4),
+                        Color.white.opacity(0),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
             )
+            .frame(width: 1)
+            .padding(.vertical, 2)
+    }
+}
+
+private struct AccountsWidgetCompactRing: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let valueText: String
+    let subtitleText: String
+    let progress: Double
+    let tint: Color
+    let size: CGFloat
+    let lineWidth: CGFloat
+    let valueFontSize: CGFloat
+    let subtitleFontSize: CGFloat
+
+    var body: some View {
+        ZStack {
+            LiquidProgressRing(
+                progress: progress,
+                tint: tint,
+                lineWidth: lineWidth
+            )
+
+            VStack(spacing: 1) {
+                Text(valueText)
+                    .font(.system(size: valueFontSize, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(AccountsWidgetStyle.primaryTextColor(for: colorScheme))
+                Text(subtitleText)
+                    .font(.system(size: subtitleFontSize, weight: .semibold, design: .rounded))
+                    .foregroundStyle(AccountsWidgetStyle.secondaryTextColor(for: colorScheme))
+            }
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+private struct AccountsWidgetLargeGroup: Identifiable {
+    let id: String
+    let planLabel: String
+    let workspaceLabel: String?
+    let accountLabel: String
+    let fiveHour: AccountsWidgetWindowSnapshot
+    let oneWeek: AccountsWidgetWindowSnapshot
+}
+
+private struct AccountsWidgetLargeGroupView: View {
+    let group: AccountsWidgetLargeGroup
+    let tagFontSize: CGFloat
+    let tagHorizontalPadding: CGFloat
+    let tagVerticalPadding: CGFloat
+    let topRowSpacing: CGFloat
+    let metricSpacing: CGFloat
+    let detailFontSize: CGFloat
+    let iconSize: CGFloat
+    let progressHeight: CGFloat
+
+    private var accentColor: Color {
+        switch group.planLabel {
+        case "PRO":
+            .orange
+        case "PLUS":
+            .pink
+        case "FREE":
+            .gray
+        case "ENTERPRISE", "BUSINESS":
+            .indigo
+        default:
+            .teal
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: topRowSpacing) {
+            HStack(spacing: 4) {
+                AccountsWidgetTag(
+                    text: group.planLabel,
+                    backgroundColor: accentColor.opacity(0.18),
+                    foregroundColor: accentColor,
+                    font: .system(size: tagFontSize, weight: .bold, design: .rounded),
+                    horizontalPadding: tagHorizontalPadding,
+                    verticalPadding: tagVerticalPadding
+                )
+
+                if let workspaceLabel = group.workspaceLabel {
+                    AccountsWidgetTag(
+                        text: workspaceLabel,
+                        backgroundColor: accentColor.opacity(0.18),
+                        foregroundColor: accentColor,
+                        font: .system(size: tagFontSize, weight: .bold, design: .rounded),
+                        horizontalPadding: tagHorizontalPadding,
+                        verticalPadding: tagVerticalPadding
+                    )
+                }
+
+                AccountsWidgetTag(
+                    text: group.accountLabel,
+                    backgroundColor: Color.orange.opacity(0.18),
+                    foregroundColor: Color.orange,
+                    font: .system(size: tagFontSize, weight: .bold, design: .rounded),
+                    horizontalPadding: tagHorizontalPadding,
+                    verticalPadding: tagVerticalPadding
+                )
+            }
+
+            HStack(alignment: .top, spacing: metricSpacing) {
+                AccountsWidgetLargeMetric(
+                    window: group.fiveHour,
+                    tint: .orange,
+                    detailFontSize: detailFontSize,
+                    iconSize: iconSize,
+                    progressHeight: progressHeight
+                )
+
+                AccountsWidgetLargeMetric(
+                    window: group.oneWeek,
+                    tint: .teal,
+                    detailFontSize: detailFontSize,
+                    iconSize: iconSize,
+                    progressHeight: progressHeight
+                )
+            }
+        }
+        .padding(.vertical, 1)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+}
+
+private struct AccountsWidgetLargeMetric: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let window: AccountsWidgetWindowSnapshot
+    let tint: Color
+    let detailFontSize: CGFloat
+    let iconSize: CGFloat
+    let progressHeight: CGFloat
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 6) {
+                Text(window.title)
+                    .font(.system(size: detailFontSize, weight: .semibold, design: .rounded))
+                    .foregroundStyle(AccountsWidgetStyle.secondaryTextColor(for: colorScheme))
+
+                LiquidProgressBar(
+                    progress: window.progressFraction,
+                    tint: tint,
+                    height: progressHeight
+                )
+            }
+
+            HStack(spacing: 6) {
+                HStack(spacing: 4) {
+                    Image(systemName: "timer")
+                        .font(.system(size: iconSize, weight: .medium))
+                    Text(window.resetText)
+                        .font(.system(size: detailFontSize, weight: .semibold, design: .rounded))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+
+                Spacer(minLength: 0)
+
+                HStack(spacing: 4) {
+                    Image(systemName: "drop.halffull")
+                        .font(.system(size: iconSize, weight: .medium))
+                    Text(window.remainingText)
+                        .font(.system(size: detailFontSize, weight: .semibold, design: .rounded))
+                }
+            }
+            .foregroundStyle(AccountsWidgetStyle.secondaryTextColor(for: colorScheme))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
 private struct AccountsWidgetEmptyState: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("No Accounts")
                 .font(.system(size: 15, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(AccountsWidgetStyle.primaryTextColor(for: colorScheme))
             Text("Open Copool to sync account usage into the widget.")
                 .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.60))
+                .foregroundStyle(AccountsWidgetStyle.secondaryTextColor(for: colorScheme))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }

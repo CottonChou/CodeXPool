@@ -5,14 +5,13 @@ extension AccountsPageModel {
         accounts: [AccountSummary],
         cloudSyncAvailable: Bool
     ) -> ViewState<[AccountSummary]> {
-        let sorted = AccountRanking.sortForDisplay(accounts)
-        if sorted.isEmpty {
+        if accounts.isEmpty {
             let messageKey = cloudSyncAvailable
                 ? "accounts.empty.message.no_accounts"
                 : "accounts.empty.message.enable_icloud"
             return .empty(message: L10n.tr(messageKey))
         }
-        return .content(sorted)
+        return .content(accounts)
     }
 
     func buildSwitchNotice(execution: SwitchAccountExecutionResult) -> NoticeMessage {
@@ -45,15 +44,15 @@ extension AccountsPageModel {
     }
 
     func applyAccounts(_ accounts: [AccountSummary]) {
-        let sorted = AccountRanking.sortForDisplay(accounts)
-        let availableIDs = Set(sorted.map(\.id))
+        let displayAccounts = AccountRanking.sortForDisplay(accounts)
+        let availableIDs = Set(displayAccounts.map(\.id))
         let nextCollapsed = collapsedAccountIDs.intersection(availableIDs)
         if nextCollapsed != collapsedAccountIDs {
             collapsedAccountIDs = nextCollapsed
         }
 
         let nextState = AccountsPageModel.makeViewState(
-            accounts: sorted,
+            accounts: displayAccounts,
             cloudSyncAvailable: isCloudSyncAvailable
         )
         if state != nextState {
@@ -66,11 +65,7 @@ extension AccountsPageModel {
         do {
             try await currentAccountSelectionSyncService.recordLocalSelection(accountID: accountID)
             try await currentAccountSelectionSyncService.pushLocalSelectionIfNeeded()
-        } catch {
-            #if DEBUG
-            // print("Current account selection sync skipped:", error.localizedDescription)
-            #endif
-        }
+        } catch {}
     }
 
     func syncCurrentAccountSelectionInBackground(accountID: String) {

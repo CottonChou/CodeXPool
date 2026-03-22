@@ -2,68 +2,6 @@ import XCTest
 @testable import Copool
 
 final class SwiftNativeProxyRuntimeServiceTests: XCTestCase {
-    func testDetectsUnsupportedReasoningSummaryNoneAsRetriable() {
-        let body = """
-        {"error":{"message":"Unsupported value: 'none' is not supported with the 'gpt-5.1-codex-max' model."}}
-        """
-        XCTAssertTrue(
-            SwiftNativeProxyRuntimeService.shouldRetryWithAutoReasoningSummary(
-                statusCode: 400,
-                bodyText: body
-            )
-        )
-        XCTAssertFalse(
-            SwiftNativeProxyRuntimeService.shouldRetryWithAutoReasoningSummary(
-                statusCode: 404,
-                bodyText: body
-            )
-        )
-
-        let quotedBody = """
-        {"error":{"message":"Unsupported value: \\\"none\\\" for reasoning.summary"}}
-        """
-        XCTAssertTrue(
-            SwiftNativeProxyRuntimeService.shouldRetryWithAutoReasoningSummary(
-                statusCode: 400,
-                bodyText: quotedBody
-            )
-        )
-    }
-
-    func testPromotesReasoningSummaryNoneToAuto() {
-        let payload: [String: Any] = [
-            "model": "gpt-5.1-codex-max",
-            "reasoning": [
-                "effort": "medium",
-                "summary": "none"
-            ]
-        ]
-        let adjusted = SwiftNativeProxyRuntimeService.payloadWithAutoReasoningSummaryIfNeeded(payload: payload)
-        let reasoning = adjusted?["reasoning"] as? [String: Any]
-        XCTAssertEqual(reasoning?["summary"] as? String, "auto")
-
-        let payloadAuto: [String: Any] = [
-            "model": "gpt-5.1-codex-max",
-            "reasoning": [
-                "summary": "auto"
-            ]
-        ]
-        XCTAssertNil(
-            SwiftNativeProxyRuntimeService.payloadWithAutoReasoningSummaryIfNeeded(payload: payloadAuto)
-        )
-
-        let payloadEffortNone: [String: Any] = [
-            "model": "gpt-5.1-codex-max",
-            "reasoning": [
-                "effort": "none",
-                "summary": "auto"
-            ]
-        ]
-        let adjustedEffort = SwiftNativeProxyRuntimeService.payloadWithAutoReasoningSummaryIfNeeded(payload: payloadEffortNone)
-        let adjustedReasoning = adjustedEffort?["reasoning"] as? [String: Any]
-        XCTAssertEqual(adjustedReasoning?["effort"] as? String, "medium")
-    }
-
     func testNormalizesReasoningSummaryForUpstream() {
         XCTAssertEqual(
             SwiftNativeProxyRuntimeService.normalizedReasoningSummaryForUpstream("none"),
@@ -200,6 +138,7 @@ final class SwiftNativeProxyRuntimeServiceTests: XCTestCase {
         let paths = FileSystemPaths(
             applicationSupportDirectory: tempDir,
             accountStorePath: tempDir.appendingPathComponent("accounts.json"),
+            settingsStorePath: tempDir.appendingPathComponent("settings.json"),
             codexAuthPath: tempDir.appendingPathComponent("auth.json"),
             codexConfigPath: tempDir.appendingPathComponent("config.toml"),
             proxyDaemonDataDirectory: tempDir.appendingPathComponent("proxyd", isDirectory: true),
@@ -212,6 +151,7 @@ final class SwiftNativeProxyRuntimeServiceTests: XCTestCase {
         let runtime = SwiftNativeProxyRuntimeService(
             paths: paths,
             storeRepository: storeRepo,
+            settingsRepository: MockSettingsRepository(),
             authRepository: authRepo
         )
 
@@ -242,10 +182,10 @@ final class SwiftNativeProxyRuntimeServiceTests: XCTestCase {
         XCTAssertNotNil(modelItems)
         XCTAssertTrue((modelItems?.count ?? 0) > 0)
         let ids = (modelItems ?? []).compactMap { $0["id"] as? String }
-        XCTAssertTrue(ids.contains("gpt-5-4"))
         XCTAssertTrue(ids.contains("gpt-5.4"))
         XCTAssertTrue(ids.contains("gpt-5.3-codex"))
         XCTAssertTrue(ids.contains("gpt-5.2"))
+        XCTAssertFalse(ids.contains("gpt-5-4"))
 
         var modelsByAPIKeyHeader = URLRequest(url: modelsURL)
         modelsByAPIKeyHeader.setValue(started.apiKey ?? "", forHTTPHeaderField: "x-api-key")
@@ -261,6 +201,7 @@ final class SwiftNativeProxyRuntimeServiceTests: XCTestCase {
         let paths = FileSystemPaths(
             applicationSupportDirectory: tempDir,
             accountStorePath: tempDir.appendingPathComponent("accounts.json"),
+            settingsStorePath: tempDir.appendingPathComponent("settings.json"),
             codexAuthPath: tempDir.appendingPathComponent("auth.json"),
             codexConfigPath: tempDir.appendingPathComponent("config.toml"),
             proxyDaemonDataDirectory: tempDir.appendingPathComponent("proxyd", isDirectory: true),
@@ -278,6 +219,7 @@ final class SwiftNativeProxyRuntimeServiceTests: XCTestCase {
         let runtime = SwiftNativeProxyRuntimeService(
             paths: paths,
             storeRepository: MockStoreRepository(),
+            settingsRepository: MockSettingsRepository(),
             authRepository: MockAuthRepository()
         )
 
@@ -298,6 +240,7 @@ final class SwiftNativeProxyRuntimeServiceTests: XCTestCase {
         let paths = FileSystemPaths(
             applicationSupportDirectory: tempDir,
             accountStorePath: tempDir.appendingPathComponent("accounts.json"),
+            settingsStorePath: tempDir.appendingPathComponent("settings.json"),
             codexAuthPath: tempDir.appendingPathComponent("auth.json"),
             codexConfigPath: tempDir.appendingPathComponent("config.toml"),
             proxyDaemonDataDirectory: tempDir.appendingPathComponent("proxyd", isDirectory: true),
@@ -308,6 +251,7 @@ final class SwiftNativeProxyRuntimeServiceTests: XCTestCase {
         let runtime = SwiftNativeProxyRuntimeService(
             paths: paths,
             storeRepository: MockStoreRepository(),
+            settingsRepository: MockSettingsRepository(),
             authRepository: MockAuthRepository()
         )
 
@@ -380,6 +324,16 @@ private final class MockStoreRepository: AccountsStoreRepository, @unchecked Sen
     }
 }
 
+private final class MockSettingsRepository: SettingsRepository, @unchecked Sendable {
+    func loadSettings() throws -> AppSettings {
+        .defaultValue
+    }
+
+    func saveSettings(_ settings: AppSettings) throws {
+        _ = settings
+    }
+}
+
 private final class MockAuthRepository: AuthRepository, @unchecked Sendable {
     func readCurrentAuth() throws -> JSONValue { .null }
     func readCurrentAuthOptional() throws -> JSONValue? { nil }
@@ -396,5 +350,4 @@ private final class MockAuthRepository: AuthRepository, @unchecked Sendable {
     func extractAuth(from auth: JSONValue) throws -> ExtractedAuth {
         ExtractedAuth(accountID: "acct", accessToken: "token", email: nil, planType: nil, teamName: nil)
     }
-    func currentAuthAccountID() -> String? { nil }
 }

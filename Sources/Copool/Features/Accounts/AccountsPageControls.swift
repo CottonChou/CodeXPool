@@ -1,38 +1,37 @@
 import SwiftUI
 
 struct AccountsActionBarView: View {
-    @ObservedObject var model: AccountsPageModel
+    let presentation: AccountsActionBarPresentation
+    let onTriggerAction: (AccountsPageActionIntent) -> Void
+    let onToggleCollapse: () -> Void
 
     var body: some View {
         HStack(spacing: LayoutRules.listRowSpacing) {
             ScrollView(.horizontal) {
                 AccountsActionStrip(
-                    descriptors: model.desktopActionButtons,
-                    onTrigger: triggerAction
+                    descriptors: presentation.descriptors,
+                    onTrigger: onTriggerAction
                 )
             }
             .scrollIndicators(.hidden)
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            CollapseChevronButton(isExpanded: model.collapsePresentation.isExpanded) {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    model.toggleAllAccountsCollapsed()
-                }
+            CollapseChevronButton(isExpanded: presentation.collapse.isExpanded) {
+                onToggleCollapse()
             }
-            .accessibilityLabel(Text(model.collapsePresentation.accessibilityLabel))
+            .accessibilityLabel(Text(presentation.collapse.accessibilityLabel))
         }
-    }
-
-    private func triggerAction(_ intent: AccountsPageActionIntent) {
-        Task { await model.handlePageAction(intent) }
     }
 }
 
 #if os(iOS)
 struct AccountsToolbarActions: ToolbarContent {
-    @ObservedObject var model: AccountsPageModel
+    let leadingButtons: [AccountsActionButtonDescriptor<AccountsPageActionIntent>]
+    let trailingButtons: [AccountsActionButtonDescriptor<AccountsPageActionIntent>]
     let currentLocale: AppLocale
     let onSelectLocale: (AppLocale) -> Void
+    let onTriggerAction: (AccountsPageActionIntent) -> Void
+    let onToggleCollapse: () -> Void
 
     var body: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
@@ -46,14 +45,14 @@ struct AccountsToolbarActions: ToolbarContent {
 
         ToolbarItemGroup(placement: .topBarLeading) {
             AccountsToolbarButtonGroup(
-                descriptors: model.leadingToolbarButtons,
+                descriptors: leadingButtons,
                 onTrigger: triggerAction
             )
         }
 
         ToolbarItemGroup(placement: .topBarTrailing) {
             AccountsToolbarButtonGroup(
-                descriptors: model.trailingToolbarButtons,
+                descriptors: trailingButtons,
                 onTrigger: triggerAction
             )
         }
@@ -61,12 +60,10 @@ struct AccountsToolbarActions: ToolbarContent {
 
     private func triggerAction(_ intent: AccountsPageActionIntent) {
         if intent == .toggleCollapse {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                model.toggleAllAccountsCollapsed()
-            }
+            onToggleCollapse()
             return
         }
-        Task { await model.handlePageAction(intent) }
+        onTriggerAction(intent)
     }
 }
 #endif

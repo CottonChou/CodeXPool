@@ -69,24 +69,33 @@ struct AccountCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            AccountCardHeaderSection(
-                presentation: presentation,
-                isCollapsed: isCollapsed,
-                isCurrent: account.isCurrent,
-                palette: palette,
-                onDelete: onDelete
-            )
-
-            Text(presentation.displayAccountName)
-                .font(.headline)
-                .foregroundStyle(account.isCurrent ? palette.toneColor : .primary)
-                .lineLimit(displaysExpandedTitle ? 2 : 1)
-                .fixedSize(horizontal: false, vertical: true)
-                .truncationMode(.tail)
-
             if isCollapsed {
+                AccountCompactHeaderContent(
+                    planLabel: presentation.planLabel,
+                    workspaceLabel: presentation.teamNameTag,
+                    accountName: presentation.displayAccountName,
+                    accentColor: palette.toneColor,
+                    titleFont: .headline,
+                    titleColor: account.isCurrent ? palette.toneColor : .primary,
+                    spacing: 8
+                )
                 AccountCardCompactUsageSection(presentation: presentation)
             } else {
+                AccountCardHeaderSection(
+                    presentation: presentation,
+                    isCollapsed: isCollapsed,
+                    isCurrent: account.isCurrent,
+                    palette: palette,
+                    onDelete: onDelete
+                )
+
+                Text(presentation.displayAccountName)
+                    .font(.headline)
+                    .foregroundStyle(account.isCurrent ? palette.toneColor : .primary)
+                    .lineLimit(displaysExpandedTitle ? 2 : 1)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .truncationMode(.tail)
+
                 AccountCardExpandedUsageSection(presentation: presentation)
             }
         }

@@ -34,6 +34,7 @@ actor CloudKitProxyControlSyncService: ProxyControlCloudSyncServiceProtocol {
         var publicAccessEnabled: Bool
         var remoteServers: [RemoteServerConfig]
         var remoteStatuses: [String: RemoteProxyStatus]
+        var remoteDiscoveries: [String: [DiscoveredRemoteProxyInstance]]
         var remoteLogs: [String: String]
         var lastHandledCommandID: String?
         var lastCommandError: String?
@@ -50,6 +51,7 @@ actor CloudKitProxyControlSyncService: ProxyControlCloudSyncServiceProtocol {
             publicAccessEnabled = normalizedSnapshot.publicAccessEnabled
             remoteServers = normalizedSnapshot.remoteServers
             remoteStatuses = normalizedSnapshot.remoteStatuses
+            remoteDiscoveries = normalizedSnapshot.remoteDiscoveries
             remoteLogs = normalizedSnapshot.remoteLogs
             lastHandledCommandID = normalizedSnapshot.lastHandledCommandID
             lastCommandError = normalizedSnapshot.lastCommandError

@@ -40,10 +40,8 @@ struct AccountsWidgetWindowSnapshot: Codable, Equatable, Sendable {
 struct AccountsWidgetRowSnapshot: Codable, Equatable, Sendable, Identifiable {
     var id: String
     var planLabel: String
-    var workspaceOrAccountLabel: String
-    var accountLabel: String?
-    var fiveHourRemainingText: String
-    var oneWeekRemainingText: String
-    var fiveHourResetText: String
-    var oneWeekResetText: String
+    var workspaceLabel: String?
+    var accountLabel: String
+    var fiveHour: AccountsWidgetWindowSnapshot
+    var oneWeek: AccountsWidgetWindowSnapshot
 }

@@ -11,38 +11,52 @@ extension ProxyPageModel {
             return
         }
         do {
-            let snapshot = try await performLocalCommand(
+            try await applyLocalRemoteServerCommand(
                 kind: .addRemoteServer,
                 remoteServer: RemoteServerConfiguration.makeDraft()
             )
-            applyRemoteSnapshot(snapshot)
             notice = NoticeMessage(style: .success, text: L10n.tr("settings.notice.remote_servers_saved"))
         } catch {
-            notice = NoticeMessage(style: .error, text: error.localizedDescription)
+            showError(error)
         }
     }
 
-    func saveRemoteServer(_ server: RemoteServerConfig) async {
+    func saveRemoteServer(
+        _ server: RemoteServerConfig,
+        previousServerID: String? = nil
+    ) async {
         if usesRemoteMacControl {
             await performRemoteCommand(
                 kind: .saveRemoteServer,
                 remoteServer: RemoteServerConfiguration.normalize(server),
+                previousRemoteServerID: previousServerID,
                 successNotice: L10n.tr("settings.notice.remote_servers_saved")
             )
             return
         }
-        remoteActions[server.id] = .save
-        defer { remoteActions.removeValue(forKey: server.id) }
-        do {
-            let snapshot = try await performLocalCommand(
-                kind: .saveRemoteServer,
-                remoteServer: RemoteServerConfiguration.normalize(server)
-            )
-            applyRemoteSnapshot(snapshot)
-            notice = NoticeMessage(style: .success, text: L10n.tr("settings.notice.remote_servers_saved"))
-        } catch {
-            notice = NoticeMessage(style: .error, text: error.localizedDescription)
+        let actionKey = previousServerID ?? server.id
+        await withSaveRemoteAction(actionKey: actionKey, serverID: server.id) {
+            do {
+                try await applyLocalRemoteServerCommand(
+                    kind: .saveRemoteServer,
+                    remoteServer: RemoteServerConfiguration.normalize(server),
+                    previousRemoteServerID: previousServerID
+                )
+                notice = NoticeMessage(style: .success, text: L10n.tr("settings.notice.remote_servers_saved"))
+            } catch {
+                showError(error)
+            }
         }
+    }
+
+    func adoptDiscoveredRemoteServer(
+        _ server: RemoteServerConfig,
+        previousServerID: String
+    ) async {
+        let normalized = RemoteServerConfiguration.normalize(server)
+        await saveRemoteServer(normalized, previousServerID: previousServerID)
+        guard !hasErrorNotice else { return }
+        await refreshRemote(server: normalized)
     }
 
     func removeRemoteServer(id: String) async {
@@ -54,17 +68,42 @@ extension ProxyPageModel {
             )
             return
         }
-        remoteActions[id] = .remove
-        defer { remoteActions.removeValue(forKey: id) }
-        do {
-            let snapshot = try await performLocalCommand(
-                kind: .removeRemoteServer,
-                remoteServerID: id
-            )
-            applyRemoteSnapshot(snapshot)
-            notice = NoticeMessage(style: .success, text: L10n.tr("proxy.notice.remote_server_removed"))
-        } catch {
-            notice = NoticeMessage(style: .error, text: error.localizedDescription)
+        await withRemoteAction(id, action: .removeLocal) {
+            do {
+                try await applyLocalRemoteServerCommand(
+                    kind: .removeRemoteServer,
+                    remoteServerID: id
+                )
+                notice = NoticeMessage(style: .success, text: L10n.tr("proxy.notice.remote_server_removed"))
+            } catch {
+                showError(error)
+            }
+        }
+    }
+
+    func discoverRemote(server: RemoteServerConfig) async {
+        guard canManageRemoteServers else { return }
+        let normalized = RemoteServerConfiguration.normalize(server)
+
+        await withRemoteAction(normalized.id, action: .discover) {
+            if usesRemoteMacControl {
+                await performRemoteCommand(
+                    kind: .discoverRemote,
+                    remoteServer: normalized
+                )
+            } else {
+                do {
+                    try await applyLocalRemoteServerCommand(
+                        kind: .discoverRemote,
+                        remoteServer: normalized
+                    )
+                } catch {
+                    showError(error)
+                }
+            }
+
+            guard !hasErrorNotice else { return }
+            notice = remoteDiscoveryNotice(for: normalized.id)
         }
     }
 
@@ -86,16 +125,15 @@ extension ProxyPageModel {
             await performRemoteCommand(kind: .refreshRemote, remoteServerID: server.id)
             return
         }
-        remoteActions[server.id] = .refresh
-        defer { remoteActions.removeValue(forKey: server.id) }
-        do {
-            let snapshot = try await performLocalCommand(
-                kind: .refreshRemote,
-                remoteServerID: server.id
-            )
-            applyRemoteSnapshot(snapshot)
-        } catch {
-            notice = NoticeMessage(style: .error, text: error.localizedDescription)
+        await withRemoteAction(server.id, action: .refresh) {
+            do {
+                try await applyLocalRemoteServerCommand(
+                    kind: .refreshRemote,
+                    remoteServerID: server.id
+                )
+            } catch {
+                showError(error)
+            }
         }
     }
 
@@ -110,19 +148,44 @@ extension ProxyPageModel {
             )
             return
         }
-        remoteActions[server.id] = .deploy
-        defer { remoteActions.removeValue(forKey: server.id) }
-        notice = NoticeMessage(style: .info, text: L10n.tr("proxy.notice.remote_deploying_format", server.label))
+        await withRemoteAction(server.id, action: .deploy) {
+            notice = NoticeMessage(style: .info, text: L10n.tr("proxy.notice.remote_deploying_format", server.label))
+            do {
+                try await applyLocalRemoteServerCommand(
+                    kind: .deployRemote,
+                    remoteServerID: server.id
+                )
+                notice = NoticeMessage(style: .success, text: L10n.tr("proxy.notice.remote_deploy_done_format", server.label))
+            } catch {
+                showError(error)
+            }
+        }
+    }
 
-        do {
-            let snapshot = try await performLocalCommand(
-                kind: .deployRemote,
-                remoteServerID: server.id
-            )
-            applyRemoteSnapshot(snapshot)
-            notice = NoticeMessage(style: .success, text: L10n.tr("proxy.notice.remote_deploy_done_format", server.label))
-        } catch {
-            notice = NoticeMessage(style: .error, text: error.localizedDescription)
+    func syncRemoteAccounts(server: RemoteServerConfig) async {
+        guard canManageRemoteServers else { return }
+        await withRemoteAction(server.id, action: .syncAccounts) {
+            if usesRemoteMacControl {
+                await performRemoteCommand(
+                    kind: .syncRemoteAccounts,
+                    remoteServerID: server.id,
+                    successNotice: L10n.tr("proxy.notice.remote_accounts_synced_format", server.label)
+                )
+                return
+            }
+
+            do {
+                try await applyLocalRemoteServerCommand(
+                    kind: .syncRemoteAccounts,
+                    remoteServerID: server.id
+                )
+                notice = NoticeMessage(
+                    style: .success,
+                    text: L10n.tr("proxy.notice.remote_accounts_synced_format", server.label)
+                )
+            } catch {
+                showError(error)
+            }
         }
     }
 
@@ -136,18 +199,16 @@ extension ProxyPageModel {
             )
             return
         }
-        remoteActions[server.id] = .start
-        defer { remoteActions.removeValue(forKey: server.id) }
-
-        do {
-            let snapshot = try await performLocalCommand(
-                kind: .startRemote,
-                remoteServerID: server.id
-            )
-            applyRemoteSnapshot(snapshot)
-            notice = NoticeMessage(style: .success, text: L10n.tr("proxy.notice.remote_started_format", server.label))
-        } catch {
-            notice = NoticeMessage(style: .error, text: error.localizedDescription)
+        await withRemoteAction(server.id, action: .start) {
+            do {
+                try await applyLocalRemoteServerCommand(
+                    kind: .startRemote,
+                    remoteServerID: server.id
+                )
+                notice = NoticeMessage(style: .success, text: L10n.tr("proxy.notice.remote_started_format", server.label))
+            } catch {
+                showError(error)
+            }
         }
     }
 
@@ -161,45 +222,133 @@ extension ProxyPageModel {
             )
             return
         }
-        remoteActions[server.id] = .stop
-        defer { remoteActions.removeValue(forKey: server.id) }
-
-        do {
-            let snapshot = try await performLocalCommand(
-                kind: .stopRemote,
-                remoteServerID: server.id
-            )
-            applyRemoteSnapshot(snapshot)
-            notice = NoticeMessage(style: .info, text: L10n.tr("proxy.notice.remote_stopped_format", server.label))
-        } catch {
-            notice = NoticeMessage(style: .error, text: error.localizedDescription)
+        await withRemoteAction(server.id, action: .stop) {
+            do {
+                try await applyLocalRemoteServerCommand(
+                    kind: .stopRemote,
+                    remoteServerID: server.id
+                )
+                notice = NoticeMessage(style: .info, text: L10n.tr("proxy.notice.remote_stopped_format", server.label))
+            } catch {
+                showError(error)
+            }
         }
     }
 
     func readRemoteLogs(server: RemoteServerConfig) async {
         guard canManageRemoteServers else { return }
-        if usesRemoteMacControl {
-            remoteActions[server.id] = .logs
-            defer { remoteActions.removeValue(forKey: server.id) }
+        await withRemoteAction(server.id, action: .logs) {
+            if usesRemoteMacControl {
+                await performRemoteLogCommand(serverID: server.id, logLines: 120)
+                return
+            }
 
-            await performRemoteLogCommand(
-                serverID: server.id,
-                logLines: 120
-            )
-            return
+            do {
+                try await applyLocalRemoteServerCommand(
+                    kind: .readRemoteLogs,
+                    remoteServerID: server.id,
+                    logLines: 120
+                )
+            } catch {
+                showError(error)
+            }
         }
-        remoteActions[server.id] = .logs
-        defer { remoteActions.removeValue(forKey: server.id) }
+    }
 
-        do {
-            let snapshot = try await performLocalCommand(
-                kind: .readRemoteLogs,
-                remoteServerID: server.id,
-                logLines: 120
-            )
-            applyRemoteSnapshot(snapshot)
-        } catch {
-            notice = NoticeMessage(style: .error, text: error.localizedDescription)
+    func uninstallRemote(server: RemoteServerConfig) async {
+        guard canManageRemoteServers else { return }
+        await withRemoteAction(server.id, action: .uninstall) {
+            if usesRemoteMacControl {
+                await performRemoteCommand(
+                    kind: .uninstallRemote,
+                    remoteServerID: server.id,
+                    removeRemoteDirectory: false,
+                    successNotice: L10n.tr("proxy.notice.remote_uninstalled_format", server.label)
+                )
+                return
+            }
+
+            do {
+                try await applyLocalRemoteServerCommand(
+                    kind: .uninstallRemote,
+                    remoteServerID: server.id,
+                    removeRemoteDirectory: false
+                )
+                notice = NoticeMessage(
+                    style: .success,
+                    text: L10n.tr("proxy.notice.remote_uninstalled_format", server.label)
+                )
+            } catch {
+                showError(error)
+            }
         }
+    }
+
+    private func applyLocalRemoteServerCommand(
+        kind: ProxyControlCommandKind,
+        remoteServer: RemoteServerConfig? = nil,
+        remoteServerID: String? = nil,
+        previousRemoteServerID: String? = nil,
+        logLines: Int? = nil,
+        removeRemoteDirectory: Bool? = nil
+    ) async throws {
+        let snapshot = try await performLocalCommand(
+            kind: kind,
+            remoteServer: remoteServer,
+            remoteServerID: remoteServerID,
+            previousRemoteServerID: previousRemoteServerID,
+            logLines: logLines,
+            removeRemoteDirectory: removeRemoteDirectory
+        )
+        applyRemoteSnapshot(snapshot)
+    }
+
+    private func withRemoteAction(
+        _ key: String,
+        action: RemoteServerAction,
+        operation: () async -> Void
+    ) async {
+        remoteActions[key] = action
+        defer { remoteActions.removeValue(forKey: key) }
+        await operation()
+    }
+
+    private func withSaveRemoteAction(
+        actionKey: String,
+        serverID: String,
+        operation: () async -> Void
+    ) async {
+        remoteActions[actionKey] = .save
+        defer {
+            remoteActions.removeValue(forKey: actionKey)
+            if actionKey != serverID {
+                remoteActions.removeValue(forKey: serverID)
+            }
+        }
+        await operation()
+    }
+
+    private func showError(_ error: Error) {
+        notice = NoticeMessage(style: .error, text: error.localizedDescription)
+    }
+
+    private func remoteDiscoveryNotice(for serverID: String) -> NoticeMessage {
+        let count = remoteDiscoveries[serverID]?.count ?? 0
+        if count == 0 {
+            return NoticeMessage(style: .info, text: L10n.tr("proxy.notice.remote_discovery_empty"))
+        }
+
+        return NoticeMessage(
+            style: .success,
+            text: L10n.tr("proxy.notice.remote_discovery_found_format", String(count))
+        )
+    }
+
+    private var hasErrorNotice: Bool {
+        guard let notice else { return false }
+        if case .error = notice.style {
+            return true
+        }
+        return false
     }
 }

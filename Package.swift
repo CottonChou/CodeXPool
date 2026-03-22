@@ -14,6 +14,9 @@ let package = Package(
         .executableTarget(
             name: "Copool",
             path: "Sources/Copool",
+            exclude: [
+                "Copool.icon"
+            ],
             resources: [
                 .process("Resources")
             ]

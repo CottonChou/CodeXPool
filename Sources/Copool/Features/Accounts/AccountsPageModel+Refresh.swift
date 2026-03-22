@@ -17,7 +17,7 @@ extension AccountsPageModel {
                     }
                 )
             } else {
-                accounts = try await coordinator.refreshAllUsage(
+                accounts = try await coordinator.refreshUsage(
                     force: true,
                     onPartialUpdate: { [weak self] accounts in
                         guard let self else { return }
@@ -46,7 +46,7 @@ extension AccountsPageModel {
 
         do {
             let accounts = try await coordinator.refreshUsage(
-                forAccountIDs: [id],
+                accountIDs: [id],
                 force: true,
                 onPartialUpdate: { [weak self] accounts in
                     guard let self else { return }
