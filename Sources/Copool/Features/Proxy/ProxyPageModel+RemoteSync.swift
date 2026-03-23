@@ -74,12 +74,21 @@ extension ProxyPageModel {
     @discardableResult
     func applyRemoteSnapshot(_ snapshot: ProxyControlSnapshot) -> Bool {
         let normalizedSnapshot = ProxySyncPolicy.RemoteLogs.normalize(snapshot)
+        let nextState = ProxyRemoteSnapshotPresentationState(snapshot: normalizedSnapshot)
         lastAppliedRemoteSnapshot = normalizedSnapshot
         lastHandledRemoteCommandID = normalizedSnapshot.lastHandledCommandID
         lastRemoteCommandError = normalizedSnapshot.lastCommandError
         lastAppliedRemoteSnapshotSyncedAt = normalizedSnapshot.syncedAt
         lastAppliedRemoteStatusesSyncedAt = normalizedSnapshot.remoteStatusesSyncedAt
-        let nextState = ProxyRemoteSnapshotPresentationState(snapshot: normalizedSnapshot)
+        lastSyncedProxyConfiguration = ProxyConfiguration(
+            preferredPortText: nextState.preferredPortText,
+            cloudflared: CloudflaredConfiguration(
+                enabled: nextState.publicAccessEnabled,
+                tunnelMode: nextState.cloudflaredTunnelMode,
+                useHTTP2: nextState.cloudflaredUseHTTP2,
+                namedHostname: nextState.cloudflaredNamedHostname
+            )
+        )
         guard nextState != currentRemoteSnapshotPresentationState else {
             return false
         }
@@ -98,7 +107,6 @@ extension ProxyPageModel {
         if cloudflaredNamedInput.hostname != nextState.cloudflaredNamedHostname {
             cloudflaredNamedInput.hostname = nextState.cloudflaredNamedHostname
         }
-        lastSyncedProxyConfiguration = currentProxyConfiguration
         return true
     }
 

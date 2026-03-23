@@ -26,6 +26,7 @@ actor CloudKitProxyControlSyncService: ProxyControlCloudSyncServiceProtocol {
     private struct SnapshotSemanticState: Encodable {
         var proxyStatus: ApiProxyStatus
         var preferredProxyPort: Int?
+        var preferredProxyPortText: String?
         var autoStartProxy: Bool
         var cloudflaredStatus: CloudflaredStatus
         var cloudflaredTunnelMode: CloudflaredTunnelMode
@@ -33,6 +34,7 @@ actor CloudKitProxyControlSyncService: ProxyControlCloudSyncServiceProtocol {
         var cloudflaredUseHTTP2: Bool
         var publicAccessEnabled: Bool
         var remoteServers: [RemoteServerConfig]
+        var remoteStatusesSyncedAt: Int64?
         var remoteStatuses: [String: RemoteProxyStatus]
         var remoteDiscoveries: [String: [DiscoveredRemoteProxyInstance]]
         var remoteLogs: [String: String]
@@ -43,6 +45,7 @@ actor CloudKitProxyControlSyncService: ProxyControlCloudSyncServiceProtocol {
             let normalizedSnapshot = ProxySyncPolicy.RemoteLogs.normalize(snapshot)
             proxyStatus = normalizedSnapshot.proxyStatus
             preferredProxyPort = normalizedSnapshot.preferredProxyPort
+            preferredProxyPortText = normalizedSnapshot.preferredProxyPortText
             autoStartProxy = normalizedSnapshot.autoStartProxy
             cloudflaredStatus = normalizedSnapshot.cloudflaredStatus
             cloudflaredTunnelMode = normalizedSnapshot.cloudflaredTunnelMode
@@ -50,6 +53,7 @@ actor CloudKitProxyControlSyncService: ProxyControlCloudSyncServiceProtocol {
             cloudflaredUseHTTP2 = normalizedSnapshot.cloudflaredUseHTTP2
             publicAccessEnabled = normalizedSnapshot.publicAccessEnabled
             remoteServers = normalizedSnapshot.remoteServers
+            remoteStatusesSyncedAt = normalizedSnapshot.remoteStatusesSyncedAt
             remoteStatuses = normalizedSnapshot.remoteStatuses
             remoteDiscoveries = normalizedSnapshot.remoteDiscoveries
             remoteLogs = normalizedSnapshot.remoteLogs
@@ -315,8 +319,21 @@ actor CloudKitProxyControlSyncService: ProxyControlCloudSyncServiceProtocol {
         }
     }
 
+    nonisolated static func semanticSnapshotDigest(for snapshot: ProxyControlSnapshot) throws -> String {
+        let normalizedSnapshot = ProxySyncPolicy.RemoteLogs.normalize(snapshot)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        do {
+            let data = try encoder.encode(SnapshotSemanticState(snapshot: normalizedSnapshot))
+            let digest = SHA256.hash(data: data)
+            return digest.map { String(format: "%02x", $0) }.joined()
+        } catch {
+            throw AppError.invalidData("Failed to serialize proxy control payload: \(error.localizedDescription)")
+        }
+    }
+
     private func snapshotDigest(for snapshot: ProxyControlSnapshot) throws -> String {
-        try digest(for: SnapshotSemanticState(snapshot: snapshot))
+        try Self.semanticSnapshotDigest(for: snapshot)
     }
 
     private func commandDigest(for command: ProxyControlCommand) throws -> String {

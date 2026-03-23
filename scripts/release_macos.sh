@@ -9,13 +9,12 @@ SCHEME="${SCHEME:-Copool}"
 CONFIGURATION="${CONFIGURATION:-Release}"
 DEVELOPMENT_TEAM="${DEVELOPMENT_TEAM:-KLU8GF65GP}"
 CODESIGN_IDENTITY="${CODESIGN_IDENTITY:-Developer ID Application: Ning Huang (KLU8GF65GP)}"
-SIGNING_STYLE="${SIGNING_STYLE:-Automatic}"
-PROVISIONING_PROFILE_SPECIFIER="${PROVISIONING_PROFILE_SPECIFIER:-}"
-AUTO_DETECT_PROFILE="${AUTO_DETECT_PROFILE:-1}"
-RELEASE_ROOT="${RELEASE_ROOT:-$ROOT_DIR/artifacts/macos-release}"
 WORK_ROOT="${WORK_ROOT:-}"
 KEEP_WORK_ROOT="${KEEP_WORK_ROOT:-0}"
+RELEASE_ROOT="${RELEASE_ROOT:-}"
 PRODUCT_BUNDLE_IDENTIFIER="${PRODUCT_BUNDLE_IDENTIFIER:-com.alick.copool}"
+APP_ENTITLEMENTS_PATH="${APP_ENTITLEMENTS_PATH:-$ROOT_DIR/Copool.release.entitlements}"
+PLUGIN_ENTITLEMENTS_PATH="${PLUGIN_ENTITLEMENTS_PATH:-$ROOT_DIR/CopoolWidgetsMac.entitlements}"
 NOTARIZE_WITH="${NOTARIZE_WITH:-auto}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-}"
 CREATE_GITHUB_RELEASE="${CREATE_GITHUB_RELEASE:-0}"
@@ -40,9 +39,15 @@ ensure_clean_dir() {
 
 cleanup_work_root() {
   if [[ "${KEEP_WORK_ROOT}" == "1" || -z "${WORK_ROOT:-}" ]]; then
+    if [[ -n "${STAGE_ROOT:-}" && "${STAGE_ROOT}" == "${TMPDIR:-/tmp}"/copool-stage.* ]]; then
+      rm -rf "$STAGE_ROOT"
+    fi
     return
   fi
 
+  if [[ -n "${STAGE_ROOT:-}" && "$STAGE_ROOT" != "$WORK_ROOT"/* ]]; then
+    rm -rf "$STAGE_ROOT"
+  fi
   rm -rf "$WORK_ROOT"
 }
 
@@ -61,6 +66,11 @@ extract_plist_value() {
 }
 
 resolve_provisioning_profile_specifier() {
+  resolve_provisioning_profile_specifier_for_bundle_id "$PRODUCT_BUNDLE_IDENTIFIER"
+}
+
+resolve_provisioning_profile_specifier_for_bundle_id() {
+  local bundle_id="$1"
   local profile_dir
   local profile_path
   local plist_path
@@ -102,8 +112,39 @@ resolve_provisioning_profile_specifier() {
       fi
 
       bundle_identifier_suffix="${app_identifier#${team_id}.}"
-      if [[ "$bundle_identifier_suffix" == "$PRODUCT_BUNDLE_IDENTIFIER" && "$name" == *"Developer ID"* ]]; then
+      if [[ "$bundle_identifier_suffix" == "$bundle_id" && "$name" == *"Developer ID"* ]]; then
         printf '%s' "$name"
+        return 0
+      fi
+    done < <(find "$profile_dir" -maxdepth 1 \( -name '*.mobileprovision' -o -name '*.provisionprofile' \) -print0)
+  done
+
+  return 1
+}
+
+resolve_profile_path_by_name() {
+  local expected_name="$1"
+  local profile_dir
+  local profile_path
+  local plist_path
+  local name
+  local tmp_dir
+
+  tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/copool-profile-path.XXXXXX")"
+  trap 'rm -rf "$tmp_dir"' RETURN
+
+  for profile_dir in \
+    "$HOME/Library/MobileDevice/Provisioning Profiles" \
+    "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+  do
+    [[ -d "$profile_dir" ]] || continue
+
+    while IFS= read -r -d '' profile_path; do
+      plist_path="$tmp_dir/profile.plist"
+      decode_profile_to_plist "$profile_path" "$plist_path" || continue
+      name="$(extract_plist_value "$plist_path" ":Name")"
+      if [[ "$name" == "$expected_name" ]]; then
+        printf '%s' "$profile_path"
         return 0
       fi
     done < <(find "$profile_dir" -maxdepth 1 \( -name '*.mobileprovision' -o -name '*.provisionprofile' \) -print0)
@@ -118,7 +159,7 @@ pick_notarization_backend() {
       printf '%s' "$NOTARIZE_WITH"
       ;;
     auto)
-      if command -v asc >/dev/null 2>&1 && asc auth whoami >/dev/null 2>&1; then
+      if command -v asc >/dev/null 2>&1 && asc auth status >/dev/null 2>&1; then
         printf 'asc'
       elif [[ -n "$NOTARY_PROFILE" ]]; then
         printf 'notarytool'
@@ -133,41 +174,63 @@ pick_notarization_backend() {
   esac
 }
 
-write_export_options() {
-  if [[ "$SIGNING_STYLE" == "Manual" && -z "$PROVISIONING_PROFILE_SPECIFIER" ]]; then
-    printf 'PROVISIONING_PROFILE_SPECIFIER is required when SIGNING_STYLE=Manual\n' >&2
+embed_profile_if_found() {
+  local bundle_id="$1"
+  local target_path="$2"
+  local profile_name
+  local profile_path
+
+  if ! profile_name="$(resolve_provisioning_profile_specifier_for_bundle_id "$bundle_id")"; then
+    log "No Developer ID provisioning profile found for $bundle_id; continuing without embedded profile"
+    return 0
+  fi
+
+  if ! profile_path="$(resolve_profile_path_by_name "$profile_name")"; then
+    printf 'Unable to resolve profile path for %s\n' "$profile_name" >&2
     exit 1
   fi
 
-  cat >"$EXPORT_OPTIONS_PLIST" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>method</key>
-  <string>developer-id</string>
-  <key>signingStyle</key>
-  <string>${SIGNING_STYLE,,}</string>
-  <key>teamID</key>
-  <string>${DEVELOPMENT_TEAM}</string>
-EOF
+  cp "$profile_path" "$target_path/Contents/embedded.provisionprofile"
+}
 
-  if [[ "$SIGNING_STYLE" == "Manual" ]]; then
-    cat >>"$EXPORT_OPTIONS_PLIST" <<EOF
-  <key>signingCertificate</key>
-  <string>${CODESIGN_IDENTITY}</string>
-  <key>provisioningProfiles</key>
-  <dict>
-    <key>${PRODUCT_BUNDLE_IDENTIFIER}</key>
-    <string>${PROVISIONING_PROFILE_SPECIFIER}</string>
-  </dict>
-EOF
-  fi
+sanitize_app_bundle() {
+  local source_app="$1"
+  local staged_app="$2"
 
-  cat >>"$EXPORT_OPTIONS_PLIST" <<EOF
-</dict>
-</plist>
-EOF
+  rm -rf "$staged_app"
+  mkdir -p "$(dirname "$staged_app")"
+  /usr/bin/ditto --norsrc --noqtn "$source_app" "$staged_app"
+  xattr -cr "$staged_app"
+}
+
+sign_app_bundle() {
+  local app_path="$1"
+  local app_bundle_id
+  local plugin_path
+  local plugin_bundle_id
+
+  app_bundle_id="$(defaults read "$app_path/Contents/Info" CFBundleIdentifier)"
+  embed_profile_if_found "$app_bundle_id" "$app_path"
+
+  while IFS= read -r -d '' plugin_path; do
+    plugin_bundle_id="$(defaults read "$plugin_path/Contents/Info" CFBundleIdentifier)"
+    embed_profile_if_found "$plugin_bundle_id" "$plugin_path"
+    codesign \
+      --force \
+      --sign "$CODESIGN_IDENTITY" \
+      --timestamp \
+      --options runtime \
+      --entitlements "$PLUGIN_ENTITLEMENTS_PATH" \
+      "$plugin_path"
+  done < <(find "$app_path/Contents/PlugIns" -maxdepth 1 -name '*.appex' -print0 2>/dev/null || true)
+
+  codesign \
+    --force \
+    --sign "$CODESIGN_IDENTITY" \
+    --timestamp \
+    --options runtime \
+    --entitlements "$APP_ENTITLEMENTS_PATH" \
+    "$app_path"
 }
 
 release_notes() {
@@ -190,10 +253,13 @@ if [[ -z "$WORK_ROOT" ]]; then
   WORK_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/copool-release.XXXXXX")"
 fi
 
+if [[ -z "$RELEASE_ROOT" ]]; then
+  RELEASE_ROOT="$WORK_ROOT/release"
+fi
+
 DERIVED_DATA_PATH="${DERIVED_DATA_PATH:-$WORK_ROOT/DerivedData}"
 ARCHIVE_PATH="${ARCHIVE_PATH:-$WORK_ROOT/$SCHEME.xcarchive}"
-EXPORT_PATH="${EXPORT_PATH:-$WORK_ROOT/export}"
-EXPORT_OPTIONS_PLIST="${EXPORT_OPTIONS_PLIST:-$WORK_ROOT/ExportOptions.plist}"
+STAGE_ROOT="${STAGE_ROOT:-$(mktemp -d "${TMPDIR:-/tmp}/copool-stage.XXXXXX")}"
 
 trap cleanup_work_root EXIT
 
@@ -202,6 +268,8 @@ require_command codesign
 require_command ditto
 require_command plutil
 require_command shasum
+require_command xattr
+require_command defaults
 
 NOTARIZATION_BACKEND="$(pick_notarization_backend)"
 GIT_COMMIT="$(git rev-parse HEAD)"
@@ -217,29 +285,12 @@ if [[ "$NOTARIZATION_BACKEND" == "notarytool" ]]; then
     exit 1
   fi
 fi
-
-case "$SIGNING_STYLE" in
-  Automatic|Manual)
-    ;;
-  *)
-    printf 'Invalid SIGNING_STYLE value: %s\n' "$SIGNING_STYLE" >&2
-    exit 1
-    ;;
-esac
-
-if [[ "$SIGNING_STYLE" == "Automatic" && "$AUTO_DETECT_PROFILE" == "1" && -z "$PROVISIONING_PROFILE_SPECIFIER" ]]; then
-  if PROVISIONING_PROFILE_SPECIFIER="$(resolve_provisioning_profile_specifier)"; then
-    SIGNING_STYLE="Manual"
-    log "Resolved Developer ID provisioning profile: $PROVISIONING_PROFILE_SPECIFIER"
-  fi
-fi
+require_command xcrun
 
 log "Preparing release directories"
 ensure_clean_dir "$RELEASE_ROOT"
 mkdir -p "$WORK_ROOT"
-rm -rf "$DERIVED_DATA_PATH" "$ARCHIVE_PATH" "$EXPORT_PATH"
-find "$RELEASE_ROOT" -maxdepth 1 -type d -name 'export*' -exec rm -rf {} +
-write_export_options
+rm -rf "$DERIVED_DATA_PATH" "$ARCHIVE_PATH" "$STAGE_ROOT"
 
 ARCHIVE_ARGS=(
   -project "$PROJECT_PATH"
@@ -249,34 +300,24 @@ ARCHIVE_ARGS=(
   -derivedDataPath "$DERIVED_DATA_PATH"
   -destination "generic/platform=macOS"
   archive
-  DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM"
-  CODE_SIGN_STYLE="$SIGNING_STYLE"
+  CODE_SIGNING_ALLOWED=NO
+  CODE_SIGNING_REQUIRED=NO
+  CODE_SIGN_IDENTITY=
 )
 
-if [[ "$SIGNING_STYLE" == "Manual" ]]; then
-  ARCHIVE_ARGS+=("CODE_SIGN_IDENTITY=$CODESIGN_IDENTITY")
-  ARCHIVE_ARGS+=("PROVISIONING_PROFILE_SPECIFIER=$PROVISIONING_PROFILE_SPECIFIER")
-fi
-
-log "Archiving macOS app"
+log "Archiving unsigned macOS app"
 xcodebuild "${ARCHIVE_ARGS[@]}"
 
-EXPORT_ARGS=(
-  -exportArchive
-  -archivePath "$ARCHIVE_PATH"
-  -exportPath "$EXPORT_PATH"
-  -exportOptionsPlist "$EXPORT_OPTIONS_PLIST"
-  DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM"
-)
-
-log "Exporting Developer ID app bundle"
-xcodebuild "${EXPORT_ARGS[@]}"
-
-APP_PATH="$(find "$EXPORT_PATH" -maxdepth 1 -name '*.app' -print -quit)"
-if [[ -z "$APP_PATH" ]]; then
-  printf 'No exported .app bundle found in %s\n' "$EXPORT_PATH" >&2
+ARCHIVED_APP_PATH="$(find "$ARCHIVE_PATH/Products/Applications" -maxdepth 1 -name '*.app' -print -quit)"
+if [[ -z "$ARCHIVED_APP_PATH" ]]; then
+  printf 'No archived .app bundle found in %s\n' "$ARCHIVE_PATH/Products/Applications" >&2
   exit 1
 fi
+
+APP_PATH="$STAGE_ROOT/$(basename "$ARCHIVED_APP_PATH")"
+sanitize_app_bundle "$ARCHIVED_APP_PATH" "$APP_PATH"
+log "Signing sanitized app bundle in temporary staging area"
+sign_app_bundle "$APP_PATH"
 
 log "Verifying code signature"
 codesign --verify --deep --strict --verbose=5 "$APP_PATH"
