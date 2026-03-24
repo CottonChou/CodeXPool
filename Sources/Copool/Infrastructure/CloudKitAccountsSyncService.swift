@@ -42,9 +42,13 @@ actor CloudKitAccountsSyncService: AccountsCloudSyncServiceProtocol {
         let accountsDigest = try digest(for: store.accounts)
         if let record = try await fetchRecordIfExists(),
            let payloadData = record[Constants.payloadKey] as? Data,
-           let payload = try? decodeSnapshot(from: payloadData),
-           try digest(for: payload.accounts) == accountsDigest {
-            return
+           let payload = try? decodeSnapshot(from: payloadData) {
+            if store.accounts.isEmpty, !payload.accounts.isEmpty {
+                return
+            }
+            if try digest(for: payload.accounts) == accountsDigest {
+                return
+            }
         }
 
         let payload = SnapshotPayload(
@@ -253,6 +257,10 @@ enum CloudKitAccountsStoreMerge {
         remoteSyncedAt: Int64,
         to latestStore: AccountsStore
     ) -> AccountsStore {
+        if remoteAccounts.isEmpty, !latestStore.accounts.isEmpty {
+            return latestStore
+        }
+
         var mergedStore = latestStore
         var remainingLocalAccounts = latestStore.accounts
         var mergedAccounts: [StoredAccount] = []
@@ -298,6 +306,7 @@ enum CloudKitAccountsStoreMerge {
         )
         merged.usage = usageWinner.usage
         merged.usageError = usageWinner.usageError
+        merged.usageStateUpdatedAt = usageWinner.usageStateUpdatedAt
         merged.updatedAt = max(local.updatedAt, remote.updatedAt)
         return merged
     }
@@ -316,8 +325,8 @@ enum CloudKitAccountsStoreMerge {
     }
 
     private static func preferredUsageSource(local: StoredAccount, remote: StoredAccount) -> StoredAccount {
-        let localUsageStamp = usageTimestamp(for: local)
-        let remoteUsageStamp = usageTimestamp(for: remote)
+        let localUsageStamp = local.usageStateUpdatedAt
+        let remoteUsageStamp = remote.usageStateUpdatedAt
 
         if remoteUsageStamp != localUsageStamp {
             return remoteUsageStamp > localUsageStamp ? remote : local
@@ -327,21 +336,15 @@ enum CloudKitAccountsStoreMerge {
             return remote.updatedAt >= local.updatedAt ? remote : local
         }
 
-        if remote.usageError != local.usageError {
-            return remote.updatedAt >= local.updatedAt ? remote : local
+        if local.usage != nil, local.usageError == nil, remote.usageError != nil {
+            return local
+        }
+
+        if remote.usage != nil, remote.usageError == nil, local.usageError != nil {
+            return remote
         }
 
         return local
-    }
-
-    private static func usageTimestamp(for account: StoredAccount) -> Int64 {
-        if let fetchedAt = account.usage?.fetchedAt {
-            return fetchedAt
-        }
-        if account.usageError != nil {
-            return account.updatedAt
-        }
-        return 0
     }
 
     private static func shouldKeepLocalOnlyAccount(

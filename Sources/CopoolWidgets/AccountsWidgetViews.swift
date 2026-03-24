@@ -4,29 +4,6 @@ import Foundation
 import os
 
 private enum AccountsWidgetStyle {
-    static func backgroundGradient(for colorScheme: ColorScheme) -> LinearGradient {
-        switch colorScheme {
-        case .dark:
-            LinearGradient(
-                colors: [
-                    Color(red: 0.10, green: 0.13, blue: 0.18),
-                    Color(red: 0.07, green: 0.10, blue: 0.14),
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        default:
-            LinearGradient(
-                colors: [
-                    Color(red: 0.91, green: 0.93, blue: 0.96),
-                    Color(red: 0.85, green: 0.88, blue: 0.93),
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        }
-    }
-
     static func primaryTextColor(for colorScheme: ColorScheme) -> Color {
         switch colorScheme {
         case .dark:
@@ -48,9 +25,9 @@ private enum AccountsWidgetStyle {
     static func dividerColor(for colorScheme: ColorScheme) -> Color {
         switch colorScheme {
         case .dark:
-            Color.white.opacity(0.18)
+            Color.white.opacity(0.16)
         default:
-            Color.black.opacity(0.14)
+            Color.black.opacity(0.10)
         }
     }
 
@@ -234,7 +211,6 @@ private enum AccountsWidgetStyle {
     }
 
 }
-
 private struct AccountsWidgetLayout {
     let family: WidgetFamily
     let horizontalPadding: CGFloat
@@ -269,7 +245,6 @@ private struct AccountsWidgetLayout {
 
 struct AccountsWidgetEntryView: View {
     @Environment(\.widgetFamily) private var family
-    @Environment(\.colorScheme) private var colorScheme
     let entry: AccountsWidgetEntry
 
     var body: some View {
@@ -279,37 +254,50 @@ struct AccountsWidgetEntryView: View {
             Group {
                 switch family {
                 case .systemSmall:
-                    AccountsWidgetSmallView(card: entry.snapshot.currentCard, layout: layout)
+                    AccountsWidgetSmallView(
+                        card: entry.snapshot.currentCard,
+                        usageProgressDisplayMode: usageProgressDisplayMode,
+                        layout: layout
+                    )
                 case .systemMedium:
                     AccountsWidgetMediumView(
                         current: entry.snapshot.currentCard,
                         secondary: entry.snapshot.secondaryCard,
+                        usageProgressDisplayMode: usageProgressDisplayMode,
                         layout: layout
                     )
                 default:
                     AccountsWidgetLargeView(
                         current: entry.snapshot.currentCard,
                         rows: entry.snapshot.rows,
+                        usageProgressDisplayMode: usageProgressDisplayMode,
                         layout: layout
                     )
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .containerBackground(for: .widget) {
-            AccountsWidgetStyle.backgroundGradient(for: colorScheme)
-        }
+        .containerBackground(.fill.secondary, for: .widget)
+    }
+
+    private var usageProgressDisplayMode: AccountsWidgetUsageProgressDisplayMode {
+        entry.snapshot.resolvedUsageProgressDisplayMode()
     }
 }
 
 private struct AccountsWidgetSmallView: View {
     let card: AccountsWidgetCardSnapshot?
+    let usageProgressDisplayMode: AccountsWidgetUsageProgressDisplayMode
     let layout: AccountsWidgetLayout
 
     var body: some View {
         Group {
             if let card {
-                AccountsWidgetCompactCardContent(card: card, layout: layout)
+                AccountsWidgetCompactCardContent(
+                    card: card,
+                    usageProgressDisplayMode: usageProgressDisplayMode,
+                    layout: layout
+                )
             } else {
                 AccountsWidgetEmptyState()
             }
@@ -324,6 +312,7 @@ private struct AccountsWidgetMediumView: View {
     @Environment(\.widgetContentMargins) private var widgetContentMargins
     let current: AccountsWidgetCardSnapshot?
     let secondary: AccountsWidgetCardSnapshot?
+    let usageProgressDisplayMode: AccountsWidgetUsageProgressDisplayMode
     let layout: AccountsWidgetLayout
 
     var body: some View {
@@ -332,7 +321,11 @@ private struct AccountsWidgetMediumView: View {
         return HStack(spacing: dividerSpacing) {
             Group {
                 if let current {
-                    AccountsWidgetCompactCardContent(card: current, layout: layout)
+                    AccountsWidgetCompactCardContent(
+                        card: current,
+                        usageProgressDisplayMode: usageProgressDisplayMode,
+                        layout: layout
+                    )
                 } else {
                     AccountsWidgetEmptyState()
                 }
@@ -343,7 +336,11 @@ private struct AccountsWidgetMediumView: View {
 
             Group {
                 if let secondary {
-                    AccountsWidgetCompactCardContent(card: secondary, layout: layout)
+                    AccountsWidgetCompactCardContent(
+                        card: secondary,
+                        usageProgressDisplayMode: usageProgressDisplayMode,
+                        layout: layout
+                    )
                 } else {
                     AccountsWidgetEmptyState()
                 }
@@ -360,6 +357,7 @@ private struct AccountsWidgetLargeView: View {
     @Environment(\.colorScheme) private var colorScheme
     let current: AccountsWidgetCardSnapshot?
     let rows: [AccountsWidgetRowSnapshot]
+    let usageProgressDisplayMode: AccountsWidgetUsageProgressDisplayMode
     let layout: AccountsWidgetLayout
 
     var body: some View {
@@ -384,6 +382,7 @@ private struct AccountsWidgetLargeView: View {
                     ForEach(Array(groups.enumerated()), id: \.element.id) { index, group in
                         AccountsWidgetLargeGroupView(
                             group: group,
+                            usageProgressDisplayMode: usageProgressDisplayMode,
                             tagFontSize: tagFontSize,
                             tagHorizontalPadding: tagHorizontalPadding,
                             tagVerticalPadding: tagVerticalPadding,
@@ -441,7 +440,10 @@ private struct AccountsWidgetLargeView: View {
 }
 
 private struct AccountsWidgetCompactCardContent: View {
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.widgetRenderingMode) private var renderingMode
     let card: AccountsWidgetCardSnapshot
+    let usageProgressDisplayMode: AccountsWidgetUsageProgressDisplayMode
     let layout: AccountsWidgetLayout
 
     private var accentColor: Color {
@@ -457,6 +459,21 @@ private struct AccountsWidgetCompactCardContent: View {
         default:
             .teal
         }
+    }
+
+    private var planTagPalette: AccountsWidgetTagPalette {
+        AccountsWidgetTagPaletteResolver.planTagPalette(
+            for: card.planLabel,
+            colorScheme: colorScheme,
+            renderingMode: renderingMode
+        )
+    }
+
+    private var accountTagPalette: AccountsWidgetTagPalette {
+        AccountsWidgetTagPaletteResolver.accountTagPalette(
+            for: colorScheme,
+            renderingMode: renderingMode
+        )
     }
 
     private var workspaceLabel: String? {
@@ -482,14 +499,14 @@ private struct AccountsWidgetCompactCardContent: View {
             let ringAreaHeight = size.height * (hasWorkspaceLabel ? 0.47 : 0.56)
             let ringSize = min((size.width - ringSpacing) / 2, ringAreaHeight)
             let ringLineWidth = min(max(ringSize * 0.13, 7), 12)
-            let ringValueFontSize = min(max(ringSize * 0.21, 13), 21)
-            let ringSubtitleFontSize = min(max(ringSize * 0.10, 9), 12)
+            let ringValueFontSize = min(max(ringSize * 0.18, 11), 18)
+            let ringSubtitleFontSize = min(max(ringSize * 0.085, 8), 10)
 
             VStack(alignment: .leading, spacing: groupSpacing) {
                 AccountsWidgetTag(
                     text: card.planLabel,
-                    backgroundColor: accentColor.opacity(0.18),
-                    foregroundColor: accentColor,
+                    backgroundColor: planTagPalette.fill.color,
+                    foregroundColor: planTagPalette.text.color,
                     font: Font.system(size: tagFontSize, weight: .bold, design: .rounded),
                     horizontalPadding: tagHorizontalPadding,
                     verticalPadding: tagVerticalPadding
@@ -499,8 +516,8 @@ private struct AccountsWidgetCompactCardContent: View {
                 if let workspaceLabel {
                     AccountsWidgetTag(
                         text: workspaceLabel,
-                        backgroundColor: accentColor.opacity(0.18),
-                        foregroundColor: accentColor,
+                        backgroundColor: planTagPalette.fill.color,
+                        foregroundColor: planTagPalette.text.color,
                         font: Font.system(size: tagFontSize, weight: .bold, design: .rounded),
                         horizontalPadding: tagHorizontalPadding,
                         verticalPadding: tagVerticalPadding
@@ -510,8 +527,8 @@ private struct AccountsWidgetCompactCardContent: View {
 
                 AccountsWidgetTag(
                     text: displayAccountName,
-                    backgroundColor: Color.orange.opacity(0.18),
-                    foregroundColor: Color.orange,
+                    backgroundColor: accountTagPalette.fill.color,
+                    foregroundColor: accountTagPalette.text.color,
                     font: Font.system(size: tagFontSize, weight: .bold, design: .rounded),
                     horizontalPadding: tagHorizontalPadding,
                     verticalPadding: tagVerticalPadding
@@ -520,9 +537,9 @@ private struct AccountsWidgetCompactCardContent: View {
 
                 HStack(spacing: ringSpacing) {
                     AccountsWidgetCompactRing(
-                        valueText: card.fiveHour.usedText,
+                        valueText: displayText(for: card.fiveHour),
                         subtitleText: card.fiveHour.title,
-                        progress: card.fiveHour.progressFraction,
+                        progress: displayProgress(for: card.fiveHour),
                         tint: .orange,
                         size: ringSize,
                         lineWidth: ringLineWidth,
@@ -532,9 +549,9 @@ private struct AccountsWidgetCompactCardContent: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                     AccountsWidgetCompactRing(
-                        valueText: card.oneWeek.usedText,
+                        valueText: displayText(for: card.oneWeek),
                         subtitleText: card.oneWeek.title,
-                        progress: card.oneWeek.progressFraction,
+                        progress: displayProgress(for: card.oneWeek),
                         tint: .teal,
                         size: ringSize,
                         lineWidth: ringLineWidth,
@@ -549,6 +566,14 @@ private struct AccountsWidgetCompactCardContent: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(maxHeight: .infinity, alignment: .center)
         }
+    }
+
+    private func displayText(for window: AccountsWidgetWindowSnapshot) -> String {
+        usageProgressDisplayMode == .remaining ? window.remainingText : window.usedText
+    }
+
+    private func displayProgress(for window: AccountsWidgetWindowSnapshot) -> Double {
+        usageProgressDisplayMode == .remaining ? max(0, 1 - window.progressFraction) : window.progressFraction
     }
 }
 
@@ -607,6 +632,10 @@ private struct AccountsWidgetCompactRing: View {
     let valueFontSize: CGFloat
     let subtitleFontSize: CGFloat
 
+    private var innerContentWidth: CGFloat {
+        max(size - (lineWidth * 2) - 12, 20)
+    }
+
     var body: some View {
         ZStack {
             LiquidProgressRing(
@@ -619,11 +648,16 @@ private struct AccountsWidgetCompactRing: View {
                 Text(valueText)
                     .font(.system(size: valueFontSize, weight: .bold, design: .rounded))
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
                     .foregroundStyle(AccountsWidgetStyle.primaryTextColor(for: colorScheme))
                 Text(subtitleText)
                     .font(.system(size: subtitleFontSize, weight: .semibold, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
                     .foregroundStyle(AccountsWidgetStyle.secondaryTextColor(for: colorScheme))
             }
+            .frame(width: innerContentWidth)
         }
         .frame(width: size, height: size)
     }
@@ -639,7 +673,10 @@ private struct AccountsWidgetLargeGroup: Identifiable {
 }
 
 private struct AccountsWidgetLargeGroupView: View {
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.widgetRenderingMode) private var renderingMode
     let group: AccountsWidgetLargeGroup
+    let usageProgressDisplayMode: AccountsWidgetUsageProgressDisplayMode
     let tagFontSize: CGFloat
     let tagHorizontalPadding: CGFloat
     let tagVerticalPadding: CGFloat
@@ -664,13 +701,28 @@ private struct AccountsWidgetLargeGroupView: View {
         }
     }
 
+    private var planTagPalette: AccountsWidgetTagPalette {
+        AccountsWidgetTagPaletteResolver.planTagPalette(
+            for: group.planLabel,
+            colorScheme: colorScheme,
+            renderingMode: renderingMode
+        )
+    }
+
+    private var accountTagPalette: AccountsWidgetTagPalette {
+        AccountsWidgetTagPaletteResolver.accountTagPalette(
+            for: colorScheme,
+            renderingMode: renderingMode
+        )
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: topRowSpacing) {
             HStack(spacing: 4) {
                 AccountsWidgetTag(
                     text: group.planLabel,
-                    backgroundColor: accentColor.opacity(0.18),
-                    foregroundColor: accentColor,
+                    backgroundColor: planTagPalette.fill.color,
+                    foregroundColor: planTagPalette.text.color,
                     font: .system(size: tagFontSize, weight: .bold, design: .rounded),
                     horizontalPadding: tagHorizontalPadding,
                     verticalPadding: tagVerticalPadding
@@ -679,8 +731,8 @@ private struct AccountsWidgetLargeGroupView: View {
                 if let workspaceLabel = group.workspaceLabel {
                     AccountsWidgetTag(
                         text: workspaceLabel,
-                        backgroundColor: accentColor.opacity(0.18),
-                        foregroundColor: accentColor,
+                        backgroundColor: planTagPalette.fill.color,
+                        foregroundColor: planTagPalette.text.color,
                         font: .system(size: tagFontSize, weight: .bold, design: .rounded),
                         horizontalPadding: tagHorizontalPadding,
                         verticalPadding: tagVerticalPadding
@@ -689,8 +741,8 @@ private struct AccountsWidgetLargeGroupView: View {
 
                 AccountsWidgetTag(
                     text: group.accountLabel,
-                    backgroundColor: Color.orange.opacity(0.18),
-                    foregroundColor: Color.orange,
+                    backgroundColor: accountTagPalette.fill.color,
+                    foregroundColor: accountTagPalette.text.color,
                     font: .system(size: tagFontSize, weight: .bold, design: .rounded),
                     horizontalPadding: tagHorizontalPadding,
                     verticalPadding: tagVerticalPadding
@@ -700,6 +752,7 @@ private struct AccountsWidgetLargeGroupView: View {
             HStack(alignment: .top, spacing: metricSpacing) {
                 AccountsWidgetLargeMetric(
                     window: group.fiveHour,
+                    usageProgressDisplayMode: usageProgressDisplayMode,
                     tint: .orange,
                     detailFontSize: detailFontSize,
                     iconSize: iconSize,
@@ -708,6 +761,7 @@ private struct AccountsWidgetLargeGroupView: View {
 
                 AccountsWidgetLargeMetric(
                     window: group.oneWeek,
+                    usageProgressDisplayMode: usageProgressDisplayMode,
                     tint: .teal,
                     detailFontSize: detailFontSize,
                     iconSize: iconSize,
@@ -723,6 +777,7 @@ private struct AccountsWidgetLargeGroupView: View {
 private struct AccountsWidgetLargeMetric: View {
     @Environment(\.colorScheme) private var colorScheme
     let window: AccountsWidgetWindowSnapshot
+    let usageProgressDisplayMode: AccountsWidgetUsageProgressDisplayMode
     let tint: Color
     let detailFontSize: CGFloat
     let iconSize: CGFloat
@@ -736,7 +791,7 @@ private struct AccountsWidgetLargeMetric: View {
                     .foregroundStyle(AccountsWidgetStyle.secondaryTextColor(for: colorScheme))
 
                 LiquidProgressBar(
-                    progress: window.progressFraction,
+                    progress: displayProgress,
                     tint: tint,
                     height: progressHeight
                 )
@@ -757,13 +812,21 @@ private struct AccountsWidgetLargeMetric: View {
                 HStack(spacing: 4) {
                     Image(systemName: "drop.halffull")
                         .font(.system(size: iconSize, weight: .medium))
-                    Text(window.remainingText)
+                    Text(displayText)
                         .font(.system(size: detailFontSize, weight: .semibold, design: .rounded))
                 }
             }
             .foregroundStyle(AccountsWidgetStyle.secondaryTextColor(for: colorScheme))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var displayProgress: Double {
+        usageProgressDisplayMode == .remaining ? max(0, 1 - window.progressFraction) : window.progressFraction
+    }
+
+    private var displayText: String {
+        usageProgressDisplayMode == .remaining ? window.remainingText : window.usedText
     }
 }
 

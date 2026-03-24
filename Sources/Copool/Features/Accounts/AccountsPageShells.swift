@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct AccountsPageShell: View {
-    let model: AccountsPageModel
+    @ObservedObject var store: AccountsPageViewStore
     let currentLocale: AppLocale
     let onSelectLocale: (AppLocale) -> Void
     let areCardsPresented: Bool
@@ -9,12 +9,14 @@ struct AccountsPageShell: View {
     let onToggleCollapse: () -> Void
     let onSwitchAccount: (String) -> Void
     let onRefreshAccountUsage: (String) -> Void
+    let onAuthorizeWorkspace: (String) -> Void
+    let onDeletePendingWorkspace: (String) -> Void
     let onDeleteAccount: (String) -> Void
 
     var body: some View {
         #if os(iOS)
         AccountsIOSPageShell(
-            model: model,
+            store: store,
             currentLocale: currentLocale,
             onSelectLocale: onSelectLocale,
             areCardsPresented: areCardsPresented,
@@ -22,16 +24,20 @@ struct AccountsPageShell: View {
             onToggleCollapse: onToggleCollapse,
             onSwitchAccount: onSwitchAccount,
             onRefreshAccountUsage: onRefreshAccountUsage,
+            onAuthorizeWorkspace: onAuthorizeWorkspace,
+            onDeletePendingWorkspace: onDeletePendingWorkspace,
             onDeleteAccount: onDeleteAccount
         )
         #else
         AccountsMacPageShell(
-            model: model,
+            store: store,
             areCardsPresented: areCardsPresented,
             onTriggerAction: onTriggerAction,
             onToggleCollapse: onToggleCollapse,
             onSwitchAccount: onSwitchAccount,
             onRefreshAccountUsage: onRefreshAccountUsage,
+            onAuthorizeWorkspace: onAuthorizeWorkspace,
+            onDeletePendingWorkspace: onDeletePendingWorkspace,
             onDeleteAccount: onDeleteAccount
         )
         #endif
@@ -40,7 +46,7 @@ struct AccountsPageShell: View {
 
 #if os(iOS)
 private struct AccountsIOSPageShell: View {
-    let model: AccountsPageModel
+    @ObservedObject var store: AccountsPageViewStore
     let currentLocale: AppLocale
     let onSelectLocale: (AppLocale) -> Void
     let areCardsPresented: Bool
@@ -48,6 +54,8 @@ private struct AccountsIOSPageShell: View {
     let onToggleCollapse: () -> Void
     let onSwitchAccount: (String) -> Void
     let onRefreshAccountUsage: (String) -> Void
+    let onAuthorizeWorkspace: (String) -> Void
+    let onDeletePendingWorkspace: (String) -> Void
     let onDeleteAccount: (String) -> Void
 
     var body: some View {
@@ -55,11 +63,14 @@ private struct AccountsIOSPageShell: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     AccountsPageContentSection(
-                        model: model,
+                        presentation: store.contentPresentation,
+                        cardStoreProvider: store.cardStore(for:),
                         availableViewportSize: proxy.size,
                         areCardsPresented: areCardsPresented,
                         onSwitchAccount: onSwitchAccount,
                         onRefreshAccountUsage: onRefreshAccountUsage,
+                        onAuthorizeWorkspace: onAuthorizeWorkspace,
+                        onDeletePendingWorkspace: onDeletePendingWorkspace,
                         onDeleteAccount: onDeleteAccount
                     )
                 }
@@ -74,7 +85,8 @@ private struct AccountsIOSPageShell: View {
             }
             .toolbar {
                 AccountsToolbarContent(
-                    model: model,
+                    leadingButtons: store.leadingToolbarButtons,
+                    trailingButtons: store.trailingToolbarButtons,
                     currentLocale: currentLocale,
                     onSelectLocale: onSelectLocale,
                     onTriggerAction: onTriggerAction,
@@ -87,12 +99,14 @@ private struct AccountsIOSPageShell: View {
 #endif
 
 private struct AccountsMacPageShell: View {
-    let model: AccountsPageModel
+    @ObservedObject var store: AccountsPageViewStore
     let areCardsPresented: Bool
     let onTriggerAction: (AccountsPageActionIntent) -> Void
     let onToggleCollapse: () -> Void
     let onSwitchAccount: (String) -> Void
     let onRefreshAccountUsage: (String) -> Void
+    let onAuthorizeWorkspace: (String) -> Void
+    let onDeletePendingWorkspace: (String) -> Void
     let onDeleteAccount: (String) -> Void
 
     private var pageContentWidth: CGFloat {
@@ -102,7 +116,7 @@ private struct AccountsMacPageShell: View {
     var body: some View {
         VStack(alignment: .leading, spacing: LayoutRules.sectionSpacing) {
             AccountsActionBarContainer(
-                model: model,
+                presentation: store.macActionBarPresentation,
                 onTriggerAction: onTriggerAction,
                 onToggleCollapse: onToggleCollapse
             )
@@ -112,7 +126,8 @@ private struct AccountsMacPageShell: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     AccountsPageContentSection(
-                        model: model,
+                        presentation: store.contentPresentation,
+                        cardStoreProvider: store.cardStore(for:),
                         availableViewportSize: CGSize(
                             width: pageContentWidth,
                             height: LayoutRules.defaultPanelHeight
@@ -120,6 +135,8 @@ private struct AccountsMacPageShell: View {
                         areCardsPresented: areCardsPresented,
                         onSwitchAccount: onSwitchAccount,
                         onRefreshAccountUsage: onRefreshAccountUsage,
+                        onAuthorizeWorkspace: onAuthorizeWorkspace,
+                        onDeletePendingWorkspace: onDeletePendingWorkspace,
                         onDeleteAccount: onDeleteAccount
                     )
                 }
@@ -134,13 +151,13 @@ private struct AccountsMacPageShell: View {
 }
 
 private struct AccountsActionBarContainer: View {
-    @ObservedObject var model: AccountsPageModel
+    let presentation: AccountsActionBarPresentation
     let onTriggerAction: (AccountsPageActionIntent) -> Void
     let onToggleCollapse: () -> Void
 
     var body: some View {
         AccountsActionBarView(
-            presentation: model.makeMacActionBarPresentation(),
+            presentation: presentation,
             onTriggerAction: onTriggerAction,
             onToggleCollapse: onToggleCollapse
         )
@@ -149,7 +166,8 @@ private struct AccountsActionBarContainer: View {
 
 #if os(iOS)
 private struct AccountsToolbarContent: ToolbarContent {
-    @ObservedObject var model: AccountsPageModel
+    let leadingButtons: [AccountsActionButtonDescriptor<AccountsPageActionIntent>]
+    let trailingButtons: [AccountsActionButtonDescriptor<AccountsPageActionIntent>]
     let currentLocale: AppLocale
     let onSelectLocale: (AppLocale) -> Void
     let onTriggerAction: (AccountsPageActionIntent) -> Void
@@ -157,8 +175,8 @@ private struct AccountsToolbarContent: ToolbarContent {
 
     var body: some ToolbarContent {
         AccountsToolbarActions(
-            leadingButtons: model.leadingToolbarButtons,
-            trailingButtons: model.trailingToolbarButtons,
+            leadingButtons: leadingButtons,
+            trailingButtons: trailingButtons,
             currentLocale: currentLocale,
             onSelectLocale: onSelectLocale,
             onTriggerAction: onTriggerAction,

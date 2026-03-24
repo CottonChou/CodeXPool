@@ -183,7 +183,11 @@ private struct LiquidRingMetrics {
     }
 }
 
-private struct LiquidGroovePalette {
+struct LiquidGroovePalette {
+    let glassTintOpacity: Double
+    let topEdgeOpacity: Double
+    let centerGlowOpacity: Double
+    let ringOuterHighlightOpacity: Double
     let glassTint: Color
     let coreTop: Color
     let coreMid: Color
@@ -201,29 +205,37 @@ private struct LiquidGroovePalette {
     init(colorScheme: ColorScheme) {
         switch colorScheme {
         case .dark:
-            glassTint = Color.white.opacity(0.08)
-            coreTop = Color.white.opacity(0.035)
-            coreMid = Color.black.opacity(0.34)
-            coreBottom = Color.white.opacity(0.018)
-            topEdge = Color.white.opacity(0.14)
-            bottomEdge = Color.black.opacity(0.34)
-            centerGlow = Color.white.opacity(0.055)
+            glassTintOpacity = 0.14
+            topEdgeOpacity = 0.24
+            centerGlowOpacity = 0.11
+            ringOuterHighlightOpacity = 0.22
+            glassTint = Color.white.opacity(glassTintOpacity)
+            coreTop = Color.white.opacity(0.07)
+            coreMid = Color.black.opacity(0.30)
+            coreBottom = Color.white.opacity(0.03)
+            topEdge = Color.white.opacity(topEdgeOpacity)
+            bottomEdge = Color.black.opacity(0.42)
+            centerGlow = Color.white.opacity(centerGlowOpacity)
             innerEdge = Color.black.opacity(0.24)
-            ringOuterHighlight = Color.white.opacity(0.14)
-            ringInnerHighlight = Color.white.opacity(0.08)
-            ringShadow = Color.black.opacity(0.28)
-            ringShadowSoft = Color.black.opacity(0.12)
-            ringCoreGlow = Color.white.opacity(0.018)
+            ringOuterHighlight = Color.white.opacity(ringOuterHighlightOpacity)
+            ringInnerHighlight = Color.white.opacity(0.12)
+            ringShadow = Color.black.opacity(0.34)
+            ringShadowSoft = Color.black.opacity(0.16)
+            ringCoreGlow = Color.white.opacity(0.04)
         default:
-            glassTint = Color.white.opacity(0.06)
+            glassTintOpacity = 0.06
+            topEdgeOpacity = 0.26
+            centerGlowOpacity = 0.08
+            ringOuterHighlightOpacity = 0.30
+            glassTint = Color.white.opacity(glassTintOpacity)
             coreTop = Color.black.opacity(0.15)
             coreMid = Color.black.opacity(0.05)
             coreBottom = Color.white.opacity(0.05)
-            topEdge = Color.white.opacity(0.26)
+            topEdge = Color.white.opacity(topEdgeOpacity)
             bottomEdge = Color.black.opacity(0.1)
-            centerGlow = Color.white.opacity(0.08)
+            centerGlow = Color.white.opacity(centerGlowOpacity)
             innerEdge = Color.black.opacity(0.08)
-            ringOuterHighlight = Color.white.opacity(0.3)
+            ringOuterHighlight = Color.white.opacity(ringOuterHighlightOpacity)
             ringInnerHighlight = Color.white.opacity(0.14)
             ringShadow = Color.black.opacity(0.1)
             ringShadowSoft = Color.black.opacity(0.05)

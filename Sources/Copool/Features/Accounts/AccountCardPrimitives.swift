@@ -85,6 +85,13 @@ struct AccountCardHeaderSection: View {
                         )
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    if let statusLabel = presentation.statusLabel {
+                        AccountTagView(
+                            text: statusLabel,
+                            backgroundColor: Color.red.opacity(0.16),
+                            foregroundColor: .red
+                        )
+                    }
                     Spacer(minLength: 0)
                 }
             }
@@ -132,16 +139,16 @@ struct AccountCardCompactUsageSection: View {
             rings: [
                 AccountCompactRingDescriptor(
                     id: "five-hour",
-                    valueText: compactPercentText(presentation.compactUsage.fiveHourUsedPercent),
+                    valueText: compactPercentText(presentation.compactUsage.fiveHourDisplayPercent),
                     subtitleText: "5h",
-                    progress: compactProgress(presentation.compactUsage.fiveHourUsedPercent),
+                    progress: compactProgress(presentation.compactUsage.fiveHourDisplayPercent),
                     tint: .orange
                 ),
                 AccountCompactRingDescriptor(
                     id: "one-week",
-                    valueText: compactPercentText(presentation.compactUsage.oneWeekUsedPercent),
+                    valueText: compactPercentText(presentation.compactUsage.oneWeekDisplayPercent),
                     subtitleText: "1w",
-                    progress: compactProgress(presentation.compactUsage.oneWeekUsedPercent),
+                    progress: compactProgress(presentation.compactUsage.oneWeekDisplayPercent),
                     tint: .teal
                 ),
             ]
@@ -164,6 +171,7 @@ struct AccountCardBottomOverlay: View {
     let isCurrent: Bool
     let switching: Bool
     let refreshing: Bool
+    let showsRefreshButton: Bool
     let isRefreshEnabled: Bool
     let usageError: String?
     let palette: AccountCardPalette
@@ -184,6 +192,7 @@ struct AccountCardBottomOverlay: View {
                     isCurrent: isCurrent,
                     switching: switching,
                     refreshing: refreshing,
+                    showsRefreshButton: showsRefreshButton,
                     isRefreshEnabled: isRefreshEnabled,
                     palette: palette,
                     onSwitch: onSwitch,
@@ -235,14 +244,14 @@ private struct AccountWindowSection: View {
                 Text(presentation.title)
                     .font(.caption.weight(.semibold))
                 Spacer(minLength: 0)
-                Text(presentation.usedText)
+                Text(presentation.primaryText)
                     .font(.caption.weight(.semibold))
-                Text(presentation.remainingText)
+                Text(presentation.secondaryText)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
-            LiquidProgressBar(progress: presentation.usedPercent / 100, tint: tint)
+            LiquidProgressBar(progress: presentation.progressPercent / 100, tint: tint)
 
             Text(presentation.resetText)
                 .font(.caption2)
@@ -317,6 +326,7 @@ private struct AccountTrailingActionCluster: View {
     let isCurrent: Bool
     let switching: Bool
     let refreshing: Bool
+    let showsRefreshButton: Bool
     let isRefreshEnabled: Bool
     let palette: AccountCardPalette
     let onSwitch: () -> Void
@@ -338,11 +348,13 @@ private struct AccountTrailingActionCluster: View {
                 )
             }
 
-            AccountRefreshButton(
-                refreshing: refreshing,
-                isEnabled: isRefreshEnabled,
-                onRefresh: onRefresh
-            )
+            if showsRefreshButton {
+                AccountRefreshButton(
+                    refreshing: refreshing,
+                    isEnabled: isRefreshEnabled,
+                    onRefresh: onRefresh
+                )
+            }
         }
     }
 }

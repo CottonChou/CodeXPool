@@ -136,6 +136,61 @@ final class StoreFileRepositoryTests: XCTestCase {
         XCTAssertEqual(summaries.first(where: \.isCurrent)?.accountID, "legacy-account")
     }
 
+    func testLoadStoreDefaultsMissingWorkspaceStatusToActive() throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let storePath = tempDir.appendingPathComponent("accounts.json")
+        let account = StoredAccount(
+            id: "acct-1",
+            label: "Legacy",
+            email: "legacy@example.com",
+            accountID: "legacy-account",
+            planType: "team",
+            teamName: "workspace-a",
+            teamAlias: nil,
+            authJSON: .object([:]),
+            addedAt: 1,
+            updatedAt: 2,
+            usage: nil,
+            usageError: nil
+        )
+        var rawAccount = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(account)) as? [String: Any]
+        )
+        rawAccount.removeValue(forKey: "workspaceStatus")
+        let raw = try JSONSerialization.data(
+            withJSONObject: [
+                "version": 1,
+                "accounts": [rawAccount]
+            ],
+            options: [.prettyPrinted, .sortedKeys]
+        )
+        try raw.write(to: storePath)
+
+        let paths = FileSystemPaths(
+            applicationSupportDirectory: tempDir,
+            accountStorePath: storePath,
+            settingsStorePath: tempDir.appendingPathComponent("settings.json"),
+            codexAuthPath: tempDir.appendingPathComponent("auth.json"),
+            codexConfigPath: tempDir.appendingPathComponent("config.toml"),
+            proxyDaemonDataDirectory: tempDir.appendingPathComponent("proxyd", isDirectory: true),
+            proxyDaemonKeyPath: tempDir.appendingPathComponent("proxyd/api-proxy.key", isDirectory: false),
+            cloudflaredLogDirectory: tempDir.appendingPathComponent("cloudflared-logs", isDirectory: true)
+        )
+
+        let repository = StoreFileRepository(paths: paths)
+        let store = try repository.loadStore()
+
+        XCTAssertEqual(store.accounts.count, 1)
+        XCTAssertEqual(store.accounts[0].workspaceStatus, .active)
+        XCTAssertFalse(
+            try FileManager.default.contentsOfDirectory(at: tempDir, includingPropertiesForKeys: nil)
+                .contains(where: { $0.lastPathComponent.hasPrefix("accounts.corrupt-") })
+        )
+    }
+
     func testLoadSettingsMigratesLegacyMergedStoreIntoSeparateFiles() throws {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
@@ -237,7 +292,7 @@ final class StoreFileRepositoryTests: XCTestCase {
         XCTAssertEqual(merged.currentSelection, latestStore.currentSelection)
     }
 
-    func testCloudKitAccountsStoreMergeClearsLocalAccountsFromEmptyRemoteSnapshot() {
+    func testCloudKitAccountsStoreMergeKeepsLocalAccountsFromEmptyRemoteSnapshot() {
         let localAccount = StoredAccount(
             id: "acct-1",
             label: "Local",
@@ -268,7 +323,7 @@ final class StoreFileRepositoryTests: XCTestCase {
             to: latestStore
         )
 
-        XCTAssertTrue(merged.accounts.isEmpty)
+        XCTAssertEqual(merged.accounts, [localAccount])
         XCTAssertEqual(merged.currentSelection, latestStore.currentSelection)
     }
 
@@ -331,6 +386,58 @@ final class StoreFileRepositoryTests: XCTestCase {
         XCTAssertEqual(merged.accounts[0].id, localAccount.id)
         XCTAssertEqual(merged.accounts[0].teamAlias, localAccount.teamAlias)
         XCTAssertEqual(merged.accounts[0].usage, remoteUsage)
+    }
+
+    func testCloudKitAccountsStoreMergePrefersSuccessfulUsageOverNewerRemoteUsageError() {
+        let localUsage = UsageSnapshot(
+            fetchedAt: 200,
+            planType: "team",
+            fiveHour: UsageWindow(usedPercent: 100, windowSeconds: 18_000, resetAt: 1_000),
+            oneWeek: UsageWindow(usedPercent: 80, windowSeconds: 604_800, resetAt: 2_000),
+            credits: nil
+        )
+        let localAccount = StoredAccount(
+            id: "local-id",
+            label: "Local",
+            email: "local@example.com",
+            accountID: "account-1",
+            planType: "team",
+            teamName: "WandaFox8745",
+            teamAlias: nil,
+            authJSON: .object([:]),
+            addedAt: 1,
+            updatedAt: 200,
+            usage: localUsage,
+            usageError: nil
+        )
+        let remoteAccount = StoredAccount(
+            id: "remote-id",
+            label: "Remote",
+            email: "local@example.com",
+            accountID: "account-1",
+            planType: "team",
+            teamName: "WandaFox8745",
+            teamAlias: nil,
+            authJSON: .object([:]),
+            addedAt: 1,
+            updatedAt: 300,
+            usage: localUsage,
+            usageError: "Usage API request failed: timeout"
+        )
+
+        let merged = CloudKitAccountsStoreMerge.applyingRemoteSnapshot(
+            [remoteAccount],
+            remoteSyncedAt: 300,
+            to: AccountsStore(
+                version: 1,
+                accounts: [localAccount],
+                currentSelection: nil
+            )
+        )
+
+        XCTAssertEqual(merged.accounts.count, 1)
+        XCTAssertEqual(merged.accounts[0].usage, localUsage)
+        XCTAssertNil(merged.accounts[0].usageError)
     }
 
     func testCloudKitAccountsStoreMergeKeepsRecentLocalOnlyAccounts() {

@@ -54,6 +54,16 @@ actor AccountsCoordinator {
         try storeRepository.saveStore(store)
     }
 
+    func dismissPendingWorkspaceAuthorization(workspaceID: String) throws {
+        var store = try storeRepository.loadStore()
+        let normalizedWorkspaceID = AccountIdentity.normalizedAccountID(workspaceID)
+        guard !normalizedWorkspaceID.isEmpty else { return }
+        if !store.ignoredPendingWorkspaceIDs.contains(normalizedWorkspaceID) {
+            store.ignoredPendingWorkspaceIDs.append(normalizedWorkspaceID)
+            try storeRepository.saveStore(store)
+        }
+    }
+
     func updateTeamAlias(id: String, alias: String?) throws -> AccountSummary {
         var store = try storeRepository.loadStore()
         guard let index = store.accounts.firstIndex(where: { $0.id == id }) else {

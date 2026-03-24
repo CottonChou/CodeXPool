@@ -215,6 +215,7 @@
 		A808A808A808A808A808A808 /* AccountsPageModel+Refresh.swift in Sources */ = {isa = PBXBuildFile; fileRef = A708A708A708A708A708A708 /* AccountsPageModel+Refresh.swift */; };
 		A809A809A809A809A809A809 /* AccountsPageModel+Selection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A709A709A709A709A709A709 /* AccountsPageModel+Selection.swift */; };
 		A810A810A810A810A810A810 /* AccountsPageModel+State.swift in Sources */ = {isa = PBXBuildFile; fileRef = A710A710A710A710A710A710 /* AccountsPageModel+State.swift */; };
+		B6A471F0F3B14827A0F2D001 /* AccountsPageModel+PendingWorkspaces.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6A471F0F3B14827A0F2D000 /* AccountsPageModel+PendingWorkspaces.swift */; };
 		A811A811A811A811A811A811 /* AccountsPagePresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A713A713A713A713A713A713 /* AccountsPagePresentation.swift */; };
 		A812A812A812A812A812A812 /* AccountsPageViewStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A714A714A714A714A714A714 /* AccountsPageViewStore.swift */; };
 		A813A813A813A813A813A813 /* AccountsAnimationRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = A715A715A715A715A715A715 /* AccountsAnimationRules.swift */; };
@@ -228,6 +229,7 @@
 		A828A828A828A828A828A828 /* AccountsPageModel+Refresh.swift in Sources */ = {isa = PBXBuildFile; fileRef = A708A708A708A708A708A708 /* AccountsPageModel+Refresh.swift */; };
 		A829A829A829A829A829A829 /* AccountsPageModel+Selection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A709A709A709A709A709A709 /* AccountsPageModel+Selection.swift */; };
 		A830A830A830A830A830A830 /* AccountsPageModel+State.swift in Sources */ = {isa = PBXBuildFile; fileRef = A710A710A710A710A710A710 /* AccountsPageModel+State.swift */; };
+		B6A471F0F3B14827A0F2D002 /* AccountsPageModel+PendingWorkspaces.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6A471F0F3B14827A0F2D000 /* AccountsPageModel+PendingWorkspaces.swift */; };
 		A831A831A831A831A831A831 /* AccountsPagePresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A713A713A713A713A713A713 /* AccountsPagePresentation.swift */; };
 		A832A832A832A832A832A832 /* AccountsPageViewStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A714A714A714A714A714A714 /* AccountsPageViewStore.swift */; };
 		A833A833A833A833A833A833 /* AccountsAnimationRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = A715A715A715A715A715A715 /* AccountsAnimationRules.swift */; };
@@ -306,6 +308,7 @@
 		DCD28B83E4C2D0294C831627 /* AccountRanking.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FBDA86A5354BD9FDCE671A2 /* AccountRanking.swift */; };
 		DF8368291C8E0CEAA590256E /* RepositoryLocatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48CF6078EFCC779D84F7D6A3 /* RepositoryLocatorTests.swift */; };
 		E11DCC850FA489BD46094EE0 /* UsageWindowSelectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10E7339F7656FE20240B3B8 /* UsageWindowSelectorTests.swift */; };
+		E21DCC850FA489BD46094EE0 /* UsageServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E31DCC850FA489BD46094EE0 /* UsageServiceTests.swift */; };
 		E17348F472F786A813DD1AA4 /* RemoteShellCommandRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F7E6B167DBA6042D8D7D491 /* RemoteShellCommandRunner.swift */; };
 		E27D31CC8BE01282100CFC92 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = B200F10CE9F433B769723734 /* Localizable.strings */; };
 		E602C264D4C5549D20D359D2 /* state.rs in Resources */ = {isa = PBXBuildFile; fileRef = 906F433E9E25A6366AF39AD7 /* state.rs */; };
@@ -526,6 +529,7 @@
 		A708A708A708A708A708A708 /* AccountsPageModel+Refresh.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AccountsPageModel+Refresh.swift"; sourceTree = "<group>"; };
 		A709A709A709A709A709A709 /* AccountsPageModel+Selection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AccountsPageModel+Selection.swift"; sourceTree = "<group>"; };
 		A710A710A710A710A710A710 /* AccountsPageModel+State.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AccountsPageModel+State.swift"; sourceTree = "<group>"; };
+		B6A471F0F3B14827A0F2D000 /* AccountsPageModel+PendingWorkspaces.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AccountsPageModel+PendingWorkspaces.swift"; sourceTree = "<group>"; };
 		A711A711A711A711A711A711 /* AccountsActionPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsActionPresentationTests.swift; sourceTree = "<group>"; };
 		A712A712A712A712A712A712 /* AccountCardInteractionPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountCardInteractionPresentationTests.swift; sourceTree = "<group>"; };
 		A713A713A713A713A713A713 /* AccountsPagePresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsPagePresentation.swift; sourceTree = "<group>"; };
@@ -552,6 +556,7 @@
 		B7B61BD243C65F84D47C5E07 /* SettingsPageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPageView.swift; sourceTree = "<group>"; };
 		BCFDDF034C6446339DDFAF9B /* LaunchAtStartupService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtStartupService.swift; sourceTree = "<group>"; };
 		C10E7339F7656FE20240B3B8 /* UsageWindowSelectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageWindowSelectorTests.swift; sourceTree = "<group>"; };
+		E31DCC850FA489BD46094EE0 /* UsageServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageServiceTests.swift; sourceTree = "<group>"; };
 		C119BECC2B20B53E52701FFC /* Copool.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Copool.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C139AC44A9986277E75FA765 /* CloudflaredService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudflaredService.swift; sourceTree = "<group>"; };
 		C246C246C246C246C246C246 /* RemoteShellCommandRunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteShellCommandRunnerTests.swift; sourceTree = "<group>"; };
@@ -774,6 +779,7 @@
 				6649CF1B9E1CA80D5522A9A6 /* AccountsPageModel.swift */,
 				A707A707A707A707A707A707 /* AccountsPageModel+AccountMutations.swift */,
 				A706A706A706A706A706A706 /* AccountsPageModel+Lifecycle.swift */,
+				B6A471F0F3B14827A0F2D000 /* AccountsPageModel+PendingWorkspaces.swift */,
 				A708A708A708A708A708A708 /* AccountsPageModel+Refresh.swift */,
 				A709A709A709A709A709A709 /* AccountsPageModel+Selection.swift */,
 				A710A710A710A710A710A710 /* AccountsPageModel+State.swift */,
@@ -952,6 +958,7 @@
 				B212B212B212B212B212B212 /* SettingsPageModelTests.swift */,
 				DF11B93A2C05CC3B851D671A /* StoreFileRepositoryTests.swift */,
 				1302CF1943B5AEB08D667C6E /* SwiftNativeProxyRuntimeServiceTests.swift */,
+				E31DCC850FA489BD46094EE0 /* UsageServiceTests.swift */,
 				C10E7339F7656FE20240B3B8 /* UsageWindowSelectorTests.swift */,
 				48DAEB06DC9DE19B80FE052D /* AccountsWidgetSnapshotBuilderTests.swift */,
 				674BD908B276FA16BCABEAEC /* AccountSummaryPresentationTests.swift */,
@@ -1243,6 +1250,7 @@
 				D39533CAD4CEB5C27EFDC236 /* AccountsPageModel.swift in Sources */,
 				A807A807A807A807A807A807 /* AccountsPageModel+AccountMutations.swift in Sources */,
 				A806A806A806A806A806A806 /* AccountsPageModel+Lifecycle.swift in Sources */,
+				B6A471F0F3B14827A0F2D001 /* AccountsPageModel+PendingWorkspaces.swift in Sources */,
 				A808A808A808A808A808A808 /* AccountsPageModel+Refresh.swift in Sources */,
 				A809A809A809A809A809A809 /* AccountsPageModel+Selection.swift in Sources */,
 				A810A810A810A810A810A810 /* AccountsPageModel+State.swift in Sources */,
@@ -1391,6 +1399,7 @@
 				C244C244C244C244C244C244 /* SettingsPageModelTests.swift in Sources */,
 				137463A0132E4160501DD2AC /* StoreFileRepositoryTests.swift in Sources */,
 				634D954799F1968A5D418EA2 /* SwiftNativeProxyRuntimeServiceTests.swift in Sources */,
+				E21DCC850FA489BD46094EE0 /* UsageServiceTests.swift in Sources */,
 				E11DCC850FA489BD46094EE0 /* UsageWindowSelectorTests.swift in Sources */,
 				0C9AE3027C3A66531EA9F038 /* AccountsWidgetSnapshotBuilderTests.swift in Sources */,
 				1458D53663C6DDA922124FFD /* AccountSummaryPresentationTests.swift in Sources */,
@@ -1435,6 +1444,7 @@
 				54F5A32512F8226641F0655E /* AccountsPageModel.swift in Sources */,
 				A827A827A827A827A827A827 /* AccountsPageModel+AccountMutations.swift in Sources */,
 				A826A826A826A826A826A826 /* AccountsPageModel+Lifecycle.swift in Sources */,
+				B6A471F0F3B14827A0F2D002 /* AccountsPageModel+PendingWorkspaces.swift in Sources */,
 				A828A828A828A828A828A828 /* AccountsPageModel+Refresh.swift in Sources */,
 				A829A829A829A829A829A829 /* AccountsPageModel+Selection.swift in Sources */,
 				A830A830A830A830A830A830 /* AccountsPageModel+State.swift in Sources */,
@@ -1609,7 +1619,7 @@
 				CODE_SIGN_ENTITLEMENTS = Copool.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = KLU8GF65GP;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -1619,12 +1629,8 @@
 				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Copool;
-				INFOPLIST_KEY_CFBundleName = Copool;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
-				INFOPLIST_KEY_LSMinimumSystemVersion = 14.0;
-				INFOPLIST_KEY_LSUIElement = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Sources/Copool/Info-macOS.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -1651,7 +1657,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = CopoolWidgetsMac.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEVELOPMENT_TEAM = KLU8GF65GP;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -1693,7 +1699,7 @@
 				CODE_SIGN_ENTITLEMENTS = Copool.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = KLU8GF65GP;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -1703,12 +1709,8 @@
 				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Copool;
-				INFOPLIST_KEY_CFBundleName = Copool;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
-				INFOPLIST_KEY_LSMinimumSystemVersion = 14.0;
-				INFOPLIST_KEY_LSUIElement = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Sources/Copool/Info-macOS.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -1754,16 +1756,10 @@
 				CODE_SIGN_ENTITLEMENTS = CopooliOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEVELOPMENT_TEAM = KLU8GF65GP;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Copool;
-				INFOPLIST_KEY_CFBundleName = Copool;
-				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
-				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				"INFOPLIST_KEY_UISupportedInterfaceOrientations~ipad" = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Sources/Copool/Info-iOS.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1785,7 +1781,7 @@
 				CODE_SIGN_ENTITLEMENTS = CopoolWidgets.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEVELOPMENT_TEAM = KLU8GF65GP;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Sources/CopoolWidgets/Info.plist;
@@ -1814,7 +1810,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = CopoolWidgetsMac.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEVELOPMENT_TEAM = KLU8GF65GP;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -1983,16 +1979,10 @@
 				CODE_SIGN_ENTITLEMENTS = CopooliOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEVELOPMENT_TEAM = KLU8GF65GP;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Copool;
-				INFOPLIST_KEY_CFBundleName = Copool;
-				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
-				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				"INFOPLIST_KEY_UISupportedInterfaceOrientations~ipad" = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Sources/Copool/Info-iOS.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -2014,7 +2004,7 @@
 				CODE_SIGN_ENTITLEMENTS = CopoolWidgets.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEVELOPMENT_TEAM = KLU8GF65GP;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Sources/CopoolWidgets/Info.plist;

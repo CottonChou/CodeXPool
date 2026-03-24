@@ -11,7 +11,7 @@ final class DefaultWorkspaceMetadataService: WorkspaceMetadataService, @unchecke
     private let endpointCoordinator: EndpointRequestCoordinator
 
     init(
-        session: URLSession = .shared,
+        session: URLSession = BackgroundNetworkSession.shared,
         configPath: URL,
         endpointPreferenceStore: EndpointPreferenceStore = .shared
     ) {
@@ -25,7 +25,7 @@ final class DefaultWorkspaceMetadataService: WorkspaceMetadataService, @unchecke
 
     func fetchWorkspaceMetadata(accessToken: String) async throws -> [WorkspaceMetadata] {
         do {
-            let result = try await endpointCoordinator.fetchFirstSuccessful(
+            let payload: WorkspaceAccountsResponse = try await endpointCoordinator.fetchFirstSuccessful(
                 scope: RequestPolicy.scope,
                 candidateURLs: resolveAccountURLs()
             ) { endpoint in
@@ -36,8 +36,9 @@ final class DefaultWorkspaceMetadataService: WorkspaceMetadataService, @unchecke
                 request.setValue("application/json", forHTTPHeaderField: "Accept")
                 request.setValue("codex-tools-swift/0.1", forHTTPHeaderField: "User-Agent")
                 return request
+            } validate: { result in
+                try JSONDecoder().decode(WorkspaceAccountsResponse.self, from: result.data)
             }
-            let payload = try JSONDecoder().decode(WorkspaceAccountsResponse.self, from: result.data)
             let metadata = payload.items.map {
                 WorkspaceMetadata(
                     accountID: $0.id,
@@ -47,12 +48,51 @@ final class DefaultWorkspaceMetadataService: WorkspaceMetadataService, @unchecke
             }
             return metadata
         } catch EndpointRequestError.allRequestsFailed(let errors) {
+            if let message = Self.preferredUserFacingFailureMessage(from: errors) {
+                throw AppError.network(message)
+            }
             let preview = errors.prefix(2).joined(separator: " | ")
             if errors.count > 2 {
                 throw AppError.network(L10n.tr("error.usage.request_failed_with_more_format", preview, String(errors.count - 2)))
             }
             throw AppError.network(L10n.tr("error.usage.request_failed_format", preview))
         }
+    }
+
+    private static func preferredUserFacingFailureMessage(from errors: [String]) -> String? {
+        if errors.contains(where: isCancellationFailure) {
+            return L10n.tr("error.workspace.discovery_cancelled")
+        }
+        if errors.contains(where: isTimeoutFailure) {
+            return L10n.tr("error.workspace.discovery_timed_out")
+        }
+        if errors.contains(where: isHTMLForbiddenFailure) {
+            return L10n.tr("error.workspace.discovery_forbidden")
+        }
+
+        for error in errors {
+            let detail = error.components(separatedBy: ": ").dropFirst().joined(separator: ": ")
+            guard let detail = detail.nonEmptyTrimmed, !detail.hasPrefix("<") else {
+                continue
+            }
+            return detail
+        }
+        return nil
+    }
+
+    private static func isCancellationFailure(_ error: String) -> Bool {
+        error.lowercased().contains("cancelled")
+    }
+
+    private static func isTimeoutFailure(_ error: String) -> Bool {
+        let normalized = error.lowercased()
+        return normalized.contains("timed out") || normalized.contains("timeout")
+    }
+
+    private static func isHTMLForbiddenFailure(_ error: String) -> Bool {
+        let normalized = error.lowercased()
+        let containsHTML = normalized.contains("<html") || normalized.contains("<head") || normalized.contains("<meta ")
+        return containsHTML && normalized.contains("-> 403:")
     }
 
     private func resolveAccountURLs() -> [String] {
@@ -65,7 +105,6 @@ final class DefaultWorkspaceMetadataService: WorkspaceMetadataService, @unchecke
             candidates.append("\(originWithoutBackend)\(backendPrefix)/accounts")
         } else {
             candidates.append("\(baseOrigin)\(backendPrefix)/accounts")
-            candidates.append("\(baseOrigin)/accounts")
         }
 
         candidates.append("https://chatgpt.com/backend-api/accounts")
@@ -93,4 +132,17 @@ private extension String {
         guard hasSuffix(suffix) else { return nil }
         return String(dropLast(suffix.count))
     }
+
+    var nonEmptyTrimmed: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
 }
+
+#if DEBUG
+extension DefaultWorkspaceMetadataService {
+    static func debugPreferredUserFacingFailureMessage(from errors: [String]) -> String? {
+        preferredUserFacingFailureMessage(from: errors)
+    }
+}
+#endif

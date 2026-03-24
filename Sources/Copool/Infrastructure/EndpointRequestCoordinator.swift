@@ -46,6 +46,20 @@ final class EndpointRequestCoordinator: @unchecked Sendable {
         candidateURLs: [String],
         makeRequest: @escaping @Sendable (URL) -> URLRequest
     ) async throws -> EndpointFetchResult {
+        try await fetchFirstSuccessful(
+            scope: scope,
+            candidateURLs: candidateURLs,
+            makeRequest: makeRequest,
+            validate: { $0 }
+        )
+    }
+
+    func fetchFirstSuccessful<Value: Sendable>(
+        scope: String,
+        candidateURLs: [String],
+        makeRequest: @escaping @Sendable (URL) -> URLRequest,
+        validate: @escaping @Sendable (EndpointFetchResult) throws -> Value
+    ) async throws -> Value {
         let orderedCandidates = await preferenceStore.prioritizedCandidates(
             scope: scope,
             candidates: candidateURLs
@@ -58,11 +72,12 @@ final class EndpointRequestCoordinator: @unchecked Sendable {
 
         switch await attemptRequest(
             endpointString: firstCandidate,
-            makeRequest: makeRequest
+            makeRequest: makeRequest,
+            validate: validate
         ) {
         case .success(let result):
             await preferenceStore.recordSuccess(scope: scope, endpoint: result.endpoint)
-            return result
+            return result.value
         case .failure(let message):
             failures.append(message)
         }
@@ -73,15 +88,16 @@ final class EndpointRequestCoordinator: @unchecked Sendable {
         }
 
         let result = await withTaskGroup(
-            of: AttemptResult.self,
-            returning: EndpointFetchResult?.self
+            of: AttemptResult<Value>.self,
+            returning: ValidatedEndpointFetchResult<Value>?.self
         ) { group in
             for endpointString in remainingCandidates {
                 group.addTask { [session] in
                     await Self.attemptRequest(
                         session: session,
                         endpointString: endpointString,
-                        makeRequest: makeRequest
+                        makeRequest: makeRequest,
+                        validate: validate
                     )
                 }
             }
@@ -104,25 +120,28 @@ final class EndpointRequestCoordinator: @unchecked Sendable {
         }
 
         await preferenceStore.recordSuccess(scope: scope, endpoint: result.endpoint)
-        return result
+        return result.value
     }
 
-    private func attemptRequest(
+    private func attemptRequest<Value: Sendable>(
         endpointString: String,
-        makeRequest: @escaping @Sendable (URL) -> URLRequest
-    ) async -> AttemptResult {
+        makeRequest: @escaping @Sendable (URL) -> URLRequest,
+        validate: @escaping @Sendable (EndpointFetchResult) throws -> Value
+    ) async -> AttemptResult<Value> {
         await Self.attemptRequest(
             session: session,
             endpointString: endpointString,
-            makeRequest: makeRequest
+            makeRequest: makeRequest,
+            validate: validate
         )
     }
 
-    private static func attemptRequest(
+    private static func attemptRequest<Value: Sendable>(
         session: URLSession,
         endpointString: String,
-        makeRequest: @escaping @Sendable (URL) -> URLRequest
-    ) async -> AttemptResult {
+        makeRequest: @escaping @Sendable (URL) -> URLRequest,
+        validate: @escaping @Sendable (EndpointFetchResult) throws -> Value
+    ) async -> AttemptResult<Value> {
         guard let endpoint = URL(string: endpointString) else {
             return .failure("\(endpointString) -> invalid URL")
         }
@@ -134,25 +153,43 @@ final class EndpointRequestCoordinator: @unchecked Sendable {
             }
 
             guard (200..<300).contains(httpResponse.statusCode) else {
-                let body = String(data: data, encoding: .utf8) ?? ""
-                let snippet = String(body.prefix(140))
-                return .failure("\(endpointString) -> \(httpResponse.statusCode): \(snippet)")
+                let detail = OpenAIChatGPTOAuthSupport.bestHTTPErrorMessage(
+                    from: data,
+                    statusCode: httpResponse.statusCode,
+                    snippetLimit: 140
+                )
+                return .failure("\(endpointString) -> \(httpResponse.statusCode): \(detail)")
             }
 
-            return .success(
-                EndpointFetchResult(
-                    data: data,
-                    response: httpResponse,
-                    endpoint: endpointString
-                )
+            let result = EndpointFetchResult(
+                data: data,
+                response: httpResponse,
+                endpoint: endpointString
             )
+
+            do {
+                let validated = try validate(result)
+                return .success(
+                    ValidatedEndpointFetchResult(
+                        value: validated,
+                        endpoint: endpointString
+                    )
+                )
+            } catch {
+                return .failure("\(endpointString) -> \(error.localizedDescription)")
+            }
         } catch {
             return .failure("\(endpointString) -> \(error.localizedDescription)")
         }
     }
 
-    private enum AttemptResult: Sendable {
-        case success(EndpointFetchResult)
+    private struct ValidatedEndpointFetchResult<Value: Sendable>: Sendable {
+        let value: Value
+        let endpoint: String
+    }
+
+    private enum AttemptResult<Value: Sendable>: Sendable {
+        case success(ValidatedEndpointFetchResult<Value>)
         case failure(String)
     }
 }

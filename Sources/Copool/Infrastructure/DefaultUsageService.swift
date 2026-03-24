@@ -1,5 +1,16 @@
 import Foundation
 
+enum BackgroundNetworkSession {
+    static let shared: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.urlCache = nil
+        configuration.httpCookieStorage = nil
+        configuration.httpShouldSetCookies = false
+        return URLSession(configuration: configuration)
+    }()
+}
+
 final class DefaultUsageService: UsageService, @unchecked Sendable {
 private enum RequestPolicy {
         static let timeout: TimeInterval = 18
@@ -12,7 +23,7 @@ private enum RequestPolicy {
     private let endpointCoordinator: EndpointRequestCoordinator
 
     init(
-        session: URLSession = .shared,
+        session: URLSession = BackgroundNetworkSession.shared,
         configPath: URL,
         dateProvider: DateProviding = SystemDateProvider(),
         endpointPreferenceStore: EndpointPreferenceStore = .shared
@@ -28,7 +39,7 @@ private enum RequestPolicy {
 
     func fetchUsage(accessToken: String, accountID: String) async throws -> UsageSnapshot {
         do {
-            let result = try await endpointCoordinator.fetchFirstSuccessful(
+            let payload: UsageAPIResponse = try await endpointCoordinator.fetchFirstSuccessful(
                 scope: RequestPolicy.scope,
                 candidateURLs: resolveUsageURLs()
             ) { endpoint in
@@ -40,16 +51,31 @@ private enum RequestPolicy {
                 request.setValue("application/json", forHTTPHeaderField: "Accept")
                 request.setValue("codex-tools-swift/0.1", forHTTPHeaderField: "User-Agent")
                 return request
+            } validate: { result in
+                try JSONDecoder().decode(UsageAPIResponse.self, from: result.data)
             }
-            let payload = try JSONDecoder().decode(UsageAPIResponse.self, from: result.data)
             return mapPayload(payload)
         } catch EndpointRequestError.allRequestsFailed(let errors) {
+            if let message = Self.preferredUserFacingFailureMessage(from: errors) {
+                throw AppError.network(message)
+            }
             let preview = errors.prefix(2).joined(separator: " | ")
             if errors.count > 2 {
                 throw AppError.network(L10n.tr("error.usage.request_failed_with_more_format", preview, String(errors.count - 2)))
             }
             throw AppError.network(L10n.tr("error.usage.request_failed_format", preview))
         }
+    }
+
+    private static func preferredUserFacingFailureMessage(from errors: [String]) -> String? {
+        for error in errors {
+            let detail = error.components(separatedBy: ": ").dropFirst().joined(separator: ": ")
+            guard let detail = detail.nonEmptyTrimmed, !detail.hasPrefix("<") else {
+                continue
+            }
+            return detail
+        }
+        return nil
     }
 
     private func resolveUsageURLs() -> [String] {
@@ -179,5 +205,10 @@ private extension String {
     func removingSuffix(_ suffix: String) -> String? {
         guard hasSuffix(suffix) else { return nil }
         return String(dropLast(suffix.count))
+    }
+
+    var nonEmptyTrimmed: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }

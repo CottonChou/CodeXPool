@@ -19,6 +19,7 @@ extension AccountsPageModel {
                 throw AppError.invalidData(L10n.tr("error.accounts.account_not_found_for_switch"))
             }
             applyAccountsForAccountSwitch(accounts)
+            await refreshPendingWorkspaceAuthorizations(from: accounts, preferredSourceAccountID: selectedAccount.id)
             publishAndSyncLocalAccountsMutation(accounts)
             syncCurrentAccountSelectionInBackground(accountID: selectedAccount.accountID)
             notice = buildSwitchNotice(execution: execution)
@@ -43,6 +44,7 @@ extension AccountsPageModel {
             let execution = try await coordinator.switchAccountAndApplySettings(id: best.id)
             let accounts = try await coordinator.listAccounts()
             applyAccountsForAccountSwitch(accounts)
+            await refreshPendingWorkspaceAuthorizations(from: accounts, preferredSourceAccountID: best.id)
             publishAndSyncLocalAccountsMutation(accounts)
             syncCurrentAccountSelectionInBackground(accountID: best.accountID)
             var switchNotice = buildSwitchNotice(execution: execution)

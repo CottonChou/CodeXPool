@@ -2,14 +2,13 @@ import XCTest
 @testable import Copool
 
 final class RemoteProxyAccountsPayloadBuilderTests: XCTestCase {
-    func testBuildMapsLocaleToRemoteCompatibleIdentifier() throws {
+    func testBuildPreservesUsableAccountsFromStore() throws {
         let fileManager = FileManager.default
         let tempDirectory = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try fileManager.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: tempDirectory) }
 
         let storePath = tempDirectory.appendingPathComponent("accounts.json", isDirectory: false)
-        let authPath = tempDirectory.appendingPathComponent("auth.json", isDirectory: false)
 
         let store = AccountsStore(
             version: 1,
@@ -37,34 +36,22 @@ final class RemoteProxyAccountsPayloadBuilderTests: XCTestCase {
                     principalID: nil
                 ),
             ],
-            currentSelection: nil,
-            settings: AppSettings(
-                launchAtStartup: false,
-                launchCodexAfterSwitch: true,
-                autoSmartSwitch: false,
-                syncOpencodeOpenaiAuth: false,
-                localProxyHostAPIOnly: false,
-                restartEditorsOnSwitch: false,
-                restartEditorTargets: [],
-                autoStartApiProxy: false,
-                proxyConfiguration: .defaultValue,
-                remoteServers: [],
-                locale: AppLocale.japanese.identifier
-            )
+            currentSelection: nil
         )
 
         let data = try JSONEncoder().encode(store)
-        try data.write(to: storePath, options: .atomic)
+        try data.write(to: storePath, options: Data.WritingOptions.atomic)
 
         let payload = try RemoteProxyAccountsPayloadBuilder(
             sourceAccountStorePath: storePath,
-            sourceAuthPath: authPath,
             fileManager: fileManager
         ).build()
 
-        let root = try XCTUnwrap(JSONSerialization.jsonObject(with: payload) as? [String: Any])
-        let settings = try XCTUnwrap(root["settings"] as? [String: Any])
-        XCTAssertEqual(settings["locale"] as? String, "ja-JP")
+        let builtStore = try JSONDecoder().decode(AccountsStore.self, from: payload)
+        XCTAssertEqual(builtStore.version, 1)
+        XCTAssertEqual(builtStore.accounts.count, 1)
+        XCTAssertEqual(builtStore.accounts[0].accountID, "acc-1")
+        XCTAssertEqual(builtStore.accounts[0].email, "test@example.com")
     }
 
     private func makeJWT(email: String, accountID: String, planType: String) -> String {

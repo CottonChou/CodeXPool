@@ -3,6 +3,7 @@ import SwiftUI
 struct AccountsPageView: View {
     @State private var areCardsPresented = false
     @State private var didRunInitialCardEntrance = false
+    @StateObject private var store: AccountsPageViewStore
 
     let model: AccountsPageModel
     let currentLocale: AppLocale
@@ -16,6 +17,7 @@ struct AccountsPageView: View {
         self.model = model
         self.currentLocale = currentLocale
         self.onSelectLocale = onSelectLocale
+        _store = StateObject(wrappedValue: AccountsPageViewStore(model: model))
         let hasResolvedInitialState = model.hasResolvedInitialState
         _areCardsPresented = State(initialValue: hasResolvedInitialState)
         _didRunInitialCardEntrance = State(initialValue: hasResolvedInitialState)
@@ -23,7 +25,7 @@ struct AccountsPageView: View {
 
     var body: some View {
         AccountsPageShell(
-            model: model,
+            store: store,
             currentLocale: currentLocale,
             onSelectLocale: onSelectLocale,
             areCardsPresented: areCardsPresented,
@@ -31,6 +33,8 @@ struct AccountsPageView: View {
             onToggleCollapse: toggleCollapse,
             onSwitchAccount: switchAccount,
             onRefreshAccountUsage: refreshUsage,
+            onAuthorizeWorkspace: authorizeWorkspace,
+            onDeletePendingWorkspace: deletePendingWorkspace,
             onDeleteAccount: deleteAccount
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -46,8 +50,8 @@ struct AccountsPageView: View {
     }
 
     private var contentAccountCount: Int? {
-        guard case .content(let accounts) = model.state else { return nil }
-        return accounts.count
+        guard case .content(let cards) = store.contentPresentation.state else { return nil }
+        return cards.count
     }
 
     private func triggerInitialCardEntranceIfNeeded(for count: Int?) {
@@ -63,6 +67,7 @@ struct AccountsPageView: View {
     private func toggleCollapse() {
         withAnimation(AccountsAnimationRules.collapseToggle) {
             model.toggleAllAccountsCollapsed()
+            store.syncFromModel()
         }
     }
 
@@ -76,5 +81,13 @@ struct AccountsPageView: View {
 
     private func deleteAccount(id: String) {
         Task { await model.deleteAccount(id: id) }
+    }
+
+    private func authorizeWorkspace(id: String) {
+        Task { await model.authorizePendingWorkspace(id: id) }
+    }
+
+    private func deletePendingWorkspace(id: String) {
+        Task { await model.deletePendingWorkspace(id: id) }
     }
 }

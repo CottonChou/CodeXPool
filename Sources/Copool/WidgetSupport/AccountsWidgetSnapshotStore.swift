@@ -1,14 +1,14 @@
 import Foundation
 import os
 
-struct AccountsWidgetSnapshotStore {
+struct AccountsWidgetSnapshotStore: @unchecked Sendable {
     private let logger = Logger(subsystem: "Copool", category: "AccountsWidgetSnapshotStore")
     private let fileManager: FileManager
-    private let snapshotURLProvider: () -> URL?
+    private let snapshotURLProvider: @Sendable () -> URL?
 
     init(
         fileManager: FileManager = .default,
-        snapshotURLProvider: @escaping () -> URL? = {
+        snapshotURLProvider: @escaping @Sendable () -> URL? = {
             FileManager.default
                 .containerURL(
                     forSecurityApplicationGroupIdentifier: AccountsWidgetConfiguration.appGroupIdentifier

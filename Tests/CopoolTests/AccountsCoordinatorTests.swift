@@ -326,7 +326,459 @@ final class AccountsCoordinatorTests: XCTestCase {
         _ = try await coordinator.refreshUsage(accountIDs: ["acct-1", "acct-3"], force: true)
 
         let requestedAccountIDs = await usageService.readRequestedAccountIDs()
-        XCTAssertEqual(requestedAccountIDs, ["account-1", "account-3"])
+        XCTAssertEqual(Set(requestedAccountIDs), Set(["account-1", "account-3"]))
+    }
+
+    func testRefreshUsageRefreshesExpiredStoredAuthBeforeFetching() async throws {
+        let now: Int64 = 1_763_216_000
+        let expiredAccessToken = makeUnsignedJWT(payload: ["exp": now - 60])
+        let freshAccessToken = makeUnsignedJWT(payload: ["exp": now + 3_600])
+        let expiredAuth = makeTestAuthJSON(accountID: "account-1", accessToken: expiredAccessToken)
+        let refreshedAuth = makeTestAuthJSON(accountID: "account-1", accessToken: freshAccessToken)
+        let storeRepository = InMemoryAccountsStoreRepository(
+            store: AccountsStore(
+                version: 1,
+                accounts: [
+                    StoredAccount(
+                        id: "acct-1",
+                        label: "Test",
+                        email: "test@example.com",
+                        accountID: "account-1",
+                        planType: "team",
+                        teamName: nil,
+                        teamAlias: nil,
+                        authJSON: expiredAuth,
+                        addedAt: now,
+                        updatedAt: now,
+                        usage: nil,
+                        usageError: nil
+                    )
+                ],
+                currentSelection: nil
+            )
+        )
+        let usageService = ValidatingUsageService(
+            validAccessToken: freshAccessToken,
+            result: makeUsageSnapshot(fetchedAt: now, fiveHourResetAt: now + 300)
+        )
+        let authRepository = RefreshingAuthRepository(refreshedAuth: refreshedAuth)
+        let coordinator = AccountsCoordinator(
+            storeRepository: storeRepository,
+            settingsRepository: TestSettingsRepository(),
+            authRepository: authRepository,
+            usageService: usageService,
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+
+        let accounts = try await coordinator.refreshUsage(force: true)
+        let savedStore = try storeRepository.loadStore()
+        let requestedTokens = await usageService.readRequestedAccessTokens()
+
+        XCTAssertEqual(authRepository.readRefreshCallCount(), 1)
+        XCTAssertEqual(requestedTokens, [freshAccessToken])
+        XCTAssertNil(accounts.first?.usageError)
+        XCTAssertEqual(
+            savedStore.accounts.first?.authJSON["tokens"]?["access_token"]?.stringValue,
+            freshAccessToken
+        )
+    }
+
+    func testRefreshUsageShowsRefreshFailureMessageWhenRefreshTokenIsReused() async throws {
+        let now: Int64 = 1_763_216_000
+        let expiredAccessToken = makeUnsignedJWT(payload: ["exp": now - 60])
+        let expiredAuth = makeTestAuthJSON(accountID: "account-1", accessToken: expiredAccessToken)
+        let storeRepository = InMemoryAccountsStoreRepository(
+            store: AccountsStore(
+                version: 1,
+                accounts: [
+                    StoredAccount(
+                        id: "acct-1",
+                        label: "Test",
+                        email: "test@example.com",
+                        accountID: "account-1",
+                        planType: "team",
+                        teamName: nil,
+                        teamAlias: nil,
+                        authJSON: expiredAuth,
+                        addedAt: now,
+                        updatedAt: now,
+                        usage: nil,
+                        usageError: nil
+                    )
+                ],
+                currentSelection: nil
+            )
+        )
+        let usageService = ValidatingUsageService(
+            validAccessToken: "unused",
+            result: makeUsageSnapshot(fetchedAt: now, fiveHourResetAt: now + 300)
+        )
+        let message = "Your refresh token has already been used to generate a new access token. Please try signing in again."
+        let authRepository = FailingRefreshingAuthRepository(message: message)
+        let coordinator = AccountsCoordinator(
+            storeRepository: storeRepository,
+            settingsRepository: TestSettingsRepository(),
+            authRepository: authRepository,
+            usageService: usageService,
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+
+        let accounts = try await coordinator.refreshUsage(force: true)
+        let requestedTokens = await usageService.readRequestedAccessTokens()
+
+        XCTAssertEqual(authRepository.readRefreshCallCount(), 1)
+        XCTAssertEqual(requestedTokens, [])
+        XCTAssertEqual(accounts.first?.usageError, message)
+    }
+
+    func testAddAccountViaLoginOnIOSSkipsUsageFetchAndImportsSingleCurrentAccount() async throws {
+        let now: Int64 = 1_763_216_000
+        let storeRepository = InMemoryAccountsStoreRepository(store: AccountsStore())
+        let usageService = ValidatingUsageService(
+            validAccessToken: "unused",
+            result: makeUsageSnapshot(fetchedAt: now, fiveHourResetAt: now + 300)
+        )
+        let metadataService = RecordingWorkspaceMetadataService(
+            metadata: [
+                WorkspaceMetadata(accountID: "account-1", workspaceName: "remote-space", structure: "workspace"),
+                WorkspaceMetadata(accountID: "account-2", workspaceName: "ops-space", structure: "workspace")
+            ]
+        )
+        let coordinator = AccountsCoordinator(
+            storeRepository: storeRepository,
+            settingsRepository: TestSettingsRepository(),
+            authRepository: RemoteLookupAuthRepository(),
+            usageService: usageService,
+            workspaceMetadataService: metadataService,
+            chatGPTOAuthLoginService: FixedChatGPTOAuthLoginService(
+                tokens: ChatGPTOAuthTokens(
+                    accessToken: "token-1",
+                    refreshToken: "refresh-1",
+                    idToken: "id-1",
+                    apiKey: nil
+                )
+            ),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now),
+            runtimePlatform: .iOS
+        )
+
+        let imported = try await coordinator.addAccountViaLogin(customLabel: nil)
+        let requestedTokens = await usageService.readRequestedAccessTokens()
+        let accounts = try await coordinator.listAccounts()
+
+        XCTAssertEqual(imported.accountID, "account-1")
+        XCTAssertNil(imported.teamName)
+        XCTAssertEqual(requestedTokens, [])
+        XCTAssertEqual(metadataService.callCount, 1)
+        XCTAssertEqual(accounts.map(\.accountID), ["account-1"])
+        XCTAssertEqual(accounts.map(\.teamName), ["remote-space"])
+    }
+
+    func testAddAccountViaLoginOnMacOSImportsSingleCurrentAccount() async throws {
+        let now: Int64 = 1_763_216_000
+        let storeRepository = InMemoryAccountsStoreRepository(store: AccountsStore())
+        let usageService = RecordingAccountUsageService(
+            results: [
+                "account-1": makeUsageSnapshot(fetchedAt: now, fiveHourResetAt: now + 300)
+            ]
+        )
+        let metadataService = StubWorkspaceMetadataService(
+            metadata: [
+                WorkspaceMetadata(accountID: "account-1", workspaceName: "remote-space", structure: "workspace"),
+                WorkspaceMetadata(accountID: "account-2", workspaceName: "ops-space", structure: "workspace")
+            ]
+        )
+        let coordinator = AccountsCoordinator(
+            storeRepository: storeRepository,
+            settingsRepository: TestSettingsRepository(),
+            authRepository: RemoteLookupAuthRepository(),
+            usageService: usageService,
+            workspaceMetadataService: metadataService,
+            chatGPTOAuthLoginService: FixedChatGPTOAuthLoginService(
+                tokens: ChatGPTOAuthTokens(
+                    accessToken: "token-1",
+                    refreshToken: "refresh-1",
+                    idToken: "id-1",
+                    apiKey: nil
+                )
+            ),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+
+        _ = try await coordinator.addAccountViaLogin(customLabel: nil)
+
+        let accounts = try await coordinator.listAccounts()
+        let requestedAccountIDs = await usageService.readRequestedAccountIDs()
+        XCTAssertEqual(accounts.map(\.accountID), ["account-1"])
+        XCTAssertEqual(accounts.map(\.teamName), ["remote-space"])
+        XCTAssertEqual(requestedAccountIDs, ["account-1"])
+    }
+
+    func testAddAccountViaLoginReimportsCurrentAccountWithoutCreatingDuplicates() async throws {
+        let now: Int64 = 1_763_216_000
+        let storeRepository = InMemoryAccountsStoreRepository(store: AccountsStore())
+        let usageService = RecordingAccountUsageService(
+            results: [
+                "account-1": makeUsageSnapshot(fetchedAt: now, fiveHourResetAt: now + 300)
+            ]
+        )
+        let metadataService = StubWorkspaceMetadataService(
+            metadata: [
+                WorkspaceMetadata(accountID: "account-1", workspaceName: "remote-space", structure: "workspace"),
+                WorkspaceMetadata(accountID: "account-2", workspaceName: "ops-space", structure: "workspace")
+            ]
+        )
+        let coordinator = AccountsCoordinator(
+            storeRepository: storeRepository,
+            settingsRepository: TestSettingsRepository(),
+            authRepository: RemoteLookupAuthRepository(),
+            usageService: usageService,
+            workspaceMetadataService: metadataService,
+            chatGPTOAuthLoginService: FixedChatGPTOAuthLoginService(
+                tokens: ChatGPTOAuthTokens(
+                    accessToken: "token-1",
+                    refreshToken: "refresh-1",
+                    idToken: "id-1",
+                    apiKey: nil
+                )
+            ),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+
+        _ = try await coordinator.addAccountViaLogin(customLabel: nil)
+        _ = try await coordinator.addAccountViaLogin(customLabel: nil)
+
+        let accounts = try await coordinator.listAccounts()
+        let requestedAccountIDs = await usageService.readRequestedAccountIDs()
+        XCTAssertEqual(accounts.map(\.accountID), ["account-1"])
+        XCTAssertEqual(accounts.map(\.teamName), ["remote-space"])
+        XCTAssertEqual(requestedAccountIDs, ["account-1", "account-1"])
+    }
+
+    func testDiscoverPendingWorkspaceAuthorizationsReturnsOnlyMissingWorkspaceCards() async throws {
+        let now: Int64 = 1_763_216_000
+        let storeRepository = InMemoryAccountsStoreRepository(
+            store: AccountsStore(
+                accounts: [
+                    StoredAccount(
+                        id: "acct-1",
+                        label: "Current",
+                        email: "test@example.com",
+                        accountID: "account-1",
+                        planType: "team",
+                        teamName: "remote-space",
+                        teamAlias: nil,
+                        authJSON: .object([
+                            "account_id": .string("account-1")
+                        ]),
+                        addedAt: now,
+                        updatedAt: now,
+                        usage: nil,
+                        usageError: nil
+                    )
+                ]
+            )
+        )
+        let metadataService = StubWorkspaceMetadataService(
+            metadata: [
+                WorkspaceMetadata(accountID: "account-1", workspaceName: "remote-space", structure: "workspace"),
+                WorkspaceMetadata(accountID: "account-2", workspaceName: "ops-space", structure: "workspace"),
+                WorkspaceMetadata(accountID: "account-3", workspaceName: "personal", structure: "personal"),
+                WorkspaceMetadata(accountID: "account-4", workspaceName: "Deactivated Workspace", structure: "workspace"),
+                WorkspaceMetadata(accountID: "account-5", workspaceName: "   ", structure: "workspace"),
+                WorkspaceMetadata(accountID: "account-6", workspaceName: "stale-space", structure: "deactivated")
+            ]
+        )
+        let coordinator = AccountsCoordinator(
+            storeRepository: storeRepository,
+            settingsRepository: TestSettingsRepository(),
+            authRepository: MultiAccountAuthRepository(
+                extractedByAccountID: [
+                    "account-1": makeExtractedAuth(accountID: "account-1", planType: "team", teamName: nil)
+                ]
+            ),
+            usageService: CountingUsageService(result: makeUsageSnapshot(fetchedAt: now)),
+            workspaceMetadataService: metadataService,
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+
+        let candidates = try await coordinator.discoverPendingWorkspaceAuthorizations(sourceAccountID: "acct-1")
+
+        XCTAssertEqual(
+            candidates,
+            [
+                WorkspaceAuthorizationCandidate(
+                    workspaceID: "account-2",
+                    workspaceName: "ops-space",
+                    email: "test@example.com",
+                    planType: "team"
+                )
+            ]
+        )
+    }
+
+    func testListAccountsIgnoresDeactivatedRemoteWorkspaceName() async throws {
+        let now: Int64 = 1_763_216_000
+        let storeRepository = InMemoryAccountsStoreRepository(
+            store: AccountsStore(
+                version: 1,
+                accounts: [
+                    StoredAccount(
+                        id: "acct-1",
+                        label: "Team",
+                        email: "test@example.com",
+                        accountID: "account-1",
+                        planType: "team",
+                        teamName: nil,
+                        teamAlias: nil,
+                        authJSON: .object([:]),
+                        addedAt: now,
+                        updatedAt: now,
+                        usage: nil,
+                        usageError: nil
+                    )
+                ],
+                currentSelection: nil
+            )
+        )
+        let coordinator = AccountsCoordinator(
+            storeRepository: storeRepository,
+            settingsRepository: TestSettingsRepository(),
+            authRepository: RemoteLookupAuthRepository(),
+            usageService: CountingUsageService(
+                result: UsageSnapshot(
+                    fetchedAt: now,
+                    planType: "team",
+                    fiveHour: nil,
+                    oneWeek: nil,
+                    credits: nil
+                )
+            ),
+            workspaceMetadataService: StubWorkspaceMetadataService(
+                metadata: [WorkspaceMetadata(accountID: "account-1", workspaceName: "Deactivated Workspace", structure: "workspace")]
+            ),
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+
+        let accounts = try await coordinator.listAccounts()
+
+        XCTAssertEqual(accounts.first?.teamName, "Deactivated Workspace")
+        XCTAssertEqual(accounts.first?.workspaceStatus, .deactivated)
+    }
+
+    func testAuthorizeWorkspaceViaLoginImportsSpecificWorkspace() async throws {
+        let now: Int64 = 1_763_216_000
+        let storeRepository = InMemoryAccountsStoreRepository(store: AccountsStore())
+        let loginService = RecordingWorkspaceAwareChatGPTOAuthLoginService(
+            defaultTokens: ChatGPTOAuthTokens(
+                accessToken: "token-1",
+                refreshToken: "refresh-1",
+                idToken: "id-1",
+                apiKey: nil
+            ),
+            tokensByWorkspaceID: [
+                "account-2": ChatGPTOAuthTokens(
+                    accessToken: "token-2",
+                    refreshToken: "refresh-2",
+                    idToken: "id-2",
+                    apiKey: nil
+                )
+            ]
+        )
+        let usageService = RecordingAccountUsageService(
+            results: [
+                "account-2": makeUsageSnapshot(fetchedAt: now, fiveHourResetAt: now + 300)
+            ]
+        )
+        let coordinator = AccountsCoordinator(
+            storeRepository: storeRepository,
+            settingsRepository: TestSettingsRepository(),
+            authRepository: TokenMappedAuthRepository(
+                extractedByAccessToken: [
+                    "token-2": makeExtractedAuth(
+                        accountID: "account-2",
+                        planType: "team",
+                        teamName: nil
+                    )
+                ]
+            ),
+            usageService: usageService,
+            workspaceMetadataService: StubWorkspaceMetadataService(metadata: []),
+            chatGPTOAuthLoginService: loginService,
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+
+        let imported = try await coordinator.authorizeWorkspaceViaLogin(
+            workspaceID: "account-2",
+            workspaceName: "ops-space",
+            customLabel: nil
+        )
+
+        let accounts = try await coordinator.listAccounts()
+        let forcedWorkspaceIDs = await loginService.readForcedWorkspaceIDs()
+
+        XCTAssertEqual(imported.accountID, "account-2")
+        XCTAssertEqual(imported.teamName, "ops-space")
+        XCTAssertEqual(accounts.map { $0.accountID }, ["account-2"])
+        XCTAssertEqual(accounts.map { $0.teamName }, ["workspace-account-2"])
+        XCTAssertEqual(forcedWorkspaceIDs, ["account-2"])
+    }
+
+    func testRefreshUsageOnIOSIsUnavailable() async {
+        let coordinator = AccountsCoordinator(
+            storeRepository: InMemoryAccountsStoreRepository(store: AccountsStore()),
+            settingsRepository: TestSettingsRepository(),
+            authRepository: StubAuthRepository(),
+            usageService: CountingUsageService(
+                result: UsageSnapshot(
+                    fetchedAt: 1,
+                    planType: "pro",
+                    fiveHour: nil,
+                    oneWeek: nil,
+                    credits: nil
+                )
+            ),
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            runtimePlatform: .iOS
+        )
+
+        do {
+            _ = try await coordinator.refreshUsage(force: true)
+            XCTFail("Expected iOS refresh usage to be unavailable")
+        } catch {
+            XCTAssertEqual(error.localizedDescription, PlatformCapabilities.unsupportedOperationMessage)
+        }
     }
 
     func testRefreshAllUsageDoesNotClearStoredWorkspaceNameWhenAuthLacksTeamName() async throws {
@@ -736,7 +1188,7 @@ final class AccountsCoordinatorTests: XCTestCase {
     }
 
     @MainActor
-    func testAccountsPageViewStoreRepublishesContentForCardStateChanges() async {
+    func testAccountsPageViewStoreRepublishesContentForCardStateChanges() async throws {
         let model = makeAccountsPageModelForViewStoreTests(
             initialAccounts: [
                 makeAccountSummary(
@@ -755,19 +1207,106 @@ final class AccountsCoordinatorTests: XCTestCase {
         )
         let store = AccountsPageViewStore(model: model)
         let initialContent = store.contentPresentation
+        var parentStoreChangeCount = 0
+        let cancellable = store.objectWillChange.sink {
+            parentStoreChangeCount += 1
+        }
 
         model.refreshingAccountIDs = ["acct-2"]
         await Task.yield()
 
-        XCTAssertNotEqual(store.contentPresentation, initialContent)
+        XCTAssertEqual(parentStoreChangeCount, 0)
+        XCTAssertEqual(store.contentPresentation, initialContent)
 
-        guard case .content(let cards) = store.contentPresentation.state else {
+        let unchangedCardStore = try XCTUnwrap(store.cardStore(for: "acct-1"))
+        let changedCardStore = try XCTUnwrap(store.cardStore(for: "acct-2"))
+
+        XCTAssertEqual(unchangedCardStore.presentation.refreshing, false)
+        XCTAssertEqual(changedCardStore.presentation.refreshing, true)
+
+        withExtendedLifetime(cancellable) {}
+    }
+
+    @MainActor
+    func testAccountsPageViewStoreKeepsUnchangedCardStoresStableAcrossCardUpdates() async throws {
+        let model = makeAccountsPageModelForViewStoreTests(
+            initialAccounts: [
+                makeAccountSummary(
+                    id: "acct-1",
+                    accountID: "account-1",
+                    isCurrent: true,
+                    usage: nil
+                ),
+                makeAccountSummary(
+                    id: "acct-2",
+                    accountID: "account-2",
+                    isCurrent: false,
+                    usage: nil
+                )
+            ]
+        )
+        let store = AccountsPageViewStore(model: model)
+        let acct1Store = try XCTUnwrap(store.cardStore(for: "acct-1"))
+        let acct2Store = try XCTUnwrap(store.cardStore(for: "acct-2"))
+
+        model.refreshingAccountIDs = ["acct-2"]
+        await Task.yield()
+
+        XCTAssertTrue(store.cardStore(for: "acct-1") === acct1Store)
+        XCTAssertTrue(store.cardStore(for: "acct-2") === acct2Store)
+        XCTAssertEqual(acct1Store.presentation.refreshing, false)
+        XCTAssertEqual(acct2Store.presentation.refreshing, true)
+    }
+
+    @MainActor
+    func testAccountsPageViewStoreRepublishesStructureWhenVisibleCardOrderChanges() async {
+        let model = makeAccountsPageModelForViewStoreTests(
+            initialAccounts: [
+                makeAccountSummary(
+                    id: "acct-1",
+                    accountID: "account-1",
+                    isCurrent: true,
+                    usage: nil
+                ),
+                makeAccountSummary(
+                    id: "acct-2",
+                    accountID: "account-2",
+                    isCurrent: false,
+                    usage: nil
+                )
+            ]
+        )
+        let store = AccountsPageViewStore(model: model)
+        var structureChangeCount = 0
+        let cancellable = store.objectWillChange.sink {
+            structureChangeCount += 1
+        }
+
+        model.syncFromBackgroundRefresh([
+            makeAccountSummary(
+                id: "acct-2",
+                accountID: "account-2",
+                isCurrent: true,
+                usage: nil
+            ),
+            makeAccountSummary(
+                id: "acct-1",
+                accountID: "account-1",
+                isCurrent: false,
+                usage: nil
+            )
+        ])
+        await Task.yield()
+
+        XCTAssertGreaterThan(structureChangeCount, 0)
+
+        guard case .content(let cardIDs) = store.contentPresentation.state else {
             return XCTFail("Expected content presentation")
         }
 
-        XCTAssertEqual(cards.count, 2)
-        XCTAssertEqual(cards.first { $0.id == "acct-1" }?.refreshing, false)
-        XCTAssertEqual(cards.first { $0.id == "acct-2" }?.refreshing, true)
+        XCTAssertEqual(cardIDs, ["acct-2", "acct-1"])
+
+        withExtendedLifetime(cancellable) {}
     }
 
     @MainActor
@@ -984,6 +1523,927 @@ final class AccountsCoordinatorTests: XCTestCase {
     }
 
     @MainActor
+    func testAccountsPageModelRefreshUsageOnIOSShowsUnsupportedNotice() async {
+        let usageService = RecordingAccountUsageService(results: [:])
+        let coordinator = AccountsCoordinator(
+            storeRepository: InMemoryAccountsStoreRepository(store: AccountsStore()),
+            settingsRepository: TestSettingsRepository(),
+            authRepository: StubAuthRepository(),
+            usageService: usageService,
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            runtimePlatform: .iOS
+        )
+        let model = AccountsPageModel(
+            coordinator: coordinator,
+            runtimePlatform: .iOS
+        )
+
+        await model.refreshUsage()
+
+        let requestedAccountIDs = await usageService.readRequestedAccountIDs()
+        XCTAssertEqual(requestedAccountIDs, [])
+        XCTAssertEqual(model.notice?.text, PlatformCapabilities.unsupportedOperationMessage)
+    }
+
+    @MainActor
+    func testAccountsPageModelRefreshUsageOnIOSEnqueuesRemoteRefreshCommand() async throws {
+        let cloudSyncService = RecordingProxyControlCloudSyncService()
+        let coordinator = AccountsCoordinator(
+            storeRepository: InMemoryAccountsStoreRepository(store: AccountsStore()),
+            settingsRepository: TestSettingsRepository(),
+            authRepository: StubAuthRepository(),
+            usageService: RecordingAccountUsageService(results: [:]),
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            runtimePlatform: .iOS
+        )
+        let model = AccountsPageModel(
+            coordinator: coordinator,
+            proxyControlCloudSyncService: cloudSyncService,
+            runtimePlatform: .iOS
+        )
+
+        await model.refreshUsage()
+
+        let commands = await cloudSyncService.readEnqueuedCommands()
+        XCTAssertEqual(commands.count, 1)
+        XCTAssertEqual(commands.first?.kind, .refreshAccounts)
+        XCTAssertEqual(model.notice?.text, L10n.tr("accounts.notice.remote_refresh_requested"))
+    }
+
+    @MainActor
+    func testAccountsPageModelHidesPerAccountRefreshOnIOS() {
+        let account = makeAccountSummary(
+            id: "acct-1",
+            accountID: "account-1",
+            isCurrent: true,
+            usage: nil
+        )
+        let coordinator = AccountsCoordinator(
+            storeRepository: InMemoryAccountsStoreRepository(store: AccountsStore()),
+            settingsRepository: TestSettingsRepository(),
+            authRepository: StubAuthRepository(),
+            usageService: CountingUsageService(
+                result: UsageSnapshot(
+                    fetchedAt: 1,
+                    planType: "pro",
+                    fiveHour: nil,
+                    oneWeek: nil,
+                    credits: nil
+                )
+            ),
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            runtimePlatform: .iOS
+        )
+        let model = AccountsPageModel(
+            coordinator: coordinator,
+            runtimePlatform: .iOS,
+            initialAccounts: [account]
+        )
+
+        let cards = model.makeAccountCardViewStates()
+
+        XCTAssertEqual(cards.first?.showsRefreshButton, false)
+        XCTAssertEqual(model.canRefreshAccount("acct-1"), false)
+    }
+
+    @MainActor
+    func testAccountsPageModelAddAccountViaLoginPopulatesPendingWorkspaceCards() async {
+        let now: Int64 = 1_763_216_000
+        let coordinator = AccountsCoordinator(
+            storeRepository: InMemoryAccountsStoreRepository(store: AccountsStore()),
+            settingsRepository: TestSettingsRepository(),
+            authRepository: AccountIDAwareAuthRepository(),
+            usageService: RecordingAccountUsageService(
+                results: [
+                    "account-1": makeUsageSnapshot(fetchedAt: now, fiveHourResetAt: now + 300)
+                ]
+            ),
+            workspaceMetadataService: StubWorkspaceMetadataService(
+                metadata: [
+                    WorkspaceMetadata(accountID: "account-1", workspaceName: "remote-space", structure: "workspace"),
+                    WorkspaceMetadata(accountID: "account-2", workspaceName: "ops-space", structure: "workspace")
+                ]
+            ),
+            chatGPTOAuthLoginService: FixedChatGPTOAuthLoginService(
+                tokens: ChatGPTOAuthTokens(
+                    accessToken: "token-1",
+                    refreshToken: "refresh-1",
+                    idToken: "id-1",
+                    apiKey: nil
+                )
+            ),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+        let model = AccountsPageModel(coordinator: coordinator)
+
+        await model.addAccountViaLogin()
+
+        XCTAssertEqual(model.pendingWorkspaceAuthorizations.map(\.workspaceID), ["account-2"])
+        XCTAssertEqual(model.pendingWorkspaceAuthorizations.map(\.workspaceName), ["ops-space"])
+    }
+
+    @MainActor
+    func testAccountsPageModelAuthorizePendingWorkspaceImportsAndClearsCandidate() async {
+        let now: Int64 = 1_763_216_000
+        let loginService = RecordingWorkspaceAwareChatGPTOAuthLoginService(
+            defaultTokens: ChatGPTOAuthTokens(
+                accessToken: "token-1",
+                refreshToken: "refresh-1",
+                idToken: "id-1",
+                apiKey: nil
+            ),
+            tokensByWorkspaceID: [
+                "account-2": ChatGPTOAuthTokens(
+                    accessToken: "token-2",
+                    refreshToken: "refresh-2",
+                    idToken: "id-2",
+                    apiKey: nil
+                )
+            ]
+        )
+        let coordinator = AccountsCoordinator(
+            storeRepository: InMemoryAccountsStoreRepository(
+                store: AccountsStore(
+                    accounts: [
+                        StoredAccount(
+                            id: "acct-1",
+                            label: "Current",
+                            email: "test@example.com",
+                            accountID: "account-1",
+                            planType: "team",
+                            teamName: "remote-space",
+                            teamAlias: nil,
+                            authJSON: .object([
+                                "tokens": .object([
+                                    "access_token": .string("token-1"),
+                                    "account_id": .string("account-1")
+                                ])
+                            ]),
+                            addedAt: now,
+                            updatedAt: now,
+                            usage: makeUsageSnapshot(fetchedAt: now, fiveHourResetAt: now + 300),
+                            usageError: nil
+                        )
+                    ]
+                )
+            ),
+            settingsRepository: TestSettingsRepository(),
+            authRepository: TokenMappedAuthRepository(
+                extractedByAccessToken: [
+                    "token-1": makeExtractedAuth(accountID: "account-1", planType: "team", teamName: nil),
+                    "token-2": makeExtractedAuth(accountID: "account-2", planType: "team", teamName: nil)
+                ]
+            ),
+            usageService: RecordingAccountUsageService(
+                results: [
+                    "account-2": makeUsageSnapshot(fetchedAt: now, fiveHourResetAt: now + 600)
+                ]
+            ),
+            workspaceMetadataService: StubWorkspaceMetadataService(
+                metadata: [
+                    WorkspaceMetadata(accountID: "account-1", workspaceName: "remote-space", structure: "workspace"),
+                    WorkspaceMetadata(accountID: "account-2", workspaceName: "ops-space", structure: "workspace")
+                ]
+            ),
+            chatGPTOAuthLoginService: loginService,
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+        let model = AccountsPageModel(coordinator: coordinator)
+
+        await model.load()
+        XCTAssertEqual(model.pendingWorkspaceAuthorizations.map { $0.workspaceID }, ["account-2"])
+
+        await model.authorizePendingWorkspace(id: "account-2")
+
+        let accounts = try? await coordinator.listAccounts()
+        let forcedWorkspaceIDs = await loginService.readForcedWorkspaceIDs()
+        XCTAssertEqual(accounts?.map { $0.accountID }, ["account-1", "account-2"])
+        XCTAssertTrue(model.pendingWorkspaceAuthorizations.isEmpty)
+        XCTAssertEqual(forcedWorkspaceIDs, ["account-2"])
+    }
+
+    @MainActor
+    func testAccountsPageModelPendingWorkspaceDiscoveryStaysSilentWhenNoCandidatesRemain() async {
+        let now: Int64 = 1_763_216_000
+        let coordinator = AccountsCoordinator(
+            storeRepository: InMemoryAccountsStoreRepository(
+                store: AccountsStore(
+                    accounts: [
+                        StoredAccount(
+                            id: "acct-1",
+                            label: "acct-1",
+                            email: "account-1@example.com",
+                            accountID: "account-1",
+                            planType: "team",
+                            teamName: "workspace-a",
+                            teamAlias: nil,
+                            authJSON: .object([
+                                "account_id": .string("account-1"),
+                                "tokens": .object([
+                                    "access_token": .string("token-1")
+                                ])
+                            ]),
+                            addedAt: now,
+                            updatedAt: now,
+                            usage: nil,
+                            usageError: nil
+                        )
+                    ]
+                )
+            ),
+            settingsRepository: TestSettingsRepository(),
+            authRepository: RemoteLookupAuthRepository(),
+            usageService: RecordingAccountUsageService(
+                results: [
+                    "account-1": makeUsageSnapshot(fetchedAt: now, fiveHourResetAt: now + 300)
+                ]
+            ),
+            workspaceMetadataService: ThrowingWorkspaceMetadataService(
+                error: AppError.unauthorized("Provided authentication token is expired. Please try signing in again.")
+            ),
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+        let model = AccountsPageModel(coordinator: coordinator)
+
+        await model.load()
+
+        XCTAssertTrue(model.pendingWorkspaceAuthorizations.isEmpty)
+        XCTAssertNil(model.pendingWorkspaceAuthorizationError)
+    }
+
+    func testWorkspaceMetadataCancellationPrefersFriendlyMessage() async throws {
+        let message = DefaultWorkspaceMetadataService.debugPreferredUserFacingFailureMessage(
+            from: [
+                "https://chatgpt.com/backend-api/accounts -> cancelled",
+                "https://chatgpt.com/accounts -> cancelled"
+            ]
+        )
+
+        XCTAssertEqual(message, L10n.tr("error.workspace.discovery_cancelled"))
+    }
+
+    func testWorkspaceMetadataTimeoutPrefersFriendlyMessage() async throws {
+        let message = DefaultWorkspaceMetadataService.debugPreferredUserFacingFailureMessage(
+            from: [
+                "https://chatgpt.com/backend-api/accounts -> The request timed out."
+            ]
+        )
+
+        XCTAssertEqual(message, L10n.tr("error.workspace.discovery_timed_out"))
+    }
+
+    func testWorkspaceMetadataHTMLForbiddenPrefersFriendlyMessage() async throws {
+        let message = DefaultWorkspaceMetadataService.debugPreferredUserFacingFailureMessage(
+            from: [
+                "https://chatgpt.com/backend-api/accounts -> 403: <html><head><meta name=\"viewport\"></head></html>"
+            ]
+        )
+
+        XCTAssertEqual(message, L10n.tr("error.workspace.discovery_forbidden"))
+    }
+
+    @MainActor
+    func testAccountsPageModelPendingWorkspaceDiscoveryMergesAcrossAllAccounts() async {
+        let now: Int64 = 1_763_216_000
+        let coordinator = AccountsCoordinator(
+            storeRepository: InMemoryAccountsStoreRepository(
+                store: AccountsStore(
+                    accounts: [
+                        StoredAccount(
+                            id: "acct-1",
+                            label: "acct-1",
+                            email: "account-1@example.com",
+                            accountID: "account-1",
+                            planType: "team",
+                            teamName: "workspace-a",
+                            teamAlias: nil,
+                            authJSON: .object([
+                                "account_id": .string("account-1")
+                            ]),
+                            addedAt: now,
+                            updatedAt: now,
+                            usage: nil,
+                            usageError: nil
+                        ),
+                        StoredAccount(
+                            id: "acct-2",
+                            label: "acct-2",
+                            email: "account-2@example.com",
+                            accountID: "account-2",
+                            planType: "team",
+                            teamName: "workspace-b",
+                            teamAlias: nil,
+                            authJSON: .object([
+                                "account_id": .string("account-2")
+                            ]),
+                            addedAt: now,
+                            updatedAt: now,
+                            usage: nil,
+                            usageError: nil
+                        )
+                    ],
+                    currentSelection: CurrentAccountSelection(
+                        accountID: "account-1",
+                        selectedAt: now,
+                        sourceDeviceID: "device"
+                    )
+                )
+            ),
+            settingsRepository: TestSettingsRepository(),
+            authRepository: MultiAccountAuthRepository(
+                extractedByAccountID: [
+                    "account-1": ExtractedAuth(
+                        accountID: "account-1",
+                        accessToken: "token-1",
+                        email: "account-1@example.com",
+                        planType: "team",
+                        teamName: "workspace-a"
+                    ),
+                    "account-2": ExtractedAuth(
+                        accountID: "account-2",
+                        accessToken: "token-2",
+                        email: "account-2@example.com",
+                        planType: "team",
+                        teamName: "workspace-b"
+                    )
+                ]
+            ),
+            usageService: RecordingAccountUsageService(results: [:]),
+            workspaceMetadataService: AccessTokenMappedWorkspaceMetadataService(
+                metadataByAccessToken: [
+                    "token-1": [
+                        WorkspaceMetadata(accountID: "account-1", workspaceName: "workspace-a", structure: "workspace")
+                    ],
+                    "token-2": [
+                        WorkspaceMetadata(accountID: "account-2", workspaceName: "workspace-b", structure: "workspace"),
+                        WorkspaceMetadata(accountID: "account-3", workspaceName: "workspace-c", structure: "workspace")
+                    ]
+                ]
+            ),
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+        let model = AccountsPageModel(coordinator: coordinator)
+        let accounts = [
+            AccountSummary(
+                id: "acct-1",
+                label: "acct-1",
+                email: "account-1@example.com",
+                accountID: "account-1",
+                planType: "team",
+                teamName: "workspace-a",
+                teamAlias: nil,
+                addedAt: now,
+                updatedAt: now,
+                usage: nil,
+                usageError: nil,
+                isCurrent: true
+            ),
+            AccountSummary(
+                id: "acct-2",
+                label: "acct-2",
+                email: "account-2@example.com",
+                accountID: "account-2",
+                planType: "team",
+                teamName: "workspace-b",
+                teamAlias: nil,
+                addedAt: now,
+                updatedAt: now,
+                usage: nil,
+                usageError: nil,
+                isCurrent: false
+            )
+        ]
+
+        await model.refreshPendingWorkspaceAuthorizations(from: accounts)
+
+        XCTAssertEqual(model.pendingWorkspaceAuthorizations.map(\.workspaceID), ["account-3"])
+        XCTAssertNil(model.pendingWorkspaceAuthorizationError)
+    }
+
+    @MainActor
+    func testAccountsPageModelBackgroundRefreshDoesNotRediscoverPendingWorkspacesWhenOnlyUsageChanges() async {
+        let now: Int64 = 1_763_216_000
+        let metadataService = RecordingWorkspaceMetadataService(
+            metadata: [
+                WorkspaceMetadata(accountID: "account-1", workspaceName: "workspace-a", structure: "workspace"),
+                WorkspaceMetadata(accountID: "account-2", workspaceName: "workspace-b", structure: "workspace")
+            ]
+        )
+        let coordinator = AccountsCoordinator(
+            storeRepository: InMemoryAccountsStoreRepository(
+                store: AccountsStore(
+                    accounts: [
+                        StoredAccount(
+                            id: "acct-1",
+                            label: "acct-1",
+                            email: "account-1@example.com",
+                            accountID: "account-1",
+                            planType: "team",
+                            teamName: "workspace-a",
+                            teamAlias: nil,
+                            authJSON: .object([
+                                "account_id": .string("account-1")
+                            ]),
+                            addedAt: now,
+                            updatedAt: now,
+                            usage: nil,
+                            usageError: nil
+                        )
+                    ]
+                )
+            ),
+            settingsRepository: TestSettingsRepository(),
+            authRepository: MultiAccountAuthRepository(
+                extractedByAccountID: [
+                    "account-1": ExtractedAuth(
+                        accountID: "account-1",
+                        accessToken: "token-1",
+                        email: "account-1@example.com",
+                        planType: "team",
+                        teamName: "workspace-a"
+                    )
+                ]
+            ),
+            usageService: RecordingAccountUsageService(results: [:]),
+            workspaceMetadataService: metadataService,
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+        let model = AccountsPageModel(coordinator: coordinator)
+
+        await model.load()
+        XCTAssertEqual(metadataService.callCount, 2)
+
+        model.syncFromBackgroundRefresh([
+            AccountSummary(
+                id: "acct-1",
+                label: "acct-1",
+                email: "account-1@example.com",
+                accountID: "account-1",
+                planType: "team",
+                teamName: "workspace-a",
+                teamAlias: nil,
+                addedAt: now,
+                updatedAt: now + 30,
+                usage: makeUsageSnapshot(fetchedAt: now + 30, fiveHourResetAt: now + 600),
+                usageError: nil,
+                isCurrent: false
+            )
+        ])
+        await Task.yield()
+
+        XCTAssertEqual(metadataService.callCount, 2)
+        XCTAssertEqual(model.pendingWorkspaceAuthorizations.map(\.workspaceID), ["account-2"])
+    }
+
+    @MainActor
+    func testAccountsPageModelPendingWorkspaceDiscoveryCancellationDoesNotShowError() async {
+        let now: Int64 = 1_763_216_000
+        let coordinator = AccountsCoordinator(
+            storeRepository: InMemoryAccountsStoreRepository(
+                store: AccountsStore(
+                    accounts: [
+                        StoredAccount(
+                            id: "acct-1",
+                            label: "acct-1",
+                            email: "account-1@example.com",
+                            accountID: "account-1",
+                            planType: "team",
+                            teamName: "workspace-a",
+                            teamAlias: nil,
+                            authJSON: .object([
+                                "account_id": .string("account-1")
+                            ]),
+                            addedAt: now,
+                            updatedAt: now,
+                            usage: nil,
+                            usageError: nil
+                        )
+                    ]
+                )
+            ),
+            settingsRepository: TestSettingsRepository(),
+            authRepository: MultiAccountAuthRepository(
+                extractedByAccountID: [
+                    "account-1": ExtractedAuth(
+                        accountID: "account-1",
+                        accessToken: "token-1",
+                        email: "account-1@example.com",
+                        planType: "team",
+                        teamName: "workspace-a"
+                    )
+                ]
+            ),
+            usageService: RecordingAccountUsageService(results: [:]),
+            workspaceMetadataService: ThrowingWorkspaceMetadataService(error: CancellationError()),
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+        let model = AccountsPageModel(coordinator: coordinator)
+        let accounts = [
+            AccountSummary(
+                id: "acct-1",
+                label: "acct-1",
+                email: "account-1@example.com",
+                accountID: "account-1",
+                planType: "team",
+                teamName: "workspace-a",
+                teamAlias: nil,
+                addedAt: now,
+                updatedAt: now,
+                usage: nil,
+                usageError: nil,
+                isCurrent: true
+            )
+        ]
+
+        await model.refreshPendingWorkspaceAuthorizations(from: accounts)
+
+        XCTAssertTrue(model.pendingWorkspaceAuthorizations.isEmpty)
+        XCTAssertNil(model.pendingWorkspaceAuthorizationError)
+    }
+
+    @MainActor
+    func testAccountsPageModelPendingWorkspaceDiscoveryStopsAfterCancellation() async {
+        let now: Int64 = 1_763_216_000
+        let metadataService = ControlledWorkspaceMetadataService(
+            resultsByAccessToken: [
+                "token-1": [
+                    WorkspaceMetadata(accountID: "account-1", workspaceName: "workspace-a", structure: "workspace")
+                ],
+                "token-2": [
+                    WorkspaceMetadata(accountID: "account-2", workspaceName: "workspace-b", structure: "workspace"),
+                    WorkspaceMetadata(accountID: "account-3", workspaceName: "workspace-c", structure: "workspace")
+                ]
+            ]
+        )
+        let coordinator = AccountsCoordinator(
+            storeRepository: InMemoryAccountsStoreRepository(
+                store: AccountsStore(
+                    accounts: [
+                        StoredAccount(
+                            id: "acct-1",
+                            label: "acct-1",
+                            email: "account-1@example.com",
+                            accountID: "account-1",
+                            planType: "team",
+                            teamName: "workspace-a",
+                            teamAlias: nil,
+                            authJSON: .object([
+                                "account_id": .string("account-1")
+                            ]),
+                            addedAt: now,
+                            updatedAt: now,
+                            usage: nil,
+                            usageError: nil
+                        ),
+                        StoredAccount(
+                            id: "acct-2",
+                            label: "acct-2",
+                            email: "account-2@example.com",
+                            accountID: "account-2",
+                            planType: "team",
+                            teamName: "workspace-b",
+                            teamAlias: nil,
+                            authJSON: .object([
+                                "account_id": .string("account-2")
+                            ]),
+                            addedAt: now,
+                            updatedAt: now,
+                            usage: nil,
+                            usageError: nil
+                        )
+                    ],
+                    currentSelection: CurrentAccountSelection(
+                        accountID: "account-1",
+                        selectedAt: now,
+                        sourceDeviceID: "device"
+                    )
+                )
+            ),
+            settingsRepository: TestSettingsRepository(),
+            authRepository: MultiAccountAuthRepository(
+                extractedByAccountID: [
+                    "account-1": ExtractedAuth(
+                        accountID: "account-1",
+                        accessToken: "token-1",
+                        email: "account-1@example.com",
+                        planType: "team",
+                        teamName: "workspace-a"
+                    ),
+                    "account-2": ExtractedAuth(
+                        accountID: "account-2",
+                        accessToken: "token-2",
+                        email: "account-2@example.com",
+                        planType: "team",
+                        teamName: "workspace-b"
+                    )
+                ]
+            ),
+            usageService: RecordingAccountUsageService(results: [:]),
+            workspaceMetadataService: metadataService,
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+        let model = AccountsPageModel(coordinator: coordinator)
+        let accounts = [
+            AccountSummary(
+                id: "acct-1",
+                label: "acct-1",
+                email: "account-1@example.com",
+                accountID: "account-1",
+                planType: "team",
+                teamName: "workspace-a",
+                teamAlias: nil,
+                addedAt: now,
+                updatedAt: now,
+                usage: nil,
+                usageError: nil,
+                isCurrent: true
+            ),
+            AccountSummary(
+                id: "acct-2",
+                label: "acct-2",
+                email: "account-2@example.com",
+                accountID: "account-2",
+                planType: "team",
+                teamName: "workspace-b",
+                teamAlias: nil,
+                addedAt: now,
+                updatedAt: now,
+                usage: nil,
+                usageError: nil,
+                isCurrent: false
+            )
+        ]
+
+        let refreshTask = Task {
+            await model.refreshPendingWorkspaceAuthorizations(from: accounts)
+        }
+        await metadataService.waitForFirstFetchToStart()
+        refreshTask.cancel()
+        await metadataService.resumeFirstFetch()
+        _ = await refreshTask.result
+
+        let requestedTokens = await metadataService.readRequestedAccessTokens()
+        XCTAssertEqual(requestedTokens, ["token-1"])
+    }
+
+    func testListAccountsMarksWorkspaceDeactivatedWhenRemoteMetadataSaysSo() async throws {
+        let now: Int64 = 1_763_216_000
+        let coordinator = AccountsCoordinator(
+            storeRepository: InMemoryAccountsStoreRepository(
+                store: AccountsStore(
+                    accounts: [
+                        StoredAccount(
+                            id: "acct-1",
+                            label: "Primary",
+                            email: "dev@example.com",
+                            accountID: "account-1",
+                            planType: "team",
+                            teamName: "workspace-a",
+                            teamAlias: nil,
+                            authJSON: .object([
+                                "account_id": .string("account-1"),
+                                "tokens": .object([
+                                    "access_token": .string("token-1")
+                                ])
+                            ]),
+                            addedAt: now,
+                            updatedAt: now,
+                            usage: makeUsageSnapshot(fetchedAt: now),
+                            usageError: nil
+                        )
+                    ]
+                )
+            ),
+            settingsRepository: TestSettingsRepository(),
+            authRepository: TokenMappedAuthRepository(
+                extractedByAccessToken: [
+                    "token-1": makeExtractedAuth(accountID: "account-1", planType: "team", teamName: "workspace-a")
+                ]
+            ),
+            usageService: RecordingAccountUsageService(results: [:]),
+            workspaceMetadataService: StubWorkspaceMetadataService(
+                metadata: [
+                    WorkspaceMetadata(
+                        accountID: "account-1",
+                        workspaceName: "workspace-a",
+                        structure: "deactivated"
+                    )
+                ]
+            ),
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+
+        let accounts = try await coordinator.listAccounts()
+
+        XCTAssertEqual(accounts.first?.workspaceStatus, .deactivated)
+        XCTAssertEqual(accounts.first?.teamName, "workspace-a")
+    }
+
+    func testDiscoverPendingWorkspaceAuthorizationsIgnoresInactiveWorkspaceVariants() async throws {
+        let now: Int64 = 1_763_216_000
+        let storeRepository = InMemoryAccountsStoreRepository(
+            store: AccountsStore(
+                accounts: [
+                    StoredAccount(
+                        id: "acct-1",
+                        label: "Primary",
+                        email: "test@example.com",
+                        accountID: "account-1",
+                        planType: "team",
+                        teamName: "remote-space",
+                        teamAlias: nil,
+                        authJSON: .object([
+                            "account_id": .string("account-1")
+                        ]),
+                        addedAt: now,
+                        updatedAt: now,
+                        usage: nil,
+                        usageError: nil
+                    )
+                ]
+            )
+        )
+        let coordinator = AccountsCoordinator(
+            storeRepository: storeRepository,
+            settingsRepository: TestSettingsRepository(),
+            authRepository: MultiAccountAuthRepository(
+                extractedByAccountID: [
+                    "account-1": makeExtractedAuth(accountID: "account-1", planType: "team", teamName: nil)
+                ]
+            ),
+            usageService: CountingUsageService(result: makeUsageSnapshot(fetchedAt: now)),
+            workspaceMetadataService: StubWorkspaceMetadataService(
+                metadata: [
+                    WorkspaceMetadata(accountID: "account-1", workspaceName: "remote-space", structure: "workspace"),
+                    WorkspaceMetadata(accountID: "account-2", workspaceName: "ops-space", structure: "workspace"),
+                    WorkspaceMetadata(accountID: "account-3", workspaceName: "Suspended Workspace", structure: "workspace"),
+                    WorkspaceMetadata(accountID: "account-4", workspaceName: "stale-space", structure: "workspace_deactivated"),
+                    WorkspaceMetadata(accountID: "account-5", workspaceName: "inactive-space", structure: "workspace")
+                ]
+            ),
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+
+        let candidates = try await coordinator.discoverPendingWorkspaceAuthorizations(sourceAccountID: "acct-1")
+
+        XCTAssertEqual(candidates.map(\.workspaceID), ["account-2"])
+        XCTAssertEqual(candidates.map(\.workspaceName), ["ops-space"])
+    }
+
+    func testDiscoverPendingWorkspaceAuthorizationsIgnoresDismissedWorkspaceIDs() async throws {
+        let now: Int64 = 1_763_216_000
+        let storeRepository = InMemoryAccountsStoreRepository(
+            store: AccountsStore(
+                accounts: [
+                    StoredAccount(
+                        id: "acct-1",
+                        label: "Primary",
+                        email: "test@example.com",
+                        accountID: "account-1",
+                        planType: "team",
+                        teamName: "remote-space",
+                        teamAlias: nil,
+                        authJSON: .object([
+                            "account_id": .string("account-1")
+                        ]),
+                        addedAt: now,
+                        updatedAt: now,
+                        usage: nil,
+                        usageError: nil
+                    )
+                ],
+                ignoredPendingWorkspaceIDs: ["account-2"]
+            )
+        )
+        let coordinator = AccountsCoordinator(
+            storeRepository: storeRepository,
+            settingsRepository: TestSettingsRepository(),
+            authRepository: MultiAccountAuthRepository(
+                extractedByAccountID: [
+                    "account-1": makeExtractedAuth(accountID: "account-1", planType: "team", teamName: nil)
+                ]
+            ),
+            usageService: CountingUsageService(result: makeUsageSnapshot(fetchedAt: now)),
+            workspaceMetadataService: StubWorkspaceMetadataService(
+                metadata: [
+                    WorkspaceMetadata(accountID: "account-1", workspaceName: "remote-space", structure: "workspace"),
+                    WorkspaceMetadata(accountID: "account-2", workspaceName: "ops-space", structure: "workspace")
+                ]
+            ),
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+
+        let candidates = try await coordinator.discoverPendingWorkspaceAuthorizations(sourceAccountID: "acct-1")
+
+        XCTAssertTrue(candidates.isEmpty)
+    }
+
+    @MainActor
+    func testAccountsPageModelDeletePendingWorkspacePersistsDismissal() async {
+        let now: Int64 = 1_763_216_000
+        let storeRepository = InMemoryAccountsStoreRepository(
+            store: AccountsStore(
+                accounts: [
+                    StoredAccount(
+                        id: "acct-1",
+                        label: "Primary",
+                        email: "test@example.com",
+                        accountID: "account-1",
+                        planType: "team",
+                        teamName: "remote-space",
+                        teamAlias: nil,
+                        authJSON: .object([
+                            "account_id": .string("account-1")
+                        ]),
+                        addedAt: now,
+                        updatedAt: now,
+                        usage: nil,
+                        usageError: nil
+                    )
+                ]
+            )
+        )
+        let coordinator = AccountsCoordinator(
+            storeRepository: storeRepository,
+            settingsRepository: TestSettingsRepository(),
+            authRepository: MultiAccountAuthRepository(
+                extractedByAccountID: [
+                    "account-1": makeExtractedAuth(accountID: "account-1", planType: "team", teamName: nil)
+                ]
+            ),
+            usageService: CountingUsageService(result: makeUsageSnapshot(fetchedAt: now)),
+            workspaceMetadataService: StubWorkspaceMetadataService(
+                metadata: [
+                    WorkspaceMetadata(accountID: "account-1", workspaceName: "remote-space", structure: "workspace"),
+                    WorkspaceMetadata(accountID: "account-2", workspaceName: "ops-space", structure: "workspace")
+                ]
+            ),
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+        let model = AccountsPageModel(coordinator: coordinator)
+
+        await model.load()
+        XCTAssertEqual(model.pendingWorkspaceAuthorizations.map(\.workspaceID), ["account-2"])
+
+        await model.deletePendingWorkspace(id: "account-2")
+
+        let savedStore = try? storeRepository.loadStore()
+        XCTAssertTrue(model.pendingWorkspaceAuthorizations.isEmpty)
+        XCTAssertEqual(savedStore?.ignoredPendingWorkspaceIDs, ["account-2"])
+    }
+
+    @MainActor
     func testTrayMenuModelPushesInitialLocalAccountsBaselineDuringCloudReconciliation() async {
         let now: Int64 = 1_763_216_000
         let storeRepository = InMemoryAccountsStoreRepository(
@@ -1082,6 +2542,65 @@ final class AccountsCoordinatorTests: XCTestCase {
         XCTAssertEqual(pushCallCount, 1)
         let remoteSyncCallCount = await remoteSyncService.readCallCount()
         XCTAssertEqual(remoteSyncCallCount, 1)
+    }
+
+    @MainActor
+    func testTrayMenuModelRecurringRefreshStillRefreshesUsageOnMacWhenCloudSnapshotIsFresh() async {
+        let now: Int64 = 1_763_216_000
+        let usageService = CountingUsageService(result: makeUsageSnapshot(fetchedAt: now))
+        let storeRepository = InMemoryAccountsStoreRepository(
+            store: AccountsStore(
+                accounts: [
+                    makeStoredAccount(id: "acct-1", accountID: "account-1", now: now - 60)
+                ],
+                currentSelection: CurrentAccountSelection(
+                    accountID: "account-1",
+                    selectedAt: now * 1_000,
+                    sourceDeviceID: "macos-local",
+                    accountKey: nil
+                )
+            )
+        )
+        let coordinator = AccountsCoordinator(
+            storeRepository: storeRepository,
+            settingsRepository: TestSettingsRepository(),
+            authRepository: RecordingAuthRepository(),
+            usageService: usageService,
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+        let cloudSyncService = SpyAccountsCloudSyncService(
+            pullResult: AccountsCloudSyncPullResult(
+                didUpdateAccounts: false,
+                remoteSyncedAt: now
+            )
+        )
+        let trayModel = TrayMenuModel(
+            accountsCoordinator: coordinator,
+            settingsCoordinator: SettingsCoordinator(
+                settingsRepository: TestSettingsRepository(),
+                launchAtStartupService: StubLaunchAtStartupService()
+            ),
+            cloudSyncService: cloudSyncService,
+            currentAccountSelectionSyncService: nil,
+            backgroundRefreshPolicy: .init(
+                initialRefreshDelay: .zero,
+                cloudReconciliationInterval: .seconds(3),
+                usageRefreshInterval: .seconds(30),
+                refreshUsageOnRecurringTick: true,
+                cloudSyncMode: .pushLocalAccounts,
+                applyRemoteSelectionSwitchEffects: false
+            ),
+            dateProvider: FixedDateProvider(now: now),
+            initialAccounts: []
+        )
+
+        await trayModel.refreshNow(forceUsageRefresh: true)
+
+        XCTAssertEqual(usageService.callCount, 1)
     }
 }
 
@@ -1182,14 +2701,43 @@ private func makeUsageSnapshot(
     )
 }
 
-private func makeExtractedAuth(accountID: String) -> ExtractedAuth {
+private func makeExtractedAuth(
+    accountID: String,
+    planType: String? = "pro",
+    teamName: String? = nil
+) -> ExtractedAuth {
     ExtractedAuth(
         accountID: accountID,
         accessToken: "token-\(accountID)",
         email: "\(accountID)@example.com",
-        planType: "pro",
-        teamName: "workspace-\(accountID)"
+        planType: planType,
+        teamName: teamName ?? "workspace-\(accountID)"
     )
+}
+
+private func makeTestAuthJSON(accountID: String, accessToken: String) -> JSONValue {
+    .object([
+        "auth_mode": .string("chatgpt"),
+        "tokens": .object([
+            "access_token": .string(accessToken),
+            "refresh_token": .string("refresh-\(accountID)"),
+            "id_token": .string("id-\(accountID)"),
+            "account_id": .string(accountID)
+        ])
+    ])
+}
+
+private func makeUnsignedJWT(payload: [String: Any]) -> String {
+    let header = ["alg": "none", "typ": "JWT"]
+    return "\(base64URL(header)).\(base64URL(payload)).signature"
+}
+
+private func base64URL(_ object: [String: Any]) -> String {
+    let data = try! JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+    return data.base64EncodedString()
+        .replacingOccurrences(of: "+", with: "-")
+        .replacingOccurrences(of: "/", with: "_")
+        .replacingOccurrences(of: "=", with: "")
 }
 
 private final class InMemoryAccountsStoreRepository: AccountsStoreRepository, @unchecked Sendable {
@@ -1262,6 +2810,30 @@ private actor RecordingAccountUsageService: UsageService {
     }
 }
 
+private actor ValidatingUsageService: UsageService {
+    private let validAccessToken: String
+    private let result: UsageSnapshot
+    private var requestedAccessTokens: [String] = []
+
+    init(validAccessToken: String, result: UsageSnapshot) {
+        self.validAccessToken = validAccessToken
+        self.result = result
+    }
+
+    func fetchUsage(accessToken: String, accountID: String) async throws -> UsageSnapshot {
+        _ = accountID
+        requestedAccessTokens.append(accessToken)
+        guard accessToken == validAccessToken else {
+            throw AppError.unauthorized("Provided authentication token is expired. Please try signing in again.")
+        }
+        return result
+    }
+
+    func readRequestedAccessTokens() -> [String] {
+        requestedAccessTokens
+    }
+}
+
 private struct FixedDateProvider: DateProviding {
     let now: Int64
 
@@ -1298,6 +2870,74 @@ private final class RecordingWorkspaceMetadataService: WorkspaceMetadataService,
     }
 }
 
+private final class ThrowingWorkspaceMetadataService: WorkspaceMetadataService, @unchecked Sendable {
+    private let error: Error
+
+    init(error: Error) {
+        self.error = error
+    }
+
+    func fetchWorkspaceMetadata(accessToken: String) async throws -> [WorkspaceMetadata] {
+        _ = accessToken
+        throw error
+    }
+}
+
+private final class AccessTokenMappedWorkspaceMetadataService: WorkspaceMetadataService, @unchecked Sendable {
+    private let metadataByAccessToken: [String: [WorkspaceMetadata]]
+
+    init(metadataByAccessToken: [String: [WorkspaceMetadata]]) {
+        self.metadataByAccessToken = metadataByAccessToken
+    }
+
+    func fetchWorkspaceMetadata(accessToken: String) async throws -> [WorkspaceMetadata] {
+        metadataByAccessToken[accessToken] ?? []
+    }
+}
+
+private actor ControlledWorkspaceMetadataService: WorkspaceMetadataService {
+    private let resultsByAccessToken: [String: [WorkspaceMetadata]]
+    private var requestedAccessTokens: [String] = []
+    private var firstFetchStartedContinuation: CheckedContinuation<Void, Never>?
+    private var firstFetchResumeContinuation: CheckedContinuation<Void, Never>?
+    private var didStartFirstFetch = false
+
+    init(resultsByAccessToken: [String: [WorkspaceMetadata]]) {
+        self.resultsByAccessToken = resultsByAccessToken
+    }
+
+    func fetchWorkspaceMetadata(accessToken: String) async throws -> [WorkspaceMetadata] {
+        requestedAccessTokens.append(accessToken)
+        if !didStartFirstFetch {
+            didStartFirstFetch = true
+            firstFetchStartedContinuation?.resume()
+            firstFetchStartedContinuation = nil
+            await withCheckedContinuation { continuation in
+                firstFetchResumeContinuation = continuation
+            }
+        }
+        return resultsByAccessToken[accessToken] ?? []
+    }
+
+    func waitForFirstFetchToStart() async {
+        if didStartFirstFetch {
+            return
+        }
+        await withCheckedContinuation { continuation in
+            firstFetchStartedContinuation = continuation
+        }
+    }
+
+    func resumeFirstFetch() {
+        firstFetchResumeContinuation?.resume()
+        firstFetchResumeContinuation = nil
+    }
+
+    func readRequestedAccessTokens() -> [String] {
+        requestedAccessTokens
+    }
+}
+
 private final class StubAccountsManualRefreshService: AccountsManualRefreshServiceProtocol, @unchecked Sendable {
     func performManualRefresh(
         onPartialUpdate: @escaping @MainActor ([AccountSummary]) -> Void
@@ -1317,6 +2957,32 @@ private actor SpyRemoteAccountsMutationSyncService: RemoteAccountsMutationSyncSe
 
     func readCallCount() -> Int {
         callCount
+    }
+}
+
+private actor RecordingProxyControlCloudSyncService: ProxyControlCloudSyncServiceProtocol {
+    private var enqueuedCommands: [ProxyControlCommand] = []
+
+    func pushLocalSnapshot(_ snapshot: ProxyControlSnapshot) async throws {
+        _ = snapshot
+    }
+
+    func pullRemoteSnapshot() async throws -> ProxyControlSnapshot? {
+        nil
+    }
+
+    func enqueueCommand(_ command: ProxyControlCommand) async throws {
+        enqueuedCommands.append(command)
+    }
+
+    func pullPendingCommand() async throws -> ProxyControlCommand? {
+        nil
+    }
+
+    func ensurePushSubscriptionIfNeeded() async throws {}
+
+    func readEnqueuedCommands() -> [ProxyControlCommand] {
+        enqueuedCommands
     }
 }
 
@@ -1437,6 +3103,45 @@ private final class RemoteLookupAuthRepository: AuthRepository, @unchecked Senda
     }
 }
 
+private final class AccountIDAwareAuthRepository: AuthRepository, @unchecked Sendable {
+    func readCurrentAuth() throws -> JSONValue { .null }
+    func readCurrentAuthOptional() throws -> JSONValue? { nil }
+    func readAuth(from url: URL) throws -> JSONValue {
+        _ = url
+        return .null
+    }
+    func writeCurrentAuth(_ auth: JSONValue) throws {
+        _ = auth
+    }
+    func removeCurrentAuth() throws {}
+    func makeChatGPTAuth(from tokens: ChatGPTOAuthTokens) throws -> JSONValue {
+        .object([
+            "tokens": .object([
+                "access_token": .string(tokens.accessToken),
+                "refresh_token": .string(tokens.refreshToken),
+                "id_token": .string(tokens.idToken),
+                "account_id": .string("account-1")
+            ])
+        ])
+    }
+    func extractAuth(from auth: JSONValue) throws -> ExtractedAuth {
+        guard let tokens = auth["tokens"]?.objectValue,
+              let accessToken = tokens["access_token"]?.stringValue,
+              let accountID = tokens["account_id"]?.stringValue else {
+            throw AppError.invalidData("Missing test auth payload")
+        }
+
+        return ExtractedAuth(
+            accountID: accountID,
+            accessToken: accessToken,
+            email: "test@example.com",
+            planType: "team",
+            teamName: nil,
+            principalID: nil
+        )
+    }
+}
+
 private final class RecordingAuthRepository: AuthRepository, @unchecked Sendable {
     private(set) var writtenAccountCount = 0
 
@@ -1498,6 +3203,135 @@ private final class MultiAccountAuthRepository: AuthRepository, @unchecked Senda
     }
 }
 
+private final class TokenMappedAuthRepository: AuthRepository, @unchecked Sendable {
+    private let extractedByAccessToken: [String: ExtractedAuth]
+
+    init(extractedByAccessToken: [String: ExtractedAuth]) {
+        self.extractedByAccessToken = extractedByAccessToken
+    }
+
+    func readCurrentAuth() throws -> JSONValue { .null }
+    func readCurrentAuthOptional() throws -> JSONValue? { nil }
+    func readAuth(from url: URL) throws -> JSONValue {
+        _ = url
+        return .null
+    }
+    func writeCurrentAuth(_ auth: JSONValue) throws {
+        _ = auth
+    }
+    func removeCurrentAuth() throws {}
+    func makeChatGPTAuth(from tokens: ChatGPTOAuthTokens) throws -> JSONValue {
+        .object([
+            "tokens": .object([
+                "access_token": .string(tokens.accessToken),
+                "refresh_token": .string(tokens.refreshToken),
+                "id_token": .string(tokens.idToken)
+            ])
+        ])
+    }
+    func extractAuth(from auth: JSONValue) throws -> ExtractedAuth {
+        guard let accessToken = auth["tokens"]?["access_token"]?.stringValue,
+              let extracted = extractedByAccessToken[accessToken] else {
+            throw AppError.invalidData("Missing extracted auth for test access token")
+        }
+        return extracted
+    }
+}
+
+private final class RefreshingAuthRepository: AuthRepository, @unchecked Sendable {
+    private let refreshedAuth: JSONValue
+    private var refreshCallCount = 0
+
+    init(refreshedAuth: JSONValue) {
+        self.refreshedAuth = refreshedAuth
+    }
+
+    func readCurrentAuth() throws -> JSONValue { refreshedAuth }
+    func readCurrentAuthOptional() throws -> JSONValue? { refreshedAuth }
+    func readAuth(from url: URL) throws -> JSONValue {
+        _ = url
+        return refreshedAuth
+    }
+    func writeCurrentAuth(_ auth: JSONValue) throws {
+        _ = auth
+    }
+    func removeCurrentAuth() throws {}
+    func makeChatGPTAuth(from tokens: ChatGPTOAuthTokens) throws -> JSONValue {
+        _ = tokens
+        return refreshedAuth
+    }
+    func extractAuth(from auth: JSONValue) throws -> ExtractedAuth {
+        guard let tokens = auth["tokens"]?.objectValue,
+              let accessToken = tokens["access_token"]?.stringValue,
+              let accountID = tokens["account_id"]?.stringValue else {
+            throw AppError.invalidData("Missing test auth payload")
+        }
+        return ExtractedAuth(
+            accountID: accountID,
+            accessToken: accessToken,
+            email: "test@example.com",
+            planType: "team",
+            teamName: nil,
+            principalID: nil
+        )
+    }
+    func refreshChatGPTAuth(_ auth: JSONValue) async throws -> JSONValue {
+        _ = auth
+        refreshCallCount += 1
+        return refreshedAuth
+    }
+    func readRefreshCallCount() -> Int {
+        refreshCallCount
+    }
+}
+
+private final class FailingRefreshingAuthRepository: AuthRepository, @unchecked Sendable {
+    private let message: String
+    private var refreshCallCount = 0
+
+    init(message: String) {
+        self.message = message
+    }
+
+    func readCurrentAuth() throws -> JSONValue { .null }
+    func readCurrentAuthOptional() throws -> JSONValue? { nil }
+    func readAuth(from url: URL) throws -> JSONValue {
+        _ = url
+        return .null
+    }
+    func writeCurrentAuth(_ auth: JSONValue) throws {
+        _ = auth
+    }
+    func removeCurrentAuth() throws {}
+    func makeChatGPTAuth(from tokens: ChatGPTOAuthTokens) throws -> JSONValue {
+        _ = tokens
+        return .null
+    }
+    func extractAuth(from auth: JSONValue) throws -> ExtractedAuth {
+        guard let tokens = auth["tokens"]?.objectValue,
+              let accessToken = tokens["access_token"]?.stringValue,
+              let accountID = tokens["account_id"]?.stringValue else {
+            throw AppError.invalidData("Missing test auth payload")
+        }
+        return ExtractedAuth(
+            accountID: accountID,
+            accessToken: accessToken,
+            email: "test@example.com",
+            planType: "team",
+            teamName: nil,
+            principalID: nil
+        )
+    }
+    func refreshChatGPTAuth(_ auth: JSONValue) async throws -> JSONValue {
+        _ = auth
+        refreshCallCount += 1
+        throw AppError.unauthorized(message)
+    }
+    func readRefreshCallCount() -> Int {
+        refreshCallCount
+    }
+}
+
 private actor PartialUpdateRecorder {
     private var snapshots: [[AccountSummary]] = []
 
@@ -1514,6 +3348,66 @@ private final class StubChatGPTOAuthLoginService: ChatGPTOAuthLoginServiceProtoc
     func signInWithChatGPT(timeoutSeconds: TimeInterval) async throws -> ChatGPTOAuthTokens {
         _ = timeoutSeconds
         return ChatGPTOAuthTokens(accessToken: "", refreshToken: "", idToken: "", apiKey: nil)
+    }
+}
+
+private final class FixedChatGPTOAuthLoginService: ChatGPTOAuthLoginServiceProtocol, @unchecked Sendable {
+    private let tokens: ChatGPTOAuthTokens
+
+    init(tokens: ChatGPTOAuthTokens) {
+        self.tokens = tokens
+    }
+
+    func signInWithChatGPT(timeoutSeconds: TimeInterval) async throws -> ChatGPTOAuthTokens {
+        _ = timeoutSeconds
+        return tokens
+    }
+}
+
+private actor WorkspaceLoginRecorder {
+    private var forcedWorkspaceIDs: [String] = []
+
+    func record(_ forcedWorkspaceID: String?) {
+        if let forcedWorkspaceID {
+            forcedWorkspaceIDs.append(forcedWorkspaceID)
+        }
+    }
+
+    func values() -> [String] {
+        forcedWorkspaceIDs
+    }
+}
+
+private final class RecordingWorkspaceAwareChatGPTOAuthLoginService: ChatGPTOAuthLoginServiceProtocol, @unchecked Sendable {
+    private let defaultTokens: ChatGPTOAuthTokens
+    private let tokensByWorkspaceID: [String: ChatGPTOAuthTokens]
+    private let recorder = WorkspaceLoginRecorder()
+
+    init(
+        defaultTokens: ChatGPTOAuthTokens,
+        tokensByWorkspaceID: [String: ChatGPTOAuthTokens]
+    ) {
+        self.defaultTokens = defaultTokens
+        self.tokensByWorkspaceID = tokensByWorkspaceID
+    }
+
+    func signInWithChatGPT(timeoutSeconds: TimeInterval) async throws -> ChatGPTOAuthTokens {
+        _ = timeoutSeconds
+        return defaultTokens
+    }
+
+    func signInWithChatGPT(
+        timeoutSeconds: TimeInterval,
+        forcedWorkspaceID: String?
+    ) async throws -> ChatGPTOAuthTokens {
+        _ = timeoutSeconds
+        await recorder.record(forcedWorkspaceID)
+        guard let forcedWorkspaceID else { return defaultTokens }
+        return tokensByWorkspaceID[forcedWorkspaceID] ?? defaultTokens
+    }
+
+    func readForcedWorkspaceIDs() async -> [String] {
+        await recorder.values()
     }
 }
 

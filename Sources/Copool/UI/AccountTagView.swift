@@ -25,8 +25,10 @@ struct AccountTagView: View {
 struct AccountCompactHeaderContent: View {
     let planLabel: String
     let workspaceLabel: String?
+    let statusLabel: String?
     let accountName: String
     let accentColor: Color
+    var statusColor: Color = .red
     var tagFont: Font = .caption2.weight(.bold)
     var titleFont: Font = .headline
     var titleColor: Color = .primary
@@ -59,7 +61,18 @@ struct AccountCompactHeaderContent: View {
                         verticalPadding: tagVerticalPadding
                     )
                     .modifier(AccountCompactHorizontalExpansion(enabled: expandsHorizontally))
-                } else if expandsHorizontally {
+                }
+
+                if let statusLabel, !statusLabel.isEmpty {
+                    AccountTagView(
+                        text: statusLabel,
+                        backgroundColor: statusColor.opacity(0.16),
+                        foregroundColor: statusColor,
+                        font: tagFont,
+                        horizontalPadding: tagHorizontalPadding,
+                        verticalPadding: tagVerticalPadding
+                    )
+                } else if workspaceLabel == nil, expandsHorizontally {
                     Spacer(minLength: 0)
                 }
             }

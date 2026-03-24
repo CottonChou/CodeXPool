@@ -2,6 +2,10 @@ import Foundation
 
 extension AccountsPageModel {
     func importCurrentAuth() async {
+        guard runtimePlatform == .macOS else {
+            notice = NoticeMessage(style: .error, text: PlatformCapabilities.unsupportedOperationMessage)
+            return
+        }
         isImporting = true
         defer { isImporting = false }
 
@@ -9,6 +13,7 @@ extension AccountsPageModel {
             let imported = try await coordinator.importCurrentAuthAccount(customLabel: nil)
             let accounts = try await coordinator.listAccounts()
             applyAccounts(accounts)
+            await refreshPendingWorkspaceAuthorizations(from: accounts, preferredSourceAccountID: imported.id)
             publishAndSyncLocalAccountsMutation(accounts)
             notice = NoticeMessage(style: .success, text: L10n.tr("accounts.notice.imported_format", imported.label))
         } catch {
@@ -24,6 +29,7 @@ extension AccountsPageModel {
             let imported = try await coordinator.addAccountViaLogin(customLabel: nil)
             let accounts = try await coordinator.listAccounts()
             applyAccounts(accounts)
+            await refreshPendingWorkspaceAuthorizations(from: accounts, preferredSourceAccountID: imported.id)
             publishAndSyncLocalAccountsMutation(accounts)
             notice = NoticeMessage(style: .success, text: L10n.tr("accounts.notice.imported_new_format", imported.label))
         } catch {
@@ -56,6 +62,7 @@ extension AccountsPageModel {
             }
             let accounts = try await coordinator.listAccounts()
             applyAccounts(accounts)
+            await refreshPendingWorkspaceAuthorizations(from: accounts, preferredSourceAccountID: imported.id)
             publishAndSyncLocalAccountsMutation(accounts)
             let key = setAsCurrent
                 ? "accounts.notice.imported_format"
@@ -71,6 +78,7 @@ extension AccountsPageModel {
             try await coordinator.deleteAccount(id: id)
             let accounts = try await coordinator.listAccounts()
             applyAccounts(accounts)
+            await refreshPendingWorkspaceAuthorizations(from: accounts)
             publishAndSyncLocalAccountsMutation(accounts)
             notice = NoticeMessage(style: .info, text: L10n.tr("accounts.notice.account_deleted"))
         } catch {
@@ -83,6 +91,7 @@ extension AccountsPageModel {
             _ = try await coordinator.updateTeamAlias(id: id, alias: alias)
             let accounts = try await coordinator.listAccounts()
             applyAccounts(accounts)
+            await refreshPendingWorkspaceAuthorizations(from: accounts)
             publishAndSyncLocalAccountsMutation(accounts)
             notice = NoticeMessage(style: .success, text: L10n.tr("accounts.notice.team_name_updated"))
         } catch {

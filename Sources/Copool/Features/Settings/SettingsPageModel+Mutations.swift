@@ -22,6 +22,10 @@ extension SettingsPageModel {
         updateLocale(AppLocale.resolve(value))
     }
 
+    func updateUsageProgressDisplayMode(_ value: UsageProgressDisplayMode) {
+        Task { await update(AppSettingsPatch(usageProgressDisplayMode: value)) }
+    }
+
     func setSyncOpencodeOpenaiAuth(_ value: Bool) {
         updateToggle(.syncOpencodeOpenaiAuth, to: value)
     }

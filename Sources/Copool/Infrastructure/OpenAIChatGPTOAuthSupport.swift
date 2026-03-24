@@ -30,12 +30,73 @@ enum OpenAIChatGPTOAuthSupport {
     }
 
     static func successPageHTML() -> Data {
-        Data("<html><head><meta charset=\"utf-8\"><title>Copool</title></head><body style=\"font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:32px;\"><h2>Sign-in complete</h2><p>You can return to Copool.</p></body></html>".utf8)
+        Data(
+            """
+            <html>
+            <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Copool</title>
+            </head>
+            <body style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:32px;">
+            <h2>Finishing sign-in</h2>
+            <p>Copool is completing the authorization. You can return to the app now.</p>
+            <script>
+            (function () {
+              function tryClose() {
+                window.open('', '_self');
+                window.close();
+              }
+              setTimeout(tryClose, 120);
+              setTimeout(tryClose, 600);
+              setTimeout(tryClose, 1200);
+            })();
+            </script>
+            </body>
+            </html>
+            """.utf8
+        )
     }
 
     static func errorPageHTML(message: String) -> Data {
         let escapedMessage = htmlEscape(message)
         return Data("<html><head><meta charset=\"utf-8\"><title>Copool</title></head><body style=\"font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:32px;\"><h2>Sign-in failed</h2><p>\(escapedMessage)</p></body></html>".utf8)
+    }
+
+    static func bestHTTPErrorMessage(
+        from data: Data,
+        statusCode: Int? = nil,
+        snippetLimit: Int = 200
+    ) -> String {
+        if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if let error = object["error"] as? [String: Any],
+               let message = normalizedMessage(error["message"] as? String) {
+                return message
+            }
+
+            if let errors = object["errors"] as? [[String: Any]],
+               let message = errors.lazy.compactMap({ normalizedMessage($0["message"] as? String) }).first {
+                return message
+            }
+
+            if let description = normalizedMessage(object["error_description"] as? String) {
+                return description
+            }
+
+            if let error = normalizedMessage(object["error"] as? String) {
+                return error
+            }
+        }
+
+        if let body = normalizedMessage(String(data: data, encoding: .utf8)) {
+            return String(body.prefix(snippetLimit))
+        }
+
+        if let statusCode {
+            return "HTTP \(statusCode)"
+        }
+
+        return L10n.tr("error.usage.invalid_response")
     }
 
     private static func percentEncode(_ value: String) -> String {
@@ -55,6 +116,12 @@ enum OpenAIChatGPTOAuthSupport {
             escaped = escaped.replacingOccurrences(of: source, with: target)
         }
         return escaped
+    }
+
+    private static func normalizedMessage(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }
 
@@ -158,6 +225,18 @@ struct APIKeyExchangeResponse: Decodable {
 
     enum CodingKeys: String, CodingKey {
         case accessToken = "access_token"
+    }
+}
+
+struct RefreshedChatGPTOAuthTokenResponse: Decodable {
+    let idToken: String
+    let accessToken: String
+    let refreshToken: String?
+
+    enum CodingKeys: String, CodingKey {
+        case idToken = "id_token"
+        case accessToken = "access_token"
+        case refreshToken = "refresh_token"
     }
 }
 

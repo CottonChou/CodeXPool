@@ -32,4 +32,16 @@ final class RemoteShellCommandRunnerTests: XCTestCase {
         XCTAssertTrue(arguments.contains("root@example.com"))
         XCTAssertTrue(arguments.contains("echo ok"))
     }
+
+    func testWithRootPrivilegesTrimsTrailingSemicolonsFromInlineCommand() {
+        let runner = RemoteShellCommandRunner(fileManager: .default)
+
+        let command = runner.withRootPrivileges("echo ok;")
+
+        XCTAssertFalse(command.contains(";; else"))
+        XCTAssertEqual(
+            command,
+            "if [ \"$(id -u)\" = \"0\" ]; then echo ok; else sudo sh -lc 'echo ok'; fi"
+        )
+    }
 }

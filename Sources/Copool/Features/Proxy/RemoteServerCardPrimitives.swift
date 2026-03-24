@@ -42,27 +42,27 @@ struct RemoteServerFieldGrid: View {
             columns: [GridItem(.adaptive(minimum: LayoutRules.proxyRemoteFieldMinWidth), spacing: 8)],
             spacing: 8
         ) {
-            ProxyFieldGroup(title: "Name", style: .uppercaseCaption) {
+            ProxyFieldGroup(title: L10n.tr("proxy.remote.field.name"), style: .uppercaseCaption) {
                 TextField("tokyo-01", text: $draft.label)
                     .frostedRoundedInput()
             }
-            ProxyFieldGroup(title: "Host", style: .uppercaseCaption) {
+            ProxyFieldGroup(title: L10n.tr("proxy.remote.field.host"), style: .uppercaseCaption) {
                 TextField("1.2.3.4", text: $draft.host)
                     .frostedRoundedInput()
             }
-            ProxyFieldGroup(title: "SSH Port", style: .uppercaseCaption) {
+            ProxyFieldGroup(title: L10n.tr("proxy.remote.field.ssh_port"), style: .uppercaseCaption) {
                 TextField("22", value: $draft.sshPort, format: .number.grouping(.never))
                     .frostedRoundedInput()
             }
-            ProxyFieldGroup(title: "SSH User", style: .uppercaseCaption) {
+            ProxyFieldGroup(title: L10n.tr("proxy.remote.field.ssh_user"), style: .uppercaseCaption) {
                 TextField(RemoteServerConfiguration.defaultSSHUser, text: $draft.sshUser)
                     .frostedRoundedInput()
             }
-            ProxyFieldGroup(title: "Deploy Dir", style: .uppercaseCaption) {
+            ProxyFieldGroup(title: L10n.tr("proxy.remote.field.deploy_dir"), style: .uppercaseCaption) {
                 TextField(RemoteServerConfiguration.defaultRemoteDir, text: $draft.remoteDir)
                     .frostedRoundedInput()
             }
-            ProxyFieldGroup(title: "Proxy Port", style: .uppercaseCaption) {
+            ProxyFieldGroup(title: L10n.tr("proxy.remote.field.proxy_port"), style: .uppercaseCaption) {
                 TextField(
                     String(RemoteServerConfiguration.defaultProxyPort),
                     value: $draft.listenPort,
@@ -80,10 +80,10 @@ struct RemoteServerAuthSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Picker("SSH Auth", selection: $draft.authMode) {
-                Text("Path").tag("keyPath")
-                Text("Private key").tag("keyContent")
-                Text("Password").tag("password")
+            Picker(L10n.tr("proxy.remote.auth.title"), selection: $draft.authMode) {
+                Text(L10n.tr("proxy.remote.auth.path")).tag("keyPath")
+                Text(L10n.tr("proxy.remote.auth.private_key")).tag("keyContent")
+                Text(L10n.tr("proxy.remote.auth.password")).tag("password")
             }
             .pickerStyle(.menu)
             .frame(maxWidth: 220, alignment: .leading)
@@ -101,7 +101,7 @@ struct RemoteServerAuthSection: View {
                 .padding(.vertical, 6)
                 .frostedRoundedSurface(cornerRadius: 8)
             case "password":
-                SecureField("SSH password", text: Binding(
+                SecureField(L10n.tr("proxy.remote.auth.password_placeholder"), text: Binding(
                     get: { draft.password ?? "" },
                     set: { draft.password = $0 }
                 ))
@@ -122,7 +122,7 @@ struct RemoteServerAuthSection: View {
                         Image(systemName: "folder")
                     }
                     .liquidGlassActionButtonStyle()
-                    .help("Choose key file")
+                    .help(L10n.tr("proxy.remote.auth.choose_key_file"))
                     #endif
                 }
             }
@@ -198,7 +198,7 @@ struct RemoteServerLogsSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("Remote logs")
+                Text(L10n.tr("proxy.remote.logs"))
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 0)
@@ -228,7 +228,7 @@ struct RemoteServerErrorSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Remote error")
+            Text(L10n.tr("proxy.remote.error"))
                 .font(.caption2.weight(.bold))
                 .foregroundStyle(.secondary)
             Text(message)

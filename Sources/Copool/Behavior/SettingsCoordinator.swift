@@ -31,6 +31,7 @@ actor SettingsCoordinator {
         if let value = patch.autoStartApiProxy { settings.autoStartApiProxy = value }
         if let value = patch.proxyConfiguration { settings.proxyConfiguration = value.normalized() }
         if let value = patch.remoteServers { settings.remoteServers = value }
+        if let value = patch.usageProgressDisplayMode { settings.usageProgressDisplayMode = value }
         if let value = patch.locale { settings.locale = AppLocale.resolve(value).identifier }
 
         try settingsRepository.saveSettings(settings)

@@ -1,9 +1,42 @@
 import Foundation
 
+enum AccountWorkspaceStatus: String, Codable, Equatable {
+    case active
+    case deactivated
+}
+
 struct AccountsStore: Codable, Equatable {
     var version: Int = 1
     var accounts: [StoredAccount] = []
     var currentSelection: CurrentAccountSelection?
+    var ignoredPendingWorkspaceIDs: [String] = []
+
+    enum CodingKeys: String, CodingKey {
+        case version
+        case accounts
+        case currentSelection
+        case ignoredPendingWorkspaceIDs
+    }
+
+    init(
+        version: Int = 1,
+        accounts: [StoredAccount] = [],
+        currentSelection: CurrentAccountSelection? = nil,
+        ignoredPendingWorkspaceIDs: [String] = []
+    ) {
+        self.version = version
+        self.accounts = accounts
+        self.currentSelection = currentSelection
+        self.ignoredPendingWorkspaceIDs = ignoredPendingWorkspaceIDs
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
+        accounts = try container.decodeIfPresent([StoredAccount].self, forKey: .accounts) ?? []
+        currentSelection = try container.decodeIfPresent(CurrentAccountSelection.self, forKey: .currentSelection)
+        ignoredPendingWorkspaceIDs = try container.decodeIfPresent([String].self, forKey: .ignoredPendingWorkspaceIDs) ?? []
+    }
 }
 
 struct CurrentAccountSelection: Codable, Equatable {
@@ -57,6 +90,8 @@ struct StoredAccount: Codable, Equatable, Identifiable {
     var updatedAt: Int64
     var usage: UsageSnapshot?
     var usageError: String?
+    var usageStateUpdatedAt: Int64 = 0
+    var workspaceStatus: AccountWorkspaceStatus = .active
     var principalID: String? = nil
 
     enum CodingKeys: String, CodingKey {
@@ -72,11 +107,70 @@ struct StoredAccount: Codable, Equatable, Identifiable {
         case updatedAt
         case usage
         case usageError
+        case usageStateUpdatedAt
+        case workspaceStatus
         case principalID = "principalId"
     }
 
     var accountKey: String {
         AccountIdentity.key(for: self)
+    }
+
+    init(
+        id: String,
+        label: String,
+        email: String?,
+        accountID: String,
+        planType: String?,
+        teamName: String?,
+        teamAlias: String?,
+        authJSON: JSONValue,
+        addedAt: Int64,
+        updatedAt: Int64,
+        usage: UsageSnapshot?,
+        usageError: String?,
+        usageStateUpdatedAt: Int64? = nil,
+        workspaceStatus: AccountWorkspaceStatus = .active,
+        principalID: String? = nil
+    ) {
+        self.id = id
+        self.label = label
+        self.email = email
+        self.accountID = accountID
+        self.planType = planType
+        self.teamName = teamName
+        self.teamAlias = teamAlias
+        self.authJSON = authJSON
+        self.addedAt = addedAt
+        self.updatedAt = updatedAt
+        self.usage = usage
+        self.usageError = usageError
+        self.usageStateUpdatedAt = usageStateUpdatedAt
+            ?? usage?.fetchedAt
+            ?? (usageError == nil ? 0 : updatedAt)
+        self.workspaceStatus = workspaceStatus
+        self.principalID = principalID
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        label = try container.decode(String.self, forKey: .label)
+        email = try container.decodeIfPresent(String.self, forKey: .email)
+        accountID = try container.decode(String.self, forKey: .accountID)
+        planType = try container.decodeIfPresent(String.self, forKey: .planType)
+        teamName = try container.decodeIfPresent(String.self, forKey: .teamName)
+        teamAlias = try container.decodeIfPresent(String.self, forKey: .teamAlias)
+        authJSON = try container.decode(JSONValue.self, forKey: .authJSON)
+        addedAt = try container.decode(Int64.self, forKey: .addedAt)
+        updatedAt = try container.decode(Int64.self, forKey: .updatedAt)
+        usage = try container.decodeIfPresent(UsageSnapshot.self, forKey: .usage)
+        usageError = try container.decodeIfPresent(String.self, forKey: .usageError)
+        usageStateUpdatedAt = try container.decodeIfPresent(Int64.self, forKey: .usageStateUpdatedAt)
+            ?? usage?.fetchedAt
+            ?? (usageError == nil ? 0 : updatedAt)
+        workspaceStatus = try container.decodeIfPresent(AccountWorkspaceStatus.self, forKey: .workspaceStatus) ?? .active
+        principalID = try container.decodeIfPresent(String.self, forKey: .principalID)
     }
 }
 
@@ -92,6 +186,7 @@ struct AccountSummary: Equatable, Identifiable {
     var updatedAt: Int64
     var usage: UsageSnapshot?
     var usageError: String?
+    var workspaceStatus: AccountWorkspaceStatus = .active
     var isCurrent: Bool
     var principalID: String? = nil
 
@@ -140,6 +235,10 @@ struct AccountSummary: Equatable, Identifiable {
             return false
         }
     }
+
+    var isWorkspaceDeactivated: Bool {
+        workspaceStatus == .deactivated
+    }
 }
 
 extension AccountsStore {
@@ -159,6 +258,7 @@ extension AccountsStore {
                 updatedAt: account.updatedAt,
                 usage: account.usage,
                 usageError: account.usageError,
+                workspaceStatus: account.workspaceStatus,
                 isCurrent: resolvedCurrentAccountKey == account.accountKey,
                 principalID: account.principalID
             )
@@ -226,6 +326,17 @@ struct WorkspaceMetadata: Equatable, Sendable {
     var accountID: String
     var workspaceName: String?
     var structure: String?
+}
+
+struct WorkspaceAuthorizationCandidate: Equatable, Identifiable, Sendable {
+    var workspaceID: String
+    var workspaceName: String
+    var email: String?
+    var planType: String?
+
+    var id: String {
+        workspaceID
+    }
 }
 
 struct ChatGPTOAuthTokens: Equatable, Sendable {

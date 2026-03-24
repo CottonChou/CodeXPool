@@ -32,23 +32,27 @@ final class OpenAIChatGPTOAuthLoginService: ChatGPTOAuthLoginServiceProtocol, @u
     }
 
     func signInWithChatGPT(timeoutSeconds: TimeInterval) async throws -> ChatGPTOAuthTokens {
+        try await signInWithChatGPT(timeoutSeconds: timeoutSeconds, forcedWorkspaceID: nil)
+    }
+
+    func signInWithChatGPT(timeoutSeconds: TimeInterval, forcedWorkspaceID: String?) async throws -> ChatGPTOAuthTokens {
         let callback = OAuthCallbackBox<ChatGPTOAuthTokens>()
         let pkce = PKCECodes.make()
         let state = OpenAIChatGPTOAuthSupport.randomBase64URL(byteCount: 32)
-        let forcedWorkspaceID = resolveForcedWorkspaceID()
+        let effectiveForcedWorkspaceID = forcedWorkspaceID ?? resolveForcedWorkspaceID()
 
         let (server, port) = try makeCallbackServer(
             callback: callback,
             pkce: pkce,
             state: state,
-            forcedWorkspaceID: forcedWorkspaceID
+            forcedWorkspaceID: effectiveForcedWorkspaceID
         )
         let redirectURI = Self.redirectURI(for: port)
         let authorizeURL = try makeAuthorizeURL(
             redirectURI: redirectURI,
             pkce: pkce,
             state: state,
-            forcedWorkspaceID: forcedWorkspaceID
+            forcedWorkspaceID: effectiveForcedWorkspaceID
         )
 
         server.start()
@@ -153,20 +157,26 @@ final class OpenAIChatGPTOAuthLoginService: ChatGPTOAuthLoginServiceProtocol, @u
             }
 
             if let code = params["code"], !code.isEmpty {
-                do {
-                    let tokens = try await exchangeCodeForTokens(
-                        session: session,
-                        redirectURI: redirectURI,
-                        pkce: pkce,
-                        code: code,
-                        forcedWorkspaceID: forcedWorkspaceID
-                    )
-                    callback.succeed(tokens)
-                    return .html(statusCode: 200, body: OpenAIChatGPTOAuthSupport.successPageHTML())
-                } catch {
-                    callback.fail(error)
-                    return .html(statusCode: 500, body: OpenAIChatGPTOAuthSupport.errorPageHTML(message: error.localizedDescription))
+                #if os(macOS)
+                Task { @MainActor in
+                    NSApp.activate(ignoringOtherApps: true)
                 }
+                #endif
+                Task {
+                    do {
+                        let tokens = try await exchangeCodeForTokens(
+                            session: session,
+                            redirectURI: redirectURI,
+                            pkce: pkce,
+                            code: code,
+                            forcedWorkspaceID: forcedWorkspaceID
+                        )
+                        callback.succeed(tokens)
+                    } catch {
+                        callback.fail(error)
+                    }
+                }
+                return .html(statusCode: 200, body: OpenAIChatGPTOAuthSupport.successPageHTML())
             }
 
             if let errorCode = params["error"] {
@@ -230,35 +240,12 @@ final class OpenAIChatGPTOAuthLoginService: ChatGPTOAuthLoginServiceProtocol, @u
             }
         }
 
-        let apiKey = try? await exchangeIDTokenForAPIKey(session: session, idToken: tokenResponse.idToken)
         return ChatGPTOAuthTokens(
             accessToken: tokenResponse.accessToken,
             refreshToken: tokenResponse.refreshToken,
             idToken: tokenResponse.idToken,
-            apiKey: apiKey
+            apiKey: nil
         )
-    }
-
-    private static func exchangeIDTokenForAPIKey(session: URLSession, idToken: String) async throws -> String {
-        var request = URLRequest(url: endpointURL("/oauth/token"))
-        request.httpMethod = "POST"
-        request.timeoutInterval = 30
-        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        request.httpBody = OpenAIChatGPTOAuthSupport.formEncodedBody([
-            ("grant_type", "urn:ietf:params:oauth:grant-type:token-exchange"),
-            ("client_id", Configuration.clientID),
-            ("requested_token", "openai-api-key"),
-            ("subject_token", idToken),
-            ("subject_token_type", "urn:ietf:params:oauth:token-type:id_token")
-        ])
-
-        let (data, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, (200..<300).contains(httpResponse.statusCode) else {
-            throw AppError.network(L10n.tr("error.oauth.api_key_exchange_failed"))
-        }
-
-        let payload = try JSONDecoder().decode(APIKeyExchangeResponse.self, from: data)
-        return payload.accessToken
     }
 
     private func makeAuthorizeURL(

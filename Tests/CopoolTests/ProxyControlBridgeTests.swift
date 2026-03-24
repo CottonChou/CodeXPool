@@ -36,6 +36,28 @@ final class ProxyControlBridgeTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(metrics.pushLocalSnapshotCallCount, 1)
     }
 
+    func testInactiveAppReducesCommandPollingUntilReactivated() async throws {
+        let cloudSyncService = SpyProxyControlCloudSyncService()
+        let bridge = makeBridge(
+            cloudSyncService: cloudSyncService,
+            runtimePlatform: .macOS
+        )
+
+        await bridge.setAppActive(false)
+        await bridge.start()
+        try? await Task.sleep(for: .milliseconds(2_200))
+
+        let inactiveMetrics = await cloudSyncService.readMetrics()
+        XCTAssertEqual(inactiveMetrics.pullPendingCommandCallCount, 1)
+
+        await bridge.setAppActive(true)
+        try? await Task.sleep(for: .milliseconds(1_200))
+        await bridge.stop()
+
+        let activeMetrics = await cloudSyncService.readMetrics()
+        XCTAssertGreaterThanOrEqual(activeMetrics.pullPendingCommandCallCount, 2)
+    }
+
     func testStartPublishesSnapshotWithoutWaitingForSlowRemoteStatuses() async throws {
         let cloudSyncService = SpyProxyControlCloudSyncService()
         let slowRemoteService = SlowRemoteProxyService(delay: .milliseconds(600))
@@ -252,11 +274,40 @@ final class ProxyControlBridgeTests: XCTestCase {
         XCTAssertEqual(snapshot.remoteServers.first?.listenPort, 9898)
     }
 
+    func testRefreshAccountsCommandInvokesManualRefreshService() async throws {
+        let refreshService = RecordingAccountsManualRefreshService()
+        let bridge = makeBridge(
+            cloudSyncService: nil,
+            runtimePlatform: .macOS,
+            performAccountsRefresh: {
+                await refreshService.recordCall()
+            }
+        )
+        let command = ProxyControlCommand(
+            id: UUID().uuidString,
+            createdAt: 1_763_216_000_000,
+            sourceDeviceID: "ios-proxy-control",
+            kind: .refreshAccounts,
+            preferredProxyPort: nil,
+            autoStartProxy: nil,
+            cloudflaredInput: nil,
+            remoteServer: nil,
+            remoteServerID: nil,
+            logLines: nil
+        )
+
+        _ = try await bridge.performLocalCommand(command)
+
+        let callCount = await refreshService.readCallCount()
+        XCTAssertEqual(callCount, 1)
+    }
+
     private func makeBridge(
         cloudSyncService: ProxyControlCloudSyncServiceProtocol?,
         runtimePlatform: RuntimePlatform,
         remoteService: RemoteProxyServiceProtocol = StubRemoteProxyService(),
-        settings: AppSettings = .defaultValue
+        settings: AppSettings = .defaultValue,
+        performAccountsRefresh: (@MainActor @Sendable () async throws -> Void)? = nil
     ) -> ProxyControlBridge {
         let proxyCoordinator = ProxyCoordinator(
             proxyService: StubProxyRuntimeService(),
@@ -272,6 +323,7 @@ final class ProxyControlBridgeTests: XCTestCase {
             proxyCoordinator: proxyCoordinator,
             settingsCoordinator: settingsCoordinator,
             cloudSyncService: cloudSyncService,
+            performAccountsRefresh: performAccountsRefresh,
             runtimePlatform: runtimePlatform
         )
     }
@@ -293,6 +345,18 @@ final class ProxyControlBridgeTests: XCTestCase {
             remoteDir: "/opt/codex-tools",
             listenPort: 8787
         )
+    }
+}
+
+private actor RecordingAccountsManualRefreshService {
+    private var callCount = 0
+
+    func recordCall() {
+        callCount += 1
+    }
+
+    func readCallCount() -> Int {
+        callCount
     }
 }
 

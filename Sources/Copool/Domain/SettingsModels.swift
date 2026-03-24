@@ -1,5 +1,19 @@
 import Foundation
 
+enum UsageProgressDisplayMode: String, Codable, Equatable, CaseIterable, Sendable {
+    case used
+    case remaining
+
+    var localizationKey: String {
+        switch self {
+        case .used:
+            return "settings.usage_progress_display.used"
+        case .remaining:
+            return "settings.usage_progress_display.remaining"
+        }
+    }
+}
+
 struct AppSettings: Codable, Equatable {
     var launchAtStartup: Bool
     var launchCodexAfterSwitch: Bool
@@ -11,6 +25,7 @@ struct AppSettings: Codable, Equatable {
     var autoStartApiProxy: Bool
     var proxyConfiguration: ProxyConfiguration
     var remoteServers: [RemoteServerConfig]
+    var usageProgressDisplayMode: UsageProgressDisplayMode
     var locale: String
 
     enum CodingKeys: String, CodingKey {
@@ -24,6 +39,7 @@ struct AppSettings: Codable, Equatable {
         case autoStartApiProxy
         case proxyConfiguration
         case remoteServers
+        case usageProgressDisplayMode
         case locale
     }
 
@@ -38,6 +54,7 @@ struct AppSettings: Codable, Equatable {
         autoStartApiProxy: Bool,
         proxyConfiguration: ProxyConfiguration = .defaultValue,
         remoteServers: [RemoteServerConfig],
+        usageProgressDisplayMode: UsageProgressDisplayMode = .used,
         locale: String
     ) {
         self.launchAtStartup = launchAtStartup
@@ -50,6 +67,7 @@ struct AppSettings: Codable, Equatable {
         self.autoStartApiProxy = autoStartApiProxy
         self.proxyConfiguration = proxyConfiguration.normalized()
         self.remoteServers = remoteServers
+        self.usageProgressDisplayMode = usageProgressDisplayMode
         self.locale = AppLocale.resolve(locale).identifier
     }
 
@@ -65,6 +83,10 @@ struct AppSettings: Codable, Equatable {
         autoStartApiProxy = try container.decode(Bool.self, forKey: .autoStartApiProxy)
         proxyConfiguration = try container.decode(ProxyConfiguration.self, forKey: .proxyConfiguration)
         remoteServers = try container.decode([RemoteServerConfig].self, forKey: .remoteServers)
+        usageProgressDisplayMode = try container.decodeIfPresent(
+            UsageProgressDisplayMode.self,
+            forKey: .usageProgressDisplayMode
+        ) ?? .used
         locale = AppLocale.resolve(try container.decode(String.self, forKey: .locale)).identifier
     }
 
@@ -80,6 +102,7 @@ struct AppSettings: Codable, Equatable {
         try container.encode(autoStartApiProxy, forKey: .autoStartApiProxy)
         try container.encode(proxyConfiguration, forKey: .proxyConfiguration)
         try container.encode(remoteServers, forKey: .remoteServers)
+        try container.encode(usageProgressDisplayMode, forKey: .usageProgressDisplayMode)
         try container.encode(locale, forKey: .locale)
     }
 
@@ -95,6 +118,7 @@ struct AppSettings: Codable, Equatable {
             autoStartApiProxy: false,
             proxyConfiguration: .defaultValue,
             remoteServers: [],
+            usageProgressDisplayMode: .used,
             locale: AppLocale.systemDefault.identifier
         )
     }
@@ -111,5 +135,6 @@ struct AppSettingsPatch {
     var autoStartApiProxy: Bool? = nil
     var proxyConfiguration: ProxyConfiguration? = nil
     var remoteServers: [RemoteServerConfig]? = nil
+    var usageProgressDisplayMode: UsageProgressDisplayMode? = nil
     var locale: String? = nil
 }

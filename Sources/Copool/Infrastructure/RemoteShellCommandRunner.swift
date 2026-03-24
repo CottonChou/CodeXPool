@@ -51,7 +51,8 @@ struct RemoteShellCommandRunner {
     }
 
     func withRootPrivileges(_ command: String) -> String {
-        "if [ \"$(id -u)\" = \"0\" ]; then \(command); else sudo sh -lc \(shellQuote(command)); fi"
+        let normalizedCommand = command.trimmingTrailingShellTerminators()
+        return "if [ \"$(id -u)\" = \"0\" ]; then \(normalizedCommand); else sudo sh -lc \(shellQuote(normalizedCommand)); fi"
     }
 
     private func runCommand(
@@ -133,5 +134,15 @@ struct RemoteShellCommandRunner {
         default:
             return try operation(server.identityFile)
         }
+    }
+}
+
+private extension String {
+    func trimmingTrailingShellTerminators() -> String {
+        var result = trimmingCharacters(in: .whitespacesAndNewlines)
+        while let last = result.last, last == ";" || last.isWhitespace {
+            result.removeLast()
+        }
+        return result
     }
 }

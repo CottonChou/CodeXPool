@@ -20,6 +20,8 @@ actor SwiftNativeProxyRuntimeService: ProxyRuntimeService {
     private var activeAccountID: String?
     private var activeAccountLabel: String?
     private var lastError: String?
+    var cachedCandidates: [ProxyCandidate]?
+    var cachedCandidatesStoreModificationDate: Date?
 
     private let models = SwiftNativeProxyRuntimeService.clientVisibleModels
 
@@ -40,7 +42,7 @@ actor SwiftNativeProxyRuntimeService: ProxyRuntimeService {
     func status() async -> ApiProxyStatus {
         let running = server != nil
         let apiKey = try? ensurePersistedAPIKey()
-        let availableAccounts = (try? loadCandidates().count) ?? -1
+        let availableAccounts = (try? currentCandidates().count) ?? -1
 
         return ApiProxyStatus(
             running: running,
@@ -241,7 +243,7 @@ actor SwiftNativeProxyRuntimeService: ProxyRuntimeService {
     }
 
     private func sendOverCandidates(payload: [String: Any], downstreamHeaders: [String: String]) async throws -> UpstreamResponse {
-        let candidates = try loadCandidates()
+        let candidates = try currentCandidates()
         guard !candidates.isEmpty else {
             throw AppError.invalidData(L10n.tr("error.proxy_runtime.no_accounts_available"))
         }

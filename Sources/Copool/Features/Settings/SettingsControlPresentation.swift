@@ -39,6 +39,7 @@ struct SettingsPickerDescriptor<Value: Hashable>: Equatable {
 
 struct SettingsToggleSectionPresentation: Equatable {
     let toggles: [SettingsToggleDescriptor<SettingsToggleIntent>]
+    let usageProgressDisplayPicker: SettingsPickerDescriptor<UsageProgressDisplayMode>?
 }
 
 struct SettingsSwitchBehaviorSectionPresentation: Equatable {
@@ -76,7 +77,22 @@ enum SettingsControlPresentation {
                     titleKey: "settings.local_proxy_host_api_only",
                     isOn: settings.localProxyHostAPIOnly
                 )
-            ]
+            ],
+            usageProgressDisplayPicker: SettingsPickerDescriptor(
+                titleKey: "settings.usage_progress_display",
+                selectedValue: settings.usageProgressDisplayMode,
+                options: [
+                    SettingsPickerOptionDescriptor(
+                        value: .used,
+                        title: L10n.tr("settings.usage_progress_display.used")
+                    ),
+                    SettingsPickerOptionDescriptor(
+                        value: .remaining,
+                        title: L10n.tr("settings.usage_progress_display.remaining")
+                    )
+                ],
+                isEnabled: true
+            )
         )
     }
 

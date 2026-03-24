@@ -79,6 +79,83 @@ final class EndpointRequestCoordinatorTests: XCTestCase {
         XCTAssertEqual(result.endpoint, fallback)
         XCTAssertEqual(requestedURLs, [fallback])
     }
+
+    func testFetchFirstSuccessfulFallsBackWhenPreferredEndpointValidationFails() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let preferenceStore = EndpointPreferenceStore()
+        let coordinator = EndpointRequestCoordinator(
+            session: session,
+            preferenceStore: preferenceStore
+        )
+
+        let primary = "https://primary.example.com/value"
+        let fallback = "https://fallback.example.com/value"
+
+        await MockURLProtocol.store.setHandler { request in
+            let url = try XCTUnwrap(request.url?.absoluteString)
+
+            switch url {
+            case primary:
+                return (
+                    HTTPURLResponse(
+                        url: try XCTUnwrap(request.url),
+                        statusCode: 200,
+                        httpVersion: nil,
+                        headerFields: nil
+                    )!,
+                    Data(#"{"unexpected":true}"#.utf8)
+                )
+            case fallback:
+                return (
+                    HTTPURLResponse(
+                        url: try XCTUnwrap(request.url),
+                        statusCode: 200,
+                        httpVersion: nil,
+                        headerFields: nil
+                    )!,
+                    Data(#"{"ok":true}"#.utf8)
+                )
+            default:
+                return (
+                    HTTPURLResponse(
+                        url: try XCTUnwrap(request.url),
+                        statusCode: 503,
+                        httpVersion: nil,
+                        headerFields: nil
+                    )!,
+                    Data()
+                )
+            }
+        }
+
+        let firstResult = try await coordinator.fetchFirstSuccessful(
+            scope: "usage",
+            candidateURLs: [primary, fallback]
+        ) { URLRequest(url: $0) } validate: { result in
+            try JSONDecoder().decode(DecodeCheck.self, from: result.data)
+        }
+
+        XCTAssertTrue(firstResult.ok)
+
+        await MockURLProtocol.store.resetRequestedURLs()
+
+        let secondResult = try await coordinator.fetchFirstSuccessful(
+            scope: "usage",
+            candidateURLs: [primary, fallback]
+        ) { URLRequest(url: $0) } validate: { result in
+            try JSONDecoder().decode(DecodeCheck.self, from: result.data)
+        }
+
+        let requestedURLs = await MockURLProtocol.store.requestedURLs()
+        XCTAssertTrue(secondResult.ok)
+        XCTAssertEqual(requestedURLs, [fallback])
+    }
+}
+
+private struct DecodeCheck: Decodable {
+    let ok: Bool
 }
 
 private final class MockURLProtocol: URLProtocol, @unchecked Sendable {

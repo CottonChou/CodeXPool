@@ -3,10 +3,16 @@ import Foundation
 final class AuthFileRepository: AuthRepository, @unchecked Sendable {
     private let paths: FileSystemPaths
     private let fileManager: FileManager
+    private let session: URLSession
 
-    init(paths: FileSystemPaths, fileManager: FileManager = .default) {
+    init(
+        paths: FileSystemPaths,
+        fileManager: FileManager = .default,
+        session: URLSession = .shared
+    ) {
         self.paths = paths
         self.fileManager = fileManager
+        self.session = session
     }
 
     func readCurrentAuth() throws -> JSONValue {
@@ -88,6 +94,52 @@ final class AuthFileRepository: AuthRepository, @unchecked Sendable {
         }
 
         return .object(root)
+    }
+
+    func refreshChatGPTAuth(_ auth: JSONValue) async throws -> JSONValue {
+        guard let tokens = authTokenObject(from: auth) else {
+            throw AppError.unauthorized(L10n.tr("error.auth.no_chatgpt_token"))
+        }
+        guard let refreshToken = tokens["refresh_token"]?.stringValue else {
+            throw AppError.invalidData(L10n.tr("error.opencode.missing_refresh_token"))
+        }
+        guard let idToken = tokens["id_token"]?.stringValue else {
+            throw AppError.invalidData(L10n.tr("error.auth.missing_id_token"))
+        }
+
+        let claims = try AuthJWTDecoder.decodePayload(idToken)
+        let issuer = Self.resolveIssuer(from: claims)
+        let clientID = Self.resolveClientID(from: claims)
+        guard let tokenURL = URL(string: "\(issuer)/oauth/token") else {
+            throw AppError.network(L10n.tr("error.oauth.authorize_url_invalid"))
+        }
+
+        var request = URLRequest(url: tokenURL)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 30
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        request.httpBody = OpenAIChatGPTOAuthSupport.formEncodedBody([
+            ("grant_type", "refresh_token"),
+            ("refresh_token", refreshToken),
+            ("client_id", clientID)
+        ])
+
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AppError.network(L10n.tr("error.usage.invalid_response"))
+        }
+
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            throw AppError.unauthorized(
+                OpenAIChatGPTOAuthSupport.bestHTTPErrorMessage(
+                    from: data,
+                    statusCode: httpResponse.statusCode
+                )
+            )
+        }
+
+        let refreshed = try JSONDecoder().decode(RefreshedChatGPTOAuthTokenResponse.self, from: data)
+        return try updatedAuthJSON(auth, refreshed: refreshed)
     }
 
     func extractAuth(from auth: JSONValue) throws -> ExtractedAuth {
@@ -180,6 +232,49 @@ final class AuthFileRepository: AuthRepository, @unchecked Sendable {
 
     private func authTokenObject(from auth: JSONValue) -> [String: JSONValue]? {
         AuthJWTDecoder.tokenObject(from: auth)
+    }
+
+    private func updatedAuthJSON(
+        _ auth: JSONValue,
+        refreshed: RefreshedChatGPTOAuthTokenResponse
+    ) throws -> JSONValue {
+        guard var root = auth.objectValue else {
+            throw AppError.invalidData(L10n.tr("error.auth.auth_json_invalid_structure"))
+        }
+        var tokens = authTokenObject(from: auth) ?? [:]
+        tokens["access_token"] = .string(refreshed.accessToken)
+        tokens["id_token"] = .string(refreshed.idToken)
+        if let refreshToken = refreshed.refreshToken, !refreshToken.isEmpty {
+            tokens["refresh_token"] = .string(refreshToken)
+        }
+        root["tokens"] = .object(tokens)
+        root["auth_mode"] = .string(root["auth_mode"]?.stringValue ?? "chatgpt")
+        root["last_refresh"] = .string(Self.makeLastRefreshTimestamp())
+        return try CodexCurrentAuthNormalizer.normalize(
+            .object(root),
+            fallbackLastRefresh: Self.makeLastRefreshTimestamp
+        )
+    }
+
+    private static func resolveIssuer(from claims: JSONValue) -> String {
+        let fallback = "https://auth.openai.com"
+        guard let issuer = claims["iss"]?.stringValue?.trimmingCharacters(in: CharacterSet(charactersIn: "/")),
+              !issuer.isEmpty else {
+            return fallback
+        }
+        return issuer
+    }
+
+    private static func resolveClientID(from claims: JSONValue) -> String {
+        if let clientID = claims["aud"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !clientID.isEmpty {
+            return clientID
+        }
+        if let clientID = claims["aud"]?.arrayValue?.first?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !clientID.isEmpty {
+            return clientID
+        }
+        return "app_EMoamEEZ73f0CkXaXp7hrann"
     }
 
     private static func makeLastRefreshTimestamp() -> String {

@@ -12,14 +12,20 @@ final class AppContainer {
 
     private let settingsCoordinator: SettingsCoordinator
     private let accountsWidgetSnapshotWriter: AccountsWidgetSnapshotWriter
+    private let accountsWidgetDisplayModeStore: AccountsWidgetDisplayModeStore
     private let proxyCoordinator: ProxyCoordinator
     private let proxyControlCloudSyncService: CloudKitProxyControlSyncService
     private var accountsWidgetSnapshotCancellable: AnyCancellable?
+    private var widgetUsageProgressDisplayMode: UsageProgressDisplayMode
 
     lazy var proxyControlBridge: ProxyControlBridge = ProxyControlBridge(
         proxyCoordinator: proxyCoordinator,
         settingsCoordinator: settingsCoordinator,
-        cloudSyncService: proxyControlCloudSyncService
+        cloudSyncService: proxyControlCloudSyncService,
+        performAccountsRefresh: { [weak trayModel] in
+            guard let trayModel else { return }
+            _ = try await trayModel.performManualRefresh()
+        }
     )
 
     lazy var proxyModel: ProxyPageModel = ProxyPageModel(
@@ -82,7 +88,10 @@ final class AppContainer {
                 settingsRepository: settingsRepository,
                 launchAtStartupService: launchAtStartupService
             )
-            try launchAtStartupService.syncWithStoreValue(settingsRepository.loadSettings().launchAtStartup)
+            let initialSettings = try settingsRepository.loadSettings()
+            var applySettingsToContainer: ((AppSettings) -> Void)?
+            try launchAtStartupService.syncWithStoreValue(initialSettings.launchAtStartup)
+            let accountsWidgetDisplayModeStore = AccountsWidgetDisplayModeStore()
             let accountsWidgetSnapshotWriter = AccountsWidgetSnapshotWriter(
                 localeProvider: {
                     let identifier = (try? await settingsCoordinator.currentSettings().locale)
@@ -114,14 +123,29 @@ final class AppContainer {
                 backgroundRefreshPolicy: .forPlatform(PlatformCapabilities.currentPlatform),
                 initialAccounts: initialAccounts
             )
+            let accountsModel = AccountsPageModel(
+                coordinator: accountsCoordinator,
+                settingsCoordinator: settingsCoordinator,
+                manualRefreshService: trayModel,
+                proxyControlCloudSyncService: proxyControlCloudSyncService,
+                localAccountsMutationSyncService: trayModel,
+                currentAccountSelectionSyncService: currentAccountSelectionSyncService,
+                cloudSyncAvailabilityService: cloudSyncAvailabilityService,
+                runtimePlatform: PlatformCapabilities.currentPlatform,
+                usageProgressDisplayMode: initialSettings.usageProgressDisplayMode,
+                onLocalAccountsChanged: { accounts in
+                    trayModel.acceptLocalAccountsSnapshot(accounts)
+                },
+                onSettingsUpdated: { settings in
+                    applySettingsToContainer?(settings)
+                },
+                initialAccounts: initialAccounts
+            )
             let settingsModel = SettingsPageModel(
                 settingsCoordinator: settingsCoordinator,
                 editorAppService: editorAppService,
                 onSettingsUpdated: { settings in
-                    trayModel.applySettings(settings)
-                    Task {
-                        await accountsWidgetSnapshotWriter.write(accounts: trayModel.accounts)
-                    }
+                    applySettingsToContainer?(settings)
                 },
                 onQuitRequested: {
                     #if canImport(AppKit)
@@ -130,25 +154,21 @@ final class AppContainer {
                 }
             )
 
-            return AppContainer(
+            let container = AppContainer(
                 settingsCoordinator: settingsCoordinator,
                 accountsWidgetSnapshotWriter: accountsWidgetSnapshotWriter,
+                accountsWidgetDisplayModeStore: accountsWidgetDisplayModeStore,
                 proxyCoordinator: proxyCoordinator,
                 proxyControlCloudSyncService: proxyControlCloudSyncService,
-                accountsModel: AccountsPageModel(
-                    coordinator: accountsCoordinator,
-                    manualRefreshService: trayModel,
-                    localAccountsMutationSyncService: trayModel,
-                    currentAccountSelectionSyncService: currentAccountSelectionSyncService,
-                    cloudSyncAvailabilityService: cloudSyncAvailabilityService,
-                    onLocalAccountsChanged: { accounts in
-                        trayModel.acceptLocalAccountsSnapshot(accounts)
-                    },
-                    initialAccounts: initialAccounts
-                ),
+                widgetUsageProgressDisplayMode: initialSettings.usageProgressDisplayMode,
+                accountsModel: accountsModel,
                 settingsModel: settingsModel,
                 trayModel: trayModel
             )
+            applySettingsToContainer = { settings in
+                container.applySettings(settings)
+            }
+            return container
         } catch {
             fatalError("Failed to bootstrap Swift migration app: \(error.localizedDescription)")
         }
@@ -157,28 +177,53 @@ final class AppContainer {
     private init(
         settingsCoordinator: SettingsCoordinator,
         accountsWidgetSnapshotWriter: AccountsWidgetSnapshotWriter,
+        accountsWidgetDisplayModeStore: AccountsWidgetDisplayModeStore,
         proxyCoordinator: ProxyCoordinator,
         proxyControlCloudSyncService: CloudKitProxyControlSyncService,
+        widgetUsageProgressDisplayMode: UsageProgressDisplayMode,
         accountsModel: AccountsPageModel,
         settingsModel: SettingsPageModel,
         trayModel: TrayMenuModel
     ) {
         self.settingsCoordinator = settingsCoordinator
         self.accountsWidgetSnapshotWriter = accountsWidgetSnapshotWriter
+        self.accountsWidgetDisplayModeStore = accountsWidgetDisplayModeStore
         self.proxyCoordinator = proxyCoordinator
         self.proxyControlCloudSyncService = proxyControlCloudSyncService
+        self.widgetUsageProgressDisplayMode = widgetUsageProgressDisplayMode
         self.accountsModel = accountsModel
         self.settingsModel = settingsModel
         self.trayModel = trayModel
+        accountsWidgetDisplayModeStore.save(rawValue: widgetUsageProgressDisplayMode.rawValue)
         accountsWidgetSnapshotCancellable = trayModel.$accounts
             .removeDuplicates()
-            .sink { [accountsWidgetSnapshotWriter] accounts in
+            .sink { [weak self] accounts in
+                guard let self else { return }
                 Task {
-                    await accountsWidgetSnapshotWriter.write(accounts: accounts)
+                    await self.accountsWidgetSnapshotWriter.write(
+                        accounts: accounts,
+                        usageProgressDisplayMode: self.widgetUsageProgressDisplayMode
+                    )
                 }
             }
         Task {
-            await accountsWidgetSnapshotWriter.write(accounts: trayModel.accounts)
+            await accountsWidgetSnapshotWriter.write(
+                accounts: trayModel.accounts,
+                usageProgressDisplayMode: widgetUsageProgressDisplayMode
+            )
+        }
+    }
+
+    func applySettings(_ settings: AppSettings) {
+        widgetUsageProgressDisplayMode = settings.usageProgressDisplayMode
+        accountsWidgetDisplayModeStore.save(rawValue: settings.usageProgressDisplayMode.rawValue)
+        trayModel.applySettings(settings)
+        accountsModel.applySettings(settings)
+        Task {
+            await accountsWidgetSnapshotWriter.write(
+                accounts: trayModel.accounts,
+                usageProgressDisplayMode: settings.usageProgressDisplayMode
+            )
         }
     }
 

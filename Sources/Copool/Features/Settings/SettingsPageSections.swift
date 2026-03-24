@@ -43,6 +43,13 @@ private struct SettingsGeneralSection: View {
                 descriptors: model.generalSectionPresentation.toggles,
                 onChange: model.updateToggle
             )
+
+            if let usageProgressDisplayPicker = model.generalSectionPresentation.usageProgressDisplayPicker {
+                SettingsPickerRow(
+                    descriptor: usageProgressDisplayPicker,
+                    onSelect: model.updateUsageProgressDisplayMode
+                )
+            }
         }
     }
 }

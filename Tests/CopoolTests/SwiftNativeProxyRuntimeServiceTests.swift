@@ -216,11 +216,33 @@ final class SwiftNativeProxyRuntimeServiceTests: XCTestCase {
         let legacyKey = "legacy-proxy-key"
         try legacyKey.write(to: paths.proxyDaemonKeyPath, atomically: true, encoding: .utf8)
 
+        let account = StoredAccount(
+            id: "acct-1",
+            label: "Primary",
+            email: nil,
+            accountID: "account-1",
+            planType: nil,
+            teamName: nil,
+            teamAlias: nil,
+            authJSON: .object([
+                "tokens": .object([
+                    "access_token": .string("token"),
+                    "id_token": .string("id-token"),
+                    "account_id": .string("account-1")
+                ])
+            ]),
+            addedAt: 1,
+            updatedAt: 1,
+            usage: nil,
+            usageError: nil
+        )
+        let storeRepository = CountingStoreRepository(store: AccountsStore(accounts: [account]))
+        let authRepository = CountingAuthRepository()
         let runtime = SwiftNativeProxyRuntimeService(
             paths: paths,
-            storeRepository: MockStoreRepository(),
+            storeRepository: storeRepository,
             settingsRepository: MockSettingsRepository(),
-            authRepository: MockAuthRepository()
+            authRepository: authRepository
         )
 
         let port = Int.random(in: 21000...29000)
@@ -230,6 +252,14 @@ final class SwiftNativeProxyRuntimeServiceTests: XCTestCase {
         }
 
         XCTAssertEqual(started.apiKey, legacyKey)
+
+        let firstStatus = await runtime.status()
+        let secondStatus = await runtime.status()
+
+        XCTAssertEqual(firstStatus.availableAccounts, 1)
+        XCTAssertEqual(secondStatus.availableAccounts, 1)
+        XCTAssertEqual(storeRepository.loadStoreCallCount, 1)
+        XCTAssertEqual(authRepository.extractAuthCallCount, 1)
     }
 
     func testResponsesRejectsMissingModel() async throws {
@@ -324,6 +354,24 @@ private final class MockStoreRepository: AccountsStoreRepository, @unchecked Sen
     }
 }
 
+private final class CountingStoreRepository: AccountsStoreRepository, @unchecked Sendable {
+    private let store: AccountsStore
+    private(set) var loadStoreCallCount = 0
+
+    init(store: AccountsStore) {
+        self.store = store
+    }
+
+    func loadStore() throws -> AccountsStore {
+        loadStoreCallCount += 1
+        return store
+    }
+
+    func saveStore(_ store: AccountsStore) throws {
+        _ = store
+    }
+}
+
 private final class MockSettingsRepository: SettingsRepository, @unchecked Sendable {
     func loadSettings() throws -> AppSettings {
         .defaultValue
@@ -349,5 +397,29 @@ private final class MockAuthRepository: AuthRepository, @unchecked Sendable {
     }
     func extractAuth(from auth: JSONValue) throws -> ExtractedAuth {
         ExtractedAuth(accountID: "acct", accessToken: "token", email: nil, planType: nil, teamName: nil)
+    }
+}
+
+private final class CountingAuthRepository: AuthRepository, @unchecked Sendable {
+    private(set) var extractAuthCallCount = 0
+
+    func readCurrentAuth() throws -> JSONValue { .null }
+    func readCurrentAuthOptional() throws -> JSONValue? { nil }
+    func readAuth(from url: URL) throws -> JSONValue {
+        _ = url
+        return .null
+    }
+    func writeCurrentAuth(_ auth: JSONValue) throws {
+        _ = auth
+    }
+    func removeCurrentAuth() throws {}
+    func makeChatGPTAuth(from tokens: ChatGPTOAuthTokens) throws -> JSONValue {
+        _ = tokens
+        return .null
+    }
+    func extractAuth(from auth: JSONValue) throws -> ExtractedAuth {
+        _ = auth
+        extractAuthCallCount += 1
+        return ExtractedAuth(accountID: "acct", accessToken: "token", email: nil, planType: nil, teamName: nil)
     }
 }

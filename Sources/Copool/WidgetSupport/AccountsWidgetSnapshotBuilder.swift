@@ -9,6 +9,7 @@ struct AccountsWidgetSnapshotBuilder {
 
     func build(
         accounts: [AccountSummary],
+        usageProgressDisplayMode: UsageProgressDisplayMode,
         locale: Locale,
         timeZone: TimeZone = .autoupdatingCurrent,
         now: Date = .now
@@ -21,6 +22,7 @@ struct AccountsWidgetSnapshotBuilder {
         let remaining = Array(sorted.dropFirst())
         return AccountsWidgetSnapshot(
             generatedAt: Int64(now.timeIntervalSince1970),
+            usageProgressDisplayMode: usageProgressDisplayMode == .remaining ? .remaining : .used,
             currentCard: cardSnapshot(for: current, locale: locale, timeZone: timeZone),
             secondaryCard: remaining.first.map { cardSnapshot(for: $0, locale: locale, timeZone: timeZone) },
             rows: Array(remaining.prefix(maxRowCount)).map {

@@ -103,6 +103,43 @@ final class AuthFileRepositoryTests: XCTestCase {
         XCTAssertEqual(extracted.accountKey, "user_123|acct_12345")
     }
 
+    func testExtractAuthIgnoresWorkspaceContainersInUnrelatedNestedObjects() throws {
+        let fixture = try makeRepositoryFixture()
+        defer { fixture.cleanup() }
+
+        let repository = fixture.repository
+        let token = makeJWT(payload: [
+            "https://api.openai.com/auth": [
+                "chatgpt_account_id": "acct_12345",
+                "chatgpt_plan_type": "team"
+            ]
+        ])
+
+        let auth = JSONValue.object([
+            "auth_mode": .string("chatgpt"),
+            "tokens": .object([
+                "access_token": .string("access-token"),
+                "id_token": .string(token)
+            ]),
+            "analytics": .object([
+                "organizations": .array([
+                    .object([
+                        "id": .string("org-shadow"),
+                        "is_active": .bool(true),
+                        "slug": .string("shadow-workspace"),
+                        "title": .string("Shadow Workspace")
+                    ])
+                ])
+            ])
+        ])
+
+        let extracted = try repository.extractAuth(from: auth)
+
+        XCTAssertEqual(extracted.accountID, "acct_12345")
+        XCTAssertEqual(extracted.planType, "team")
+        XCTAssertNil(extracted.teamName)
+    }
+
     func testMakeChatGPTAuthBuildsCodexCompatibleShape() throws {
         let fixture = try makeRepositoryFixture()
         defer { fixture.cleanup() }

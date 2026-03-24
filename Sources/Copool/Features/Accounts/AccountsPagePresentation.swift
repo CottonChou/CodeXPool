@@ -1,7 +1,9 @@
 import Foundation
 
 struct AccountsPageContentPresentation: Equatable {
-    let state: ViewState<[AccountCardViewState]>
+    let state: ViewState<[String]>
+    let pendingWorkspaceCards: [PendingWorkspaceAuthorizationCardViewState]
+    let pendingWorkspaceError: String?
     let isOverviewMode: Bool
 }
 
@@ -15,31 +17,55 @@ struct AccountCardViewState: Equatable, Identifiable {
     let isCollapsed: Bool
     let switching: Bool
     let refreshing: Bool
+    let showsRefreshButton: Bool
     let isRefreshEnabled: Bool
     let isUsageRefreshActive: Bool
+    let usageProgressDisplayMode: UsageProgressDisplayMode
 
     var id: String {
         account.id
     }
 }
 
+struct PendingWorkspaceAuthorizationCardViewState: Equatable, Identifiable {
+    let candidate: WorkspaceAuthorizationCandidate
+    let authorizing: Bool
+
+    var id: String {
+        candidate.id
+    }
+}
+
 extension AccountsPageModel {
+    func makeAccountCardViewStates() -> [AccountCardViewState] {
+        guard case .content(let accounts) = state else { return [] }
+        return accounts.map { account in
+            AccountCardViewState(
+                account: account,
+                isCollapsed: isAccountCollapsed(account.id),
+                switching: switchingAccountID == account.id,
+                refreshing: isAccountRefreshing(account.id),
+                showsRefreshButton: runtimePlatform == .macOS,
+                isRefreshEnabled: canRefreshAccount(account.id),
+                isUsageRefreshActive: isUsageRefreshActive(forAccountID: account.id),
+                usageProgressDisplayMode: usageProgressDisplayMode
+            )
+        }
+    }
+
     func makeContentPresentation() -> AccountsPageContentPresentation {
         let contentState = state.mapContent { accounts in
-            accounts.map { account in
-                AccountCardViewState(
-                    account: account,
-                    isCollapsed: isAccountCollapsed(account.id),
-                    switching: switchingAccountID == account.id,
-                    refreshing: isAccountRefreshing(account.id),
-                    isRefreshEnabled: canRefreshAccount(account.id),
-                    isUsageRefreshActive: isUsageRefreshActive(forAccountID: account.id)
-                )
-            }
+            accounts.map(\.id)
         }
-
         return AccountsPageContentPresentation(
             state: contentState,
+            pendingWorkspaceCards: pendingWorkspaceAuthorizations.map { candidate in
+                PendingWorkspaceAuthorizationCardViewState(
+                    candidate: candidate,
+                    authorizing: authorizingWorkspaceID == candidate.id
+                )
+            },
+            pendingWorkspaceError: pendingWorkspaceAuthorizationError,
             isOverviewMode: areAllAccountsCollapsed
         )
     }

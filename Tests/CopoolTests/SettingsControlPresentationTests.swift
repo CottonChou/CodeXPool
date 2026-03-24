@@ -21,6 +21,21 @@ final class SettingsControlPresentationTests: XCTestCase {
         )
     }
 
+    func testGeneralSectionIncludesUsageProgressDisplayPicker() {
+        let presentation = SettingsControlPresentation.generalSection(
+            settings: AppSettings.defaultValue
+        )
+
+        XCTAssertEqual(
+            presentation.usageProgressDisplayPicker?.selectedValue,
+            .used
+        )
+        XCTAssertEqual(
+            presentation.usageProgressDisplayPicker?.options.map(\.value),
+            [.used, .remaining]
+        )
+    }
+
     func testSwitchBehaviorSectionEnablesRestartTargetPickerWhenConfigured() {
         let settings = AppSettings(
             launchAtStartup: false,
@@ -33,6 +48,7 @@ final class SettingsControlPresentationTests: XCTestCase {
             autoStartApiProxy: false,
             proxyConfiguration: .defaultValue,
             remoteServers: [],
+            usageProgressDisplayMode: .used,
             locale: AppLocale.english.identifier
         )
 
@@ -62,6 +78,7 @@ final class SettingsControlPresentationTests: XCTestCase {
             autoStartApiProxy: false,
             proxyConfiguration: .defaultValue,
             remoteServers: [],
+            usageProgressDisplayMode: .used,
             locale: "zh_CN"
         )
 
@@ -70,4 +87,5 @@ final class SettingsControlPresentationTests: XCTestCase {
         XCTAssertEqual(presentation.picker.selectedValue, .simplifiedChinese)
         XCTAssertEqual(presentation.picker.options.count, AppLocale.allCases.count)
     }
+
 }

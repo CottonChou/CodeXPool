@@ -11,10 +11,14 @@ final class AccountsActionPresentationTests: XCTestCase {
             isRefreshSpinnerActive: false
         )
 
-        XCTAssertEqual(buttons.map(\.intent), [.importCurrentAuth, .addAccount, .smartSwitch, .refreshUsage])
+        XCTAssertEqual(
+            buttons.map(\.intent),
+            [.importCurrentAuth, .addAccount, .smartSwitch, .refreshUsage]
+        )
         XCTAssertEqual(buttons.first?.title, L10n.tr("accounts.action.importing"))
         XCTAssertFalse(buttons.first?.isEnabled ?? true)
         XCTAssertFalse(buttons[1].isEnabled)
+        XCTAssertFalse(buttons[2].isEnabled)
     }
 
     func testTrailingToolbarButtonsReflectCollapseStateAndSpinner() {
@@ -31,5 +35,16 @@ final class AccountsActionPresentationTests: XCTestCase {
             buttons[1].accessibilityLabel,
             L10n.tr("accounts.action.expand_all")
         )
+    }
+
+    func testLeadingToolbarButtonsIncludeUsageToggleIconOnIOS() {
+        let buttons = AccountsActionPresentation.leadingToolbarButtons(
+            isImporting: false,
+            isAdding: false
+        )
+
+        XCTAssertEqual(buttons.map(\.intent), [.toggleUsageProgressDisplay, .addAccount])
+        XCTAssertEqual(buttons[0].systemImage, "switch.2")
+        XCTAssertEqual(buttons[0].accessibilityLabel, L10n.tr("accounts.action.toggle_usage_progress_display"))
     }
 }

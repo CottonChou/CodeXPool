@@ -27,7 +27,8 @@ final class AccountCardPresentationTests: XCTestCase {
         let presentation = AccountCardPresentation(
             account: account,
             isCollapsed: true,
-            locale: Locale(identifier: "en_US_POSIX")
+            locale: Locale(identifier: "en_US_POSIX"),
+            usageProgressDisplayMode: .used
         )
 
         XCTAssertEqual(presentation.accent, .indigo)
@@ -35,8 +36,8 @@ final class AccountCardPresentationTests: XCTestCase {
         XCTAssertEqual(presentation.teamNameTag, "Alias A")
         XCTAssertEqual(presentation.displayAccountName, "dev")
         XCTAssertEqual(presentation.creditsText, "128")
-        XCTAssertEqual(presentation.compactUsage.fiveHourUsedPercent, 27.2)
-        XCTAssertEqual(presentation.compactUsage.oneWeekUsedPercent, 52.6)
+        XCTAssertEqual(presentation.compactUsage.fiveHourDisplayPercent, 27.2)
+        XCTAssertEqual(presentation.compactUsage.oneWeekDisplayPercent, 52.6)
     }
 
     func testExpandedPresentationFallsBackToTeamAccentAndMissingWindowDefaults() {
@@ -64,7 +65,8 @@ final class AccountCardPresentationTests: XCTestCase {
         let presentation = AccountCardPresentation(
             account: account,
             isCollapsed: false,
-            locale: Locale(identifier: "en_US_POSIX")
+            locale: Locale(identifier: "en_US_POSIX"),
+            usageProgressDisplayMode: .used
         )
 
         XCTAssertEqual(presentation.accent, .teal)
@@ -72,7 +74,70 @@ final class AccountCardPresentationTests: XCTestCase {
         XCTAssertNil(presentation.teamNameTag)
         XCTAssertEqual(presentation.displayAccountName, "account-2")
         XCTAssertEqual(presentation.creditsText, L10n.tr("accounts.card.unlimited"))
-        XCTAssertEqual(presentation.fiveHourWindow.usedPercent, 100)
+        XCTAssertEqual(presentation.fiveHourWindow.progressPercent, 100)
         XCTAssertEqual(presentation.fiveHourWindow.resetText, L10n.tr("accounts.window.reset_at_format", "--"))
+    }
+
+    func testPresentationShowsDeactivatedStatusTag() {
+        let account = AccountSummary(
+            id: "acct-3",
+            label: "Workspace",
+            email: "dev@example.com",
+            accountID: "account-3",
+            planType: "business",
+            teamName: "workspace-a",
+            teamAlias: nil,
+            addedAt: 1,
+            updatedAt: 2,
+            usage: nil,
+            usageError: nil,
+            workspaceStatus: .deactivated,
+            isCurrent: false
+        )
+
+        let presentation = AccountCardPresentation(
+            account: account,
+            isCollapsed: false,
+            locale: Locale(identifier: "en_US_POSIX"),
+            usageProgressDisplayMode: .used
+        )
+
+        XCTAssertEqual(presentation.statusLabel, L10n.tr("accounts.card.status.deactivated"))
+    }
+
+    func testRemainingModeUsesRemainingForProgressAndCompactPercent() {
+        let account = AccountSummary(
+            id: "acct-4",
+            label: "Primary",
+            email: "dev@example.com",
+            accountID: "account-4",
+            planType: "team",
+            teamName: "workspace-a",
+            teamAlias: nil,
+            addedAt: 1,
+            updatedAt: 2,
+            usage: UsageSnapshot(
+                fetchedAt: 3,
+                planType: "team",
+                fiveHour: UsageWindow(usedPercent: 72, windowSeconds: 18_000, resetAt: 1_763_216_000),
+                oneWeek: UsageWindow(usedPercent: 30, windowSeconds: 604_800, resetAt: 1_763_820_800),
+                credits: nil
+            ),
+            usageError: nil,
+            isCurrent: false
+        )
+
+        let presentation = AccountCardPresentation(
+            account: account,
+            isCollapsed: false,
+            locale: Locale(identifier: "en_US_POSIX"),
+            usageProgressDisplayMode: .remaining
+        )
+
+        XCTAssertEqual(presentation.fiveHourWindow.progressPercent, 28)
+        XCTAssertEqual(presentation.fiveHourWindow.primaryText, "Remaining 28%")
+        XCTAssertEqual(presentation.fiveHourWindow.secondaryText, "Used 72%")
+        XCTAssertEqual(presentation.compactUsage.fiveHourDisplayPercent, 28)
+        XCTAssertEqual(presentation.compactUsage.oneWeekDisplayPercent, 70)
     }
 }

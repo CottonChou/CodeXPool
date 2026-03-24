@@ -230,27 +230,26 @@ final class ProxyPageModelTests: XCTestCase {
 
     func testApplyRemoteSnapshotUpdatesSyncedConfigurationForMetadataOnlyAck() {
         let model = makeModel()
-        model.preferredPortText = "9000"
-        model.publicAccessEnabled = true
-        model.cloudflaredTunnelMode = .named
-        model.cloudflaredUseHTTP2 = true
-        model.cloudflaredNamedInput.hostname = "edge.example.com"
         model.lastSyncedProxyConfiguration = ProxyConfiguration(
             preferredPortText: "8787",
             cloudflared: CloudflaredConfiguration(enabled: false)
         )
 
-        var snapshot = makeSnapshot()
-        snapshot.preferredProxyPort = 9000
-        snapshot.preferredProxyPortText = "9000"
-        snapshot.publicAccessEnabled = true
-        snapshot.cloudflaredTunnelMode = .named
-        snapshot.cloudflaredUseHTTP2 = true
-        snapshot.cloudflaredNamedInput.hostname = "edge.example.com"
-        snapshot.syncedAt += 1_000
-        snapshot.lastHandledCommandID = "command-1"
+        var appliedSnapshot = makeSnapshot()
+        appliedSnapshot.preferredProxyPort = 9000
+        appliedSnapshot.preferredProxyPortText = "9000"
+        appliedSnapshot.publicAccessEnabled = true
+        appliedSnapshot.cloudflaredTunnelMode = .named
+        appliedSnapshot.cloudflaredUseHTTP2 = true
+        appliedSnapshot.cloudflaredNamedInput.hostname = "edge.example.com"
 
-        XCTAssertFalse(model.applyRemoteSnapshot(snapshot))
+        XCTAssertTrue(model.applyRemoteSnapshot(appliedSnapshot))
+
+        var metadataOnlyAck = appliedSnapshot
+        metadataOnlyAck.syncedAt += 1_000
+        metadataOnlyAck.lastHandledCommandID = "command-1"
+
+        XCTAssertFalse(model.applyRemoteSnapshot(metadataOnlyAck))
         XCTAssertEqual(
             model.lastSyncedProxyConfiguration,
             ProxyConfiguration(

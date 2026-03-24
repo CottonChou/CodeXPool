@@ -132,11 +132,16 @@ extension TrayMenuModel {
         _ = try await reconcileCurrentAccountSelection(failOnError: failOnCloudSyncError)
         let prefersSerialUsageRefresh = backgroundRefreshPolicy.cloudSyncMode == .pullRemoteAccounts
         let now = dateProvider.unixSecondsNow()
-        let shouldRefreshUsage = snapshotFreshnessPolicy.shouldRefreshUsage(
-            forceRefresh: forceUsageRefresh,
-            remoteSyncedAt: cloudPullResult.remoteSyncedAt,
-            now: now
-        )
+        let shouldRefreshUsage: Bool
+        if backgroundRefreshPolicy.cloudSyncMode == .pushLocalAccounts {
+            shouldRefreshUsage = forceUsageRefresh
+        } else {
+            shouldRefreshUsage = snapshotFreshnessPolicy.shouldRefreshUsage(
+                forceRefresh: forceUsageRefresh,
+                remoteSyncedAt: cloudPullResult.remoteSyncedAt,
+                now: now
+            )
+        }
         let targetAccountIDs = usageRefreshPlanningPolicy.targetAccountIDs(
             from: try await accountsCoordinator.listAccounts(),
             now: now

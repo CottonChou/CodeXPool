@@ -186,6 +186,16 @@ enum AuthWorkspaceMetadataExtractor {
         switch value {
         case .object(let object):
             let containerKeys = ["organizations", "orgs", "teams", "workspaces", "groups"]
+            let recursiveContainerKeys: Set<String> = [
+                "https://api.openai.com/auth",
+                "auth",
+                "claims",
+                "token",
+                "tokens",
+                "user",
+                "profile",
+                "session"
+            ]
             var candidates: [WorkspaceCandidate] = []
 
             for key in containerKeys {
@@ -207,7 +217,7 @@ enum AuthWorkspaceMetadataExtractor {
                 }
             }
 
-            for nested in object.values {
+            for (key, nested) in object where recursiveContainerKeys.contains(key) {
                 candidates.append(contentsOf: collectWorkspaceCandidates(in: nested))
             }
             return candidates

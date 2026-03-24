@@ -11,6 +11,7 @@ struct AccountsWidgetSnapshotBuilderTests {
                 account(id: "b", isCurrent: false, email: "second@example.com", fiveHourUsed: 35, oneWeekUsed: 45),
                 account(id: "a", isCurrent: true, email: "current@example.com", fiveHourUsed: 15, oneWeekUsed: 25)
             ],
+            usageProgressDisplayMode: .used,
             locale: Locale(identifier: "zh-Hans"),
             timeZone: TimeZone(secondsFromGMT: 0)!,
             now: Date(timeIntervalSince1970: 100)
@@ -37,6 +38,7 @@ struct AccountsWidgetSnapshotBuilderTests {
                     oneWeekUsed: 55
                 )
             ],
+            usageProgressDisplayMode: .used,
             locale: Locale(identifier: "zh-Hans"),
             timeZone: TimeZone(secondsFromGMT: 0)!,
             now: Date(timeIntervalSince1970: 100)
@@ -64,6 +66,7 @@ struct AccountsWidgetSnapshotBuilderTests {
                     oneWeekResetAt: 1_774_106_625
                 )
             ],
+            usageProgressDisplayMode: .used,
             locale: Locale(identifier: "zh-Hans"),
             timeZone: TimeZone(secondsFromGMT: 8 * 3600)!,
             now: Date(timeIntervalSince1970: 100)
@@ -84,12 +87,31 @@ struct AccountsWidgetSnapshotBuilderTests {
                 account(id: "c", isCurrent: false, email: "c@example.com", fiveHourUsed: 10, oneWeekUsed: 20),
                 account(id: "d", isCurrent: false, email: "d@example.com", fiveHourUsed: 10, oneWeekUsed: 20),
             ],
+            usageProgressDisplayMode: .used,
             locale: Locale(identifier: "en_US"),
             timeZone: TimeZone(secondsFromGMT: 0)!,
             now: Date(timeIntervalSince1970: 100)
         )
 
         #expect(snapshot.rows.count == 4)
+    }
+
+    @Test
+    func snapshotCarriesUsageProgressDisplayMode() {
+        let builder = AccountsWidgetSnapshotBuilder()
+        let snapshot = builder.build(
+            accounts: [
+                account(id: "current", isCurrent: true, email: "current@example.com", fiveHourUsed: 12, oneWeekUsed: 34)
+            ],
+            usageProgressDisplayMode: .remaining,
+            locale: Locale(identifier: "en_US"),
+            timeZone: TimeZone(secondsFromGMT: 0)!,
+            now: Date(timeIntervalSince1970: 100)
+        )
+
+        #expect(snapshot.usageProgressDisplayMode == .remaining)
+        #expect(snapshot.currentCard?.fiveHour.usedText == "12%")
+        #expect(snapshot.currentCard?.fiveHour.remainingText == "88%")
     }
 
     private func account(

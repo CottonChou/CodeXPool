@@ -230,6 +230,7 @@ struct ProxyControlSnapshot: Codable, Equatable {
 
 enum ProxyControlCommandKind: String, Codable {
     case refreshStatus
+    case refreshAccounts
     case updateProxyConfiguration
     case startProxy
     case stopProxy

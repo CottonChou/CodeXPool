@@ -62,6 +62,7 @@ struct AccountsWidgetTimelineProvider: TimelineProvider {
     private var sampleSnapshot: AccountsWidgetSnapshot {
         AccountsWidgetSnapshot(
             generatedAt: Int64(Date().timeIntervalSince1970),
+            usageProgressDisplayMode: .used,
             currentCard: AccountsWidgetCardSnapshot(
                 id: "current",
                 planLabel: "TEAM",

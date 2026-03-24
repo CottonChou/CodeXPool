@@ -2,6 +2,19 @@ import Foundation
 import Combine
 
 @MainActor
+final class AccountCardStore: ObservableObject {
+    @Published private(set) var presentation: AccountCardViewState
+
+    init(presentation: AccountCardViewState) {
+        self.presentation = presentation
+    }
+    func update(_ presentation: AccountCardViewState) {
+        guard self.presentation != presentation else { return }
+        self.presentation = presentation
+    }
+}
+
+@MainActor
 final class AccountsPageViewStore: ObservableObject {
     @Published private(set) var contentPresentation: AccountsPageContentPresentation
     @Published private(set) var macActionBarPresentation: AccountsActionBarPresentation
@@ -10,6 +23,7 @@ final class AccountsPageViewStore: ObservableObject {
 
     private let model: AccountsPageModel
     private var cancellables: Set<AnyCancellable> = []
+    private var cardStoresByID: [String: AccountCardStore] = [:]
 
     init(model: AccountsPageModel) {
         self.model = model
@@ -17,6 +31,7 @@ final class AccountsPageViewStore: ObservableObject {
         macActionBarPresentation = model.makeMacActionBarPresentation()
         leadingToolbarButtons = model.leadingToolbarButtons
         trailingToolbarButtons = model.trailingToolbarButtons
+        syncCardStores(with: model.makeAccountCardViewStates())
         bind()
     }
 
@@ -31,7 +46,17 @@ final class AccountsPageViewStore: ObservableObject {
         .store(in: &cancellables)
     }
 
+    func syncFromModel() {
+        refreshPresentations()
+    }
+
+    func cardStore(for id: String) -> AccountCardStore? {
+        cardStoresByID[id]
+    }
+
     private func refreshPresentations() {
+        syncCardStores(with: model.makeAccountCardViewStates())
+
         let nextContent = model.makeContentPresentation()
         if contentPresentation != nextContent {
             contentPresentation = nextContent
@@ -50,6 +75,19 @@ final class AccountsPageViewStore: ObservableObject {
         let nextTrailing = model.trailingToolbarButtons
         if trailingToolbarButtons != nextTrailing {
             trailingToolbarButtons = nextTrailing
+        }
+    }
+
+    private func syncCardStores(with presentations: [AccountCardViewState]) {
+        let nextIDs = Set(presentations.map(\.id))
+        cardStoresByID = cardStoresByID.filter { nextIDs.contains($0.key) }
+
+        for presentation in presentations {
+            if let existingStore = cardStoresByID[presentation.id] {
+                existingStore.update(presentation)
+            } else {
+                cardStoresByID[presentation.id] = AccountCardStore(presentation: presentation)
+            }
         }
     }
 }

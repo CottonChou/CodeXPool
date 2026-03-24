@@ -4,6 +4,8 @@ import Combine
 actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
     private enum Constants {
         static let syncInterval: Duration = .seconds(1)
+        static let activeCommandPollIntervalMilliseconds: Int64 = 1_000
+        static let inactiveCommandPollIntervalMilliseconds: Int64 = 5_000
         static let remoteStatusRefreshIntervalMilliseconds: Int64 = 8_000
     }
 
@@ -22,6 +24,7 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
     private let proxyCoordinator: ProxyCoordinator
     private let settingsCoordinator: SettingsCoordinator
     private let cloudSyncService: ProxyControlCloudSyncServiceProtocol?
+    private let performAccountsRefresh: (@MainActor @Sendable () async throws -> Void)?
     private let dateProvider: DateProviding
     private let runtimePlatform: RuntimePlatform
     private let sourceDeviceID: String
@@ -34,6 +37,8 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
     private var remoteLogs: [String: String] = [:]
     private var remoteDiscoveries: [String: [DiscoveredRemoteProxyInstance]] = [:]
     private var cachedRemoteStatuses: [String: RemoteProxyStatus] = [:]
+    private var isAppActive = true
+    private var lastCommandPollAt: Int64?
     private var lastRemoteStatusRefreshAt: Int64?
     private var pushCancellable: AnyCancellable?
 
@@ -41,6 +46,7 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
         proxyCoordinator: ProxyCoordinator,
         settingsCoordinator: SettingsCoordinator,
         cloudSyncService: ProxyControlCloudSyncServiceProtocol?,
+        performAccountsRefresh: (@MainActor @Sendable () async throws -> Void)? = nil,
         dateProvider: DateProviding = SystemDateProvider(),
         runtimePlatform: RuntimePlatform = PlatformCapabilities.currentPlatform,
         sourceDeviceID: String = "macos-proxy-bridge"
@@ -48,6 +54,7 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
         self.proxyCoordinator = proxyCoordinator
         self.settingsCoordinator = settingsCoordinator
         self.cloudSyncService = cloudSyncService
+        self.performAccountsRefresh = performAccountsRefresh
         self.dateProvider = dateProvider
         self.runtimePlatform = runtimePlatform
         self.sourceDeviceID = sourceDeviceID
@@ -94,11 +101,15 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
     func handlePushNotification() async {
         guard runtimePlatform == .macOS else { return }
         do {
-            let didHandleCommand = try await processPendingCommandIfNeeded()
+            let didHandleCommand = try await processPendingCommandIfNeeded(forcePoll: true)
             if !didHandleCommand {
                 try await publishSnapshot()
             }
         } catch {}
+    }
+
+    func setAppActive(_ isActive: Bool) {
+        isAppActive = isActive
     }
 
     private func runLoop() async {
@@ -147,8 +158,10 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
     }
 
     @discardableResult
-    private func processPendingCommandIfNeeded() async throws -> Bool {
+    private func processPendingCommandIfNeeded(forcePoll: Bool = false) async throws -> Bool {
         guard let cloudSyncService else { return false }
+        guard forcePoll || isCommandPollDue() else { return false }
+        lastCommandPollAt = dateProvider.unixMillisecondsNow()
         guard let command = try await cloudSyncService.pullPendingCommand() else { return false }
         guard command.id != lastHandledCommandID else { return false }
 
@@ -168,6 +181,14 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
             broadcastLocally: true
         )
         return true
+    }
+
+    private func isCommandPollDue() -> Bool {
+        guard let lastCommandPollAt else { return true }
+        let interval = isAppActive
+            ? Constants.activeCommandPollIntervalMilliseconds
+            : Constants.inactiveCommandPollIntervalMilliseconds
+        return dateProvider.unixMillisecondsNow() - lastCommandPollAt >= interval
     }
 
     private func buildSnapshot(forceRemoteStatusRefresh: Bool) async throws -> ProxyControlSnapshot {
@@ -315,6 +336,12 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
         switch command.kind {
         case .refreshStatus:
             scheduleRemoteStatusRefreshIfNeeded(force: true)
+            return .noRemoteStatusRefresh
+        case .refreshAccounts:
+            guard let performAccountsRefresh else {
+                throw AppError.invalidData("Accounts refresh service is unavailable.")
+            }
+            try await performAccountsRefresh()
             return .noRemoteStatusRefresh
         case .updateProxyConfiguration:
             guard let proxyConfiguration = command.proxyConfiguration else {

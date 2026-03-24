@@ -4,16 +4,22 @@ import Combine
 @MainActor
 final class AccountsPageModel: ObservableObject {
     let coordinator: AccountsCoordinator
+    let settingsCoordinator: SettingsCoordinator?
     let manualRefreshService: AccountsManualRefreshServiceProtocol?
+    let proxyControlCloudSyncService: ProxyControlCloudSyncServiceProtocol?
     let localAccountsMutationSyncService: AccountsLocalMutationSyncServiceProtocol?
     let currentAccountSelectionSyncService: CurrentAccountSelectionSyncServiceProtocol?
     let cloudSyncAvailabilityService: CloudSyncAvailabilityService?
     let onLocalAccountsChanged: (([AccountSummary]) -> Void)?
+    let onSettingsUpdated: ((AppSettings) -> Void)?
+    let runtimePlatform: RuntimePlatform
 
     private let noticeScheduler = NoticeAutoDismissScheduler()
+    var pendingWorkspaceRefreshTask: Task<Void, Never>?
 
     var hasLoaded = false
     var isCloudSyncAvailable = true
+    var usageProgressDisplayMode: UsageProgressDisplayMode
 
     @Published var state: ViewState<[AccountSummary]>
     @Published var notice: NoticeMessage? {
@@ -30,22 +36,35 @@ final class AccountsPageModel: ObservableObject {
     @Published var switchingAccountID: String?
     @Published var refreshingAccountIDs: Set<String> = []
     @Published var collapsedAccountIDs: Set<String> = []
+    @Published var pendingWorkspaceAuthorizations: [WorkspaceAuthorizationCandidate] = []
+    @Published var pendingWorkspaceAuthorizationError: String?
+    @Published var authorizingWorkspaceID: String?
 
     init(
         coordinator: AccountsCoordinator,
+        settingsCoordinator: SettingsCoordinator? = nil,
         manualRefreshService: AccountsManualRefreshServiceProtocol? = nil,
+        proxyControlCloudSyncService: ProxyControlCloudSyncServiceProtocol? = nil,
         localAccountsMutationSyncService: AccountsLocalMutationSyncServiceProtocol? = nil,
         currentAccountSelectionSyncService: CurrentAccountSelectionSyncServiceProtocol? = nil,
         cloudSyncAvailabilityService: CloudSyncAvailabilityService? = nil,
+        runtimePlatform: RuntimePlatform = PlatformCapabilities.currentPlatform,
+        usageProgressDisplayMode: UsageProgressDisplayMode = .used,
         onLocalAccountsChanged: (([AccountSummary]) -> Void)? = nil,
+        onSettingsUpdated: ((AppSettings) -> Void)? = nil,
         initialAccounts: [AccountSummary]? = nil
     ) {
         self.coordinator = coordinator
+        self.settingsCoordinator = settingsCoordinator
         self.manualRefreshService = manualRefreshService
+        self.proxyControlCloudSyncService = proxyControlCloudSyncService
         self.localAccountsMutationSyncService = localAccountsMutationSyncService
         self.currentAccountSelectionSyncService = currentAccountSelectionSyncService
         self.cloudSyncAvailabilityService = cloudSyncAvailabilityService
+        self.runtimePlatform = runtimePlatform
+        self.usageProgressDisplayMode = usageProgressDisplayMode
         self.onLocalAccountsChanged = onLocalAccountsChanged
+        self.onSettingsUpdated = onSettingsUpdated
         self.state = initialAccounts.map { initialAccounts in
             Self.makeViewState(
                 accounts: AccountRanking.sortForDisplay(initialAccounts),
@@ -55,7 +74,12 @@ final class AccountsPageModel: ObservableObject {
     }
 
     var canRefreshUsageAction: Bool {
-        !isAdding
+        switch runtimePlatform {
+        case .macOS:
+            return !isAdding
+        case .iOS:
+            return proxyControlCloudSyncService != nil && !isAdding
+        }
     }
 
     var areAllAccountsCollapsed: Bool {
@@ -78,6 +102,10 @@ final class AccountsPageModel: ObservableObject {
 
     var isRefreshSpinnerActive: Bool {
         isManualRefreshing
+    }
+
+    deinit {
+        pendingWorkspaceRefreshTask?.cancel()
     }
 
     var desktopActionButtons: [AccountsActionButtonDescriptor<AccountsPageActionIntent>] {
@@ -120,7 +148,8 @@ final class AccountsPageModel: ObservableObject {
     }
 
     func canRefreshAccount(_ id: String) -> Bool {
-        !isRefreshing
+        _ = id
+        return runtimePlatform == .macOS && !isRefreshing
     }
 
     func isUsageRefreshActive(forAccountID id: String) -> Bool {
@@ -133,6 +162,8 @@ final class AccountsPageModel: ObservableObject {
             await importCurrentAuth()
         case .addAccount:
             await addAccountViaLogin()
+        case .toggleUsageProgressDisplay:
+            await toggleUsageProgressDisplay()
         case .smartSwitch:
             await smartSwitch()
         case .refreshUsage:

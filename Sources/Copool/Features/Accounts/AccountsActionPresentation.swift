@@ -3,6 +3,7 @@ import Foundation
 enum AccountsPageActionIntent: String, Hashable {
     case importCurrentAuth
     case addAccount
+    case toggleUsageProgressDisplay
     case smartSwitch
     case refreshUsage
     case toggleCollapse
@@ -104,6 +105,16 @@ enum AccountsActionPresentation {
         isAdding: Bool
     ) -> [AccountsActionButtonDescriptor<AccountsPageActionIntent>] {
         [
+            AccountsActionButtonDescriptor(
+                intent: .toggleUsageProgressDisplay,
+                title: nil,
+                systemImage: "switch.2",
+                accessibilityLabel: L10n.tr("accounts.action.toggle_usage_progress_display"),
+                isEnabled: !isImporting && !isAdding,
+                isSpinning: false,
+                contentStyle: .icon,
+                surfaceStyle: .neutral
+            ),
             AccountsActionButtonDescriptor(
                 intent: .addAccount,
                 title: nil,

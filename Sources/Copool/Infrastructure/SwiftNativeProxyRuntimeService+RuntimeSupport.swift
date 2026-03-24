@@ -1,6 +1,19 @@
 import Foundation
 
 extension SwiftNativeProxyRuntimeService {
+    func currentCandidates() throws -> [ProxyCandidate] {
+        let modificationDate = accountsStoreModificationDate()
+        if let cachedCandidates,
+           cachedCandidatesStoreModificationDate == modificationDate {
+            return cachedCandidates
+        }
+
+        let candidates = try loadCandidates()
+        cachedCandidates = candidates
+        cachedCandidatesStoreModificationDate = modificationDate
+        return candidates
+    }
+
     func loadCandidates() throws -> [ProxyCandidate] {
         let store = try storeRepository.loadStore()
 
@@ -20,6 +33,13 @@ extension SwiftNativeProxyRuntimeService {
         return candidates.sorted { lhs, rhs in
             lhs.remainingScore > rhs.remainingScore
         }
+    }
+
+    func accountsStoreModificationDate() -> Date? {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: paths.accountStorePath.path) else {
+            return nil
+        }
+        return attributes[.modificationDate] as? Date
     }
 
     func isAuthorized(_ headers: [String: String]) -> Bool {

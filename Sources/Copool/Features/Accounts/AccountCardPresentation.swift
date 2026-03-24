@@ -10,47 +10,62 @@ enum AccountCardAccent: Equatable {
 
 struct AccountWindowPresentation: Equatable {
     let title: String
-    let usedPercent: Double
-    let usedText: String
-    let remainingText: String
+    let progressPercent: Double
+    let primaryText: String
+    let secondaryText: String
     let resetText: String
 }
 
 struct AccountCompactUsagePresentation: Equatable {
-    let fiveHourUsedPercent: Double?
-    let oneWeekUsedPercent: Double?
+    let fiveHourDisplayPercent: Double?
+    let oneWeekDisplayPercent: Double?
 }
 
 struct AccountCardPresentation: Equatable {
     let accent: AccountCardAccent
     let planLabel: String
     let teamNameTag: String?
+    let statusLabel: String?
     let displayAccountName: String
     let creditsText: String
     let fiveHourWindow: AccountWindowPresentation
     let oneWeekWindow: AccountWindowPresentation
     let compactUsage: AccountCompactUsagePresentation
 
-    init(account: AccountSummary, isCollapsed: Bool, locale: Locale) {
+    init(
+        account: AccountSummary,
+        isCollapsed: Bool,
+        locale: Locale,
+        usageProgressDisplayMode: UsageProgressDisplayMode
+    ) {
         let planLabel = account.normalizedPlanLabel
         self.planLabel = planLabel
         accent = Self.accent(for: planLabel)
         teamNameTag = account.shouldDisplayWorkspaceTag ? account.displayTeamName : nil
+        statusLabel = account.isWorkspaceDeactivated ? L10n.tr("accounts.card.status.deactivated") : nil
         displayAccountName = Self.displayName(for: account, isCollapsed: isCollapsed)
         creditsText = Self.creditsText(for: account)
         fiveHourWindow = Self.windowPresentation(
             title: L10n.tr("accounts.window.five_hour"),
             window: account.usage?.fiveHour,
-            locale: locale
+            locale: locale,
+            usageProgressDisplayMode: usageProgressDisplayMode
         )
         oneWeekWindow = Self.windowPresentation(
             title: L10n.tr("accounts.window.one_week"),
             window: account.usage?.oneWeek,
-            locale: locale
+            locale: locale,
+            usageProgressDisplayMode: usageProgressDisplayMode
         )
         compactUsage = AccountCompactUsagePresentation(
-            fiveHourUsedPercent: Self.compactUsedPercent(account.usage?.fiveHour),
-            oneWeekUsedPercent: Self.compactUsedPercent(account.usage?.oneWeek)
+            fiveHourDisplayPercent: Self.compactDisplayPercent(
+                account.usage?.fiveHour,
+                usageProgressDisplayMode: usageProgressDisplayMode
+            ),
+            oneWeekDisplayPercent: Self.compactDisplayPercent(
+                account.usage?.oneWeek,
+                usageProgressDisplayMode: usageProgressDisplayMode
+            )
         )
     }
 
@@ -85,23 +100,35 @@ struct AccountCardPresentation: Equatable {
     private static func windowPresentation(
         title: String,
         window: UsageWindow?,
-        locale: Locale
+        locale: Locale,
+        usageProgressDisplayMode: UsageProgressDisplayMode
     ) -> AccountWindowPresentation {
         let usedRaw = clamped(window?.usedPercent, fallback: 100)
         let used = roundedPercent(usedRaw)
         let remaining = max(0, 100 - used)
+        let progress = usageProgressDisplayMode == .remaining ? remaining : used
+        let primaryText = usageProgressDisplayMode == .remaining
+            ? L10n.tr("accounts.window.remaining_format", percent(remaining))
+            : L10n.tr("accounts.window.used_format", percent(used))
+        let secondaryText = usageProgressDisplayMode == .remaining
+            ? L10n.tr("accounts.window.used_format", percent(used))
+            : L10n.tr("accounts.window.remaining_format", percent(remaining))
         return AccountWindowPresentation(
             title: title,
-            usedPercent: used,
-            usedText: L10n.tr("accounts.window.used_format", percent(used)),
-            remainingText: L10n.tr("accounts.window.remaining_format", percent(remaining)),
+            progressPercent: progress,
+            primaryText: primaryText,
+            secondaryText: secondaryText,
             resetText: L10n.tr("accounts.window.reset_at_format", formatResetAt(window?.resetAt, locale: locale))
         )
     }
 
-    private static func compactUsedPercent(_ window: UsageWindow?) -> Double? {
+    private static func compactDisplayPercent(
+        _ window: UsageWindow?,
+        usageProgressDisplayMode: UsageProgressDisplayMode
+    ) -> Double? {
         guard let used = window?.usedPercent else { return nil }
-        return clamped(used, fallback: used)
+        let clampedUsed = clamped(used, fallback: used)
+        return usageProgressDisplayMode == .remaining ? max(0, 100 - clampedUsed) : clampedUsed
     }
 
     private static func clamped(_ value: Double?, fallback: Double) -> Double {

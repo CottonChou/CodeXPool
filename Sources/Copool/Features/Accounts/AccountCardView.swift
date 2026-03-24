@@ -5,8 +5,10 @@ struct AccountCardView: View {
     let isCollapsed: Bool
     let switching: Bool
     let refreshing: Bool
+    let showsRefreshButton: Bool
     let isRefreshEnabled: Bool
     let isUsageRefreshActive: Bool
+    let usageProgressDisplayMode: UsageProgressDisplayMode
     let onSwitch: () -> Void
     let onRefresh: () -> Void
     let onDelete: () -> Void
@@ -14,16 +16,16 @@ struct AccountCardView: View {
     @Environment(\.locale) private var locale
     @State private var isHoveringCollapsedSwitch = false
     @State private var isCollapsedSwitchOverlayPresented = false
-    @State private var displaysExpandedTitle: Bool
-    @State private var titleExpansionTask: Task<Void, Never>?
 
     init(
         account: AccountSummary,
         isCollapsed: Bool,
         switching: Bool,
         refreshing: Bool,
+        showsRefreshButton: Bool,
         isRefreshEnabled: Bool,
         isUsageRefreshActive: Bool,
+        usageProgressDisplayMode: UsageProgressDisplayMode,
         onSwitch: @escaping () -> Void,
         onRefresh: @escaping () -> Void,
         onDelete: @escaping () -> Void
@@ -32,16 +34,22 @@ struct AccountCardView: View {
         self.isCollapsed = isCollapsed
         self.switching = switching
         self.refreshing = refreshing
+        self.showsRefreshButton = showsRefreshButton
         self.isRefreshEnabled = isRefreshEnabled
         self.isUsageRefreshActive = isUsageRefreshActive
+        self.usageProgressDisplayMode = usageProgressDisplayMode
         self.onSwitch = onSwitch
         self.onRefresh = onRefresh
         self.onDelete = onDelete
-        _displaysExpandedTitle = State(initialValue: !isCollapsed)
     }
 
     private var presentation: AccountCardPresentation {
-        AccountCardPresentation(account: account, isCollapsed: isCollapsed, locale: locale)
+        AccountCardPresentation(
+            account: account,
+            isCollapsed: isCollapsed,
+            locale: locale,
+            usageProgressDisplayMode: usageProgressDisplayMode
+        )
     }
 
     private var palette: AccountCardPalette {
@@ -68,11 +76,39 @@ struct AccountCardView: View {
     }
 
     var body: some View {
+        cardBody
+            .copoolCollapsedSwitchHover(
+                enabled: interactionPresentation.canHoverSwitchOverlay,
+                isHoveringCollapsedSwitch: $isHoveringCollapsedSwitch
+            )
+            #if os(iOS)
+            .onLongPressGesture(minimumDuration: AccountsAnimationRules.collapsedOverlayMinimumPressDuration) {
+                guard interactionPresentation.canRevealCollapsedSwitchOverlay else { return }
+                withAnimation(AccountsAnimationRules.cardHoverOverlay) {
+                    isCollapsedSwitchOverlayPresented = true
+                }
+            }
+            #endif
+            .onChange(of: isCollapsed) { _, collapsed in
+                if !collapsed {
+                    dismissCollapsedSwitchOverlay()
+                }
+            }
+            .onChange(of: account.isCurrent) { _, isCurrent in
+                if isCurrent {
+                    dismissCollapsedSwitchOverlay()
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var cardBody: some View {
         VStack(alignment: .leading, spacing: 8) {
             if isCollapsed {
                 AccountCompactHeaderContent(
                     planLabel: presentation.planLabel,
                     workspaceLabel: presentation.teamNameTag,
+                    statusLabel: presentation.statusLabel,
                     accountName: presentation.displayAccountName,
                     accentColor: palette.toneColor,
                     titleFont: .headline,
@@ -92,8 +128,7 @@ struct AccountCardView: View {
                 Text(presentation.displayAccountName)
                     .font(.headline)
                     .foregroundStyle(account.isCurrent ? palette.toneColor : .primary)
-                    .lineLimit(displaysExpandedTitle ? 2 : 1)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(1)
                     .truncationMode(.tail)
 
                 AccountCardExpandedUsageSection(presentation: presentation)
@@ -111,6 +146,7 @@ struct AccountCardView: View {
                 isCurrent: account.isCurrent,
                 switching: switching,
                 refreshing: refreshing,
+                showsRefreshButton: showsRefreshButton,
                 isRefreshEnabled: isRefreshEnabled,
                 usageError: isUsageRefreshActive ? nil : account.usageError,
                 palette: palette,
@@ -128,39 +164,6 @@ struct AccountCardView: View {
                 onSwitch: onSwitch
             )
         }
-        .onHover { hovering in
-            guard interactionPresentation.canHoverSwitchOverlay else {
-                isHoveringCollapsedSwitch = false
-                return
-            }
-            guard isHoveringCollapsedSwitch != hovering else { return }
-            withAnimation(AccountsAnimationRules.cardHoverOverlay) {
-                isHoveringCollapsedSwitch = hovering
-            }
-        }
-        #if os(iOS)
-        .onLongPressGesture(minimumDuration: AccountsAnimationRules.collapsedOverlayMinimumPressDuration) {
-            guard interactionPresentation.canRevealCollapsedSwitchOverlay else { return }
-            withAnimation(AccountsAnimationRules.cardHoverOverlay) {
-                isCollapsedSwitchOverlayPresented = true
-            }
-        }
-        #endif
-        .onChange(of: isCollapsed) { _, collapsed in
-            syncDisplayedExpandedTitle(with: collapsed)
-            if !collapsed {
-                dismissCollapsedSwitchOverlay()
-            }
-        }
-        .onChange(of: account.isCurrent) { _, isCurrent in
-            if isCurrent {
-                dismissCollapsedSwitchOverlay()
-            }
-        }
-        .onDisappear {
-            titleExpansionTask?.cancel()
-            titleExpansionTask = nil
-        }
     }
 
     private func dismissCollapsedSwitchOverlay() {
@@ -169,25 +172,39 @@ struct AccountCardView: View {
             isCollapsedSwitchOverlayPresented = false
         }
     }
+}
 
-    private func syncDisplayedExpandedTitle(with collapsed: Bool) {
-        titleExpansionTask?.cancel()
+private struct CollapsedSwitchHoverModifier: ViewModifier {
+    let enabled: Bool
+    @Binding var isHoveringCollapsedSwitch: Bool
 
-        if collapsed {
-            withAnimation(AccountCardMorphRules.contentAnimation) {
-                displaysExpandedTitle = false
+    func body(content: Content) -> some View {
+        if enabled {
+            content.onHover { hovering in
+                guard isHoveringCollapsedSwitch != hovering else { return }
+                withAnimation(AccountsAnimationRules.cardHoverOverlay) {
+                    isHoveringCollapsedSwitch = hovering
+                }
             }
-            titleExpansionTask = nil
-            return
+        } else {
+            content
+                .onAppear {
+                    isHoveringCollapsedSwitch = false
+                }
         }
+    }
+}
 
-        titleExpansionTask = Task { @MainActor in
-            try? await Task.sleep(for: AccountCardMorphRules.titleExpansionDelay)
-            guard !Task.isCancelled else { return }
-            withAnimation(AccountCardMorphRules.contentAnimation) {
-                displaysExpandedTitle = true
-            }
-            titleExpansionTask = nil
-        }
+private extension View {
+    func copoolCollapsedSwitchHover(
+        enabled: Bool,
+        isHoveringCollapsedSwitch: Binding<Bool>
+    ) -> some View {
+        modifier(
+            CollapsedSwitchHoverModifier(
+                enabled: enabled,
+                isHoveringCollapsedSwitch: isHoveringCollapsedSwitch
+            )
+        )
     }
 }
