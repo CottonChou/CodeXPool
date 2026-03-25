@@ -1,10 +1,13 @@
 import Foundation
+import OSLog
 
 final class DefaultWorkspaceMetadataService: WorkspaceMetadataService, @unchecked Sendable {
     private enum RequestPolicy {
-        static let timeout: TimeInterval = 5
+        static let timeout: TimeInterval = 18
         static let scope = "workspace-metadata"
     }
+
+    private static let logger = Logger(subsystem: "Copool", category: "WorkspaceMetadata")
 
     private let session: URLSession
     private let configPath: URL
@@ -24,30 +27,54 @@ final class DefaultWorkspaceMetadataService: WorkspaceMetadataService, @unchecke
     }
 
     func fetchWorkspaceMetadata(accessToken: String) async throws -> [WorkspaceMetadata] {
+        let candidateURLs = resolveAccountURLs()
+        let startedAt = Date()
+        Self.logger.debug(
+            "Workspace discovery started. Candidates: \(candidateURLs.joined(separator: " | "), privacy: .public)"
+        )
+
         do {
-            let payload: WorkspaceAccountsResponse = try await endpointCoordinator.fetchFirstSuccessful(
-                scope: RequestPolicy.scope,
-                candidateURLs: resolveAccountURLs()
-            ) { endpoint in
-                var request = URLRequest(url: endpoint)
-                request.timeoutInterval = RequestPolicy.timeout
-                request.httpMethod = "GET"
-                request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-                request.setValue("application/json", forHTTPHeaderField: "Accept")
-                request.setValue("codex-tools-swift/0.1", forHTTPHeaderField: "User-Agent")
-                return request
-            } validate: { result in
-                try JSONDecoder().decode(WorkspaceAccountsResponse.self, from: result.data)
-            }
-            let metadata = payload.items.map {
-                WorkspaceMetadata(
-                    accountID: $0.id,
-                    workspaceName: $0.name,
-                    structure: $0.structure
-                )
-            }
-            return metadata
+            let resolved = try await fetchWorkspaceMetadataOnce(
+                accessToken: accessToken,
+                candidateURLs: candidateURLs
+            )
+            let elapsedMilliseconds = Int(Date().timeIntervalSince(startedAt) * 1_000)
+            Self.logger.debug(
+                "Workspace discovery succeeded via \(resolved.endpoint, privacy: .public) in \(elapsedMilliseconds) ms with \(resolved.metadata.count) entries"
+            )
+            return resolved.metadata
         } catch EndpointRequestError.allRequestsFailed(let errors) {
+            if errors.contains(where: Self.isHTMLForbiddenFailure) {
+                Self.logger.debug("Workspace discovery hit transient HTML 403. Retrying once.")
+                do {
+                    let resolved = try await fetchWorkspaceMetadataOnce(
+                        accessToken: accessToken,
+                        candidateURLs: candidateURLs
+                    )
+                    let elapsedMilliseconds = Int(Date().timeIntervalSince(startedAt) * 1_000)
+                    Self.logger.debug(
+                        "Workspace discovery retry succeeded via \(resolved.endpoint, privacy: .public) in \(elapsedMilliseconds) ms with \(resolved.metadata.count) entries"
+                    )
+                    return resolved.metadata
+                } catch EndpointRequestError.allRequestsFailed(let retryErrors) {
+                    let elapsedMilliseconds = Int(Date().timeIntervalSince(startedAt) * 1_000)
+                    Self.logger.error(
+                        "Workspace discovery failed after retry in \(elapsedMilliseconds) ms. Candidates: \(candidateURLs.joined(separator: " | "), privacy: .public). Errors: \(retryErrors.joined(separator: " | "), privacy: .public)"
+                    )
+                    if let message = Self.preferredUserFacingFailureMessage(from: retryErrors) {
+                        throw AppError.network(message)
+                    }
+                    let preview = retryErrors.prefix(2).joined(separator: " | ")
+                    if retryErrors.count > 2 {
+                        throw AppError.network(L10n.tr("error.usage.request_failed_with_more_format", preview, String(retryErrors.count - 2)))
+                    }
+                    throw AppError.network(L10n.tr("error.usage.request_failed_format", preview))
+                }
+            }
+            let elapsedMilliseconds = Int(Date().timeIntervalSince(startedAt) * 1_000)
+            Self.logger.error(
+                "Workspace discovery failed after \(elapsedMilliseconds) ms. Candidates: \(candidateURLs.joined(separator: " | "), privacy: .public). Errors: \(errors.joined(separator: " | "), privacy: .public)"
+            )
             if let message = Self.preferredUserFacingFailureMessage(from: errors) {
                 throw AppError.network(message)
             }
@@ -59,7 +86,55 @@ final class DefaultWorkspaceMetadataService: WorkspaceMetadataService, @unchecke
         }
     }
 
+    private func fetchWorkspaceMetadataOnce(
+        accessToken: String,
+        candidateURLs: [String]
+    ) async throws -> ResolvedWorkspaceAccounts {
+        try await endpointCoordinator.fetchFirstSuccessful(
+            scope: RequestPolicy.scope,
+            candidateURLs: candidateURLs
+        ) { endpoint in
+            var request = URLRequest(url: endpoint)
+            request.timeoutInterval = RequestPolicy.timeout
+            request.httpMethod = "GET"
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            request.setValue("codex-tools-swift/0.1", forHTTPHeaderField: "User-Agent")
+            Self.logger.debug(
+                "Workspace discovery request: \(Self.requestLogSummary(for: request), privacy: .public)"
+            )
+            return request
+        } validate: { result in
+            Self.logger.debug(
+                "Workspace discovery raw response from \(result.endpoint, privacy: .public) [status \(result.response.statusCode)]: \(Self.responseLogBody(for: result.data), privacy: .public)"
+            )
+            let payload = try JSONDecoder().decode(WorkspaceAccountsResponse.self, from: result.data)
+            let metadata = payload.items.map {
+                WorkspaceMetadata(
+                    accountID: $0.id,
+                    workspaceName: $0.name,
+                    structure: $0.structure
+                )
+            }
+            return ResolvedWorkspaceAccounts(
+                endpoint: result.endpoint,
+                metadata: metadata
+            )
+        }
+    }
+
     private static func preferredUserFacingFailureMessage(from errors: [String]) -> String? {
+        for error in errors {
+            let detail = error.components(separatedBy: ": ").dropFirst().joined(separator: ": ")
+            guard let detail = detail.nonEmptyTrimmed,
+                  !detail.hasPrefix("<"),
+                  !isCancellationFailure(error),
+                  !isTimeoutFailure(error) else {
+                continue
+            }
+            return detail
+        }
+
         if errors.contains(where: isCancellationFailure) {
             return L10n.tr("error.workspace.discovery_cancelled")
         }
@@ -68,14 +143,6 @@ final class DefaultWorkspaceMetadataService: WorkspaceMetadataService, @unchecke
         }
         if errors.contains(where: isHTMLForbiddenFailure) {
             return L10n.tr("error.workspace.discovery_forbidden")
-        }
-
-        for error in errors {
-            let detail = error.components(separatedBy: ": ").dropFirst().joined(separator: ": ")
-            guard let detail = detail.nonEmptyTrimmed, !detail.hasPrefix("<") else {
-                continue
-            }
-            return detail
         }
         return nil
     }
@@ -115,10 +182,39 @@ final class DefaultWorkspaceMetadataService: WorkspaceMetadataService, @unchecke
         }
         return deduped
     }
+
+    private static func requestLogSummary(for request: URLRequest) -> String {
+        let method = request.httpMethod ?? "GET"
+        let url = request.url?.absoluteString ?? ""
+        let headers = (request.allHTTPHeaderFields ?? [:])
+            .filter { $0.key.caseInsensitiveCompare("Authorization") != .orderedSame }
+        let payload: [String: Any] = [
+            "method": method,
+            "url": url,
+            "headers": headers
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
+              let text = String(data: data, encoding: .utf8) else {
+            return "\(method) \(url)"
+        }
+        return text
+    }
+
+    private static func responseLogBody(for data: Data) -> String {
+        if let text = String(data: data, encoding: .utf8) {
+            return text
+        }
+        return "<non-utf8 body: \(data.count) bytes>"
+    }
 }
 
 private struct WorkspaceAccountsResponse: Decodable {
     var items: [WorkspaceAccountItem]
+}
+
+private struct ResolvedWorkspaceAccounts: Sendable {
+    var endpoint: String
+    var metadata: [WorkspaceMetadata]
 }
 
 private struct WorkspaceAccountItem: Decodable {
@@ -143,6 +239,14 @@ private extension String {
 extension DefaultWorkspaceMetadataService {
     static func debugPreferredUserFacingFailureMessage(from errors: [String]) -> String? {
         preferredUserFacingFailureMessage(from: errors)
+    }
+
+    static func debugRequestLogSummary(for request: URLRequest) -> String {
+        requestLogSummary(for: request)
+    }
+
+    static func debugResponseLogBody(for data: Data) -> String {
+        responseLogBody(for: data)
     }
 }
 #endif

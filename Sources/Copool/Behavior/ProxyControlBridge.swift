@@ -5,7 +5,6 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
     private enum Constants {
         static let syncInterval: Duration = .seconds(1)
         static let activeCommandPollIntervalMilliseconds: Int64 = 1_000
-        static let inactiveCommandPollIntervalMilliseconds: Int64 = 5_000
         static let remoteStatusRefreshIntervalMilliseconds: Int64 = 8_000
     }
 
@@ -185,10 +184,8 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
 
     private func isCommandPollDue() -> Bool {
         guard let lastCommandPollAt else { return true }
-        let interval = isAppActive
-            ? Constants.activeCommandPollIntervalMilliseconds
-            : Constants.inactiveCommandPollIntervalMilliseconds
-        return dateProvider.unixMillisecondsNow() - lastCommandPollAt >= interval
+        return dateProvider.unixMillisecondsNow() - lastCommandPollAt
+            >= Constants.activeCommandPollIntervalMilliseconds
     }
 
     private func buildSnapshot(forceRemoteStatusRefresh: Bool) async throws -> ProxyControlSnapshot {

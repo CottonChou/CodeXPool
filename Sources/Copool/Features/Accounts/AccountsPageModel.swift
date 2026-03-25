@@ -36,6 +36,7 @@ final class AccountsPageModel: ObservableObject {
     @Published var switchingAccountID: String?
     @Published var refreshingAccountIDs: Set<String> = []
     @Published var collapsedAccountIDs: Set<String> = []
+    @Published var workspaceDirectory: [WorkspaceDirectoryEntry] = []
     @Published var pendingWorkspaceAuthorizations: [WorkspaceAuthorizationCandidate] = []
     @Published var pendingWorkspaceAuthorizationError: String?
     @Published var authorizingWorkspaceID: String?
@@ -84,7 +85,7 @@ final class AccountsPageModel: ObservableObject {
 
     var areAllAccountsCollapsed: Bool {
         guard case .content(let accounts) = state else { return false }
-        let ids = Set(accounts.map(\.id))
+        let ids = Set(accounts.filter { !$0.isWorkspaceDeactivated }.map(\.id))
         guard !ids.isEmpty else { return false }
         return collapsedAccountIDs.isSuperset(of: ids)
     }

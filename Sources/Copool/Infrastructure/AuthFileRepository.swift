@@ -1,9 +1,11 @@
 import Foundation
+import OSLog
 
 final class AuthFileRepository: AuthRepository, @unchecked Sendable {
     private let paths: FileSystemPaths
     private let fileManager: FileManager
     private let session: URLSession
+    private let logger = Logger(subsystem: "Copool", category: "AuthRepository")
 
     init(
         paths: FileSystemPaths,
@@ -61,7 +63,11 @@ final class AuthFileRepository: AuthRepository, @unchecked Sendable {
     }
 
     func makeChatGPTAuth(from tokens: ChatGPTOAuthTokens) throws -> JSONValue {
+        logger.log("makeChatGPTAuth started")
+        AuthFlowDebugLog.write("AuthRepository", "makeChatGPTAuth started")
         let claims = try AuthJWTDecoder.decodePayload(tokens.idToken)
+        logger.log("makeChatGPTAuth decoded id token")
+        AuthFlowDebugLog.write("AuthRepository", "makeChatGPTAuth decoded id token")
         let accountID = claims["https://api.openai.com/auth"]?["chatgpt_account_id"]?.stringValue
         let principalID = AuthPrincipalIDResolver.resolve(
             from: .object([:]),
@@ -69,6 +75,8 @@ final class AuthFileRepository: AuthRepository, @unchecked Sendable {
             email: claims["email"]?.stringValue,
             accountID: accountID
         )
+        logger.log("makeChatGPTAuth resolved accountID \(accountID ?? "nil", privacy: .public)")
+        AuthFlowDebugLog.write("AuthRepository", "makeChatGPTAuth resolved accountID \(accountID ?? "nil")")
 
         var tokenObject: [String: JSONValue] = [
             "access_token": .string(tokens.accessToken),
@@ -93,6 +101,8 @@ final class AuthFileRepository: AuthRepository, @unchecked Sendable {
             root["OPENAI_API_KEY"] = .string(apiKey)
         }
 
+        logger.log("makeChatGPTAuth finished")
+        AuthFlowDebugLog.write("AuthRepository", "makeChatGPTAuth finished")
         return .object(root)
     }
 
@@ -202,7 +212,7 @@ final class AuthFileRepository: AuthRepository, @unchecked Sendable {
             fallbackPrincipalID: principalID
         )
 
-        return ExtractedAuth(
+        let extracted = ExtractedAuth(
             accountID: finalAccountID,
             accessToken: accessToken,
             email: email,
@@ -210,6 +220,7 @@ final class AuthFileRepository: AuthRepository, @unchecked Sendable {
             teamName: teamName,
             principalID: finalPrincipalID
         )
+        return extracted
     }
 
     private func readJSONValue(from path: URL) throws -> JSONValue {

@@ -97,18 +97,28 @@ struct AccountCardHeaderSection: View {
             }
 
             if !isCollapsed {
-                Button(role: .destructive, action: onDelete) {
-                    Image(systemName: "trash")
-                }
-                .copoolActionButtonStyle(
-                    prominent: true,
-                    tint: .red,
-                    density: .compact,
-                    iOSStyle: .liquidGlass
-                )
-                .tint(.red)
+                AccountDeleteButton(action: onDelete)
             }
         }
+    }
+}
+
+struct AccountDeleteButton: View {
+    let action: () -> Void
+    var isDisabled: Bool = false
+
+    var body: some View {
+        Button(role: .destructive, action: action) {
+            Image(systemName: "trash")
+        }
+        .copoolActionButtonStyle(
+            prominent: true,
+            tint: .red,
+            density: .compact,
+            iOSStyle: .liquidGlass
+        )
+        .tint(.red)
+        .disabled(isDisabled)
     }
 }
 

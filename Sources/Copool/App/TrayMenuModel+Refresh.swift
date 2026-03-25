@@ -92,7 +92,6 @@ extension TrayMenuModel {
         configureCurrentSelectionPushHandlingIfNeeded()
         cloudReconciliationTask = Task { [weak self] in
             guard let self else { return }
-            try? await Task.sleep(for: self.backgroundRefreshPolicy.initialRefreshDelay)
             await self.reconcileCloudStateNow()
             while !Task.isCancelled {
                 try? await Task.sleep(for: self.backgroundRefreshPolicy.cloudReconciliationInterval)

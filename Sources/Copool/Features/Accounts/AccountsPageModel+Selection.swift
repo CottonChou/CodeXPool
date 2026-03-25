@@ -57,7 +57,7 @@ extension AccountsPageModel {
 
     func toggleAllAccountsCollapsed() {
         guard case .content(let accounts) = state else { return }
-        let ids = Set(accounts.map(\.id))
+        let ids = Set(accounts.filter { !$0.isWorkspaceDeactivated }.map(\.id))
         guard !ids.isEmpty else {
             collapsedAccountIDs = []
             return

@@ -5,37 +5,127 @@ enum AccountWorkspaceStatus: String, Codable, Equatable {
     case deactivated
 }
 
+enum WorkspaceDirectoryKind: String, Codable, Equatable {
+    case workspace
+    case personal
+}
+
+enum WorkspaceDirectoryStatus: String, Codable, Equatable {
+    case unknown
+    case active
+    case deactivated
+}
+
+enum WorkspaceDirectoryVisibility: String, Codable, Equatable {
+    case visible
+    case deleted
+}
+
+enum WorkspaceDirectorySource: String, Codable, Equatable {
+    case legacyMetadata
+    case consent
+    case deactivated
+}
+
+struct WorkspaceDirectoryEntry: Codable, Equatable, Identifiable {
+    var workspaceID: String
+    var workspaceName: String?
+    var email: String?
+    var planType: String?
+    var kind: WorkspaceDirectoryKind
+    var source: WorkspaceDirectorySource = .legacyMetadata
+    var status: WorkspaceDirectoryStatus = .unknown
+    var visibility: WorkspaceDirectoryVisibility = .visible
+    var lastSeenAt: Int64
+    var lastStatusCheckedAt: Int64?
+
+    enum CodingKeys: String, CodingKey {
+        case workspaceID = "workspaceId"
+        case workspaceName
+        case email
+        case planType
+        case kind
+        case source
+        case status
+        case visibility
+        case lastSeenAt
+        case lastStatusCheckedAt
+    }
+
+    var id: String {
+        workspaceID
+    }
+
+    init(
+        workspaceID: String,
+        workspaceName: String?,
+        email: String?,
+        planType: String?,
+        kind: WorkspaceDirectoryKind,
+        source: WorkspaceDirectorySource = .legacyMetadata,
+        status: WorkspaceDirectoryStatus = .unknown,
+        visibility: WorkspaceDirectoryVisibility = .visible,
+        lastSeenAt: Int64,
+        lastStatusCheckedAt: Int64?
+    ) {
+        self.workspaceID = workspaceID
+        self.workspaceName = workspaceName
+        self.email = email
+        self.planType = planType
+        self.kind = kind
+        self.source = source
+        self.status = status
+        self.visibility = visibility
+        self.lastSeenAt = lastSeenAt
+        self.lastStatusCheckedAt = lastStatusCheckedAt
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        workspaceID = try container.decode(String.self, forKey: .workspaceID)
+        workspaceName = try container.decodeIfPresent(String.self, forKey: .workspaceName)
+        email = try container.decodeIfPresent(String.self, forKey: .email)
+        planType = try container.decodeIfPresent(String.self, forKey: .planType)
+        kind = try container.decode(WorkspaceDirectoryKind.self, forKey: .kind)
+        source = try container.decodeIfPresent(WorkspaceDirectorySource.self, forKey: .source) ?? .legacyMetadata
+        status = try container.decodeIfPresent(WorkspaceDirectoryStatus.self, forKey: .status) ?? .unknown
+        visibility = try container.decodeIfPresent(WorkspaceDirectoryVisibility.self, forKey: .visibility) ?? .visible
+        lastSeenAt = try container.decode(Int64.self, forKey: .lastSeenAt)
+        lastStatusCheckedAt = try container.decodeIfPresent(Int64.self, forKey: .lastStatusCheckedAt)
+    }
+}
+
 struct AccountsStore: Codable, Equatable {
     var version: Int = 1
     var accounts: [StoredAccount] = []
+    var workspaceDirectory: [WorkspaceDirectoryEntry] = []
     var currentSelection: CurrentAccountSelection?
-    var ignoredPendingWorkspaceIDs: [String] = []
 
     enum CodingKeys: String, CodingKey {
         case version
         case accounts
+        case workspaceDirectory
         case currentSelection
-        case ignoredPendingWorkspaceIDs
     }
 
     init(
         version: Int = 1,
         accounts: [StoredAccount] = [],
-        currentSelection: CurrentAccountSelection? = nil,
-        ignoredPendingWorkspaceIDs: [String] = []
+        workspaceDirectory: [WorkspaceDirectoryEntry] = [],
+        currentSelection: CurrentAccountSelection? = nil
     ) {
         self.version = version
         self.accounts = accounts
+        self.workspaceDirectory = workspaceDirectory
         self.currentSelection = currentSelection
-        self.ignoredPendingWorkspaceIDs = ignoredPendingWorkspaceIDs
     }
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
         accounts = try container.decodeIfPresent([StoredAccount].self, forKey: .accounts) ?? []
+        workspaceDirectory = try container.decodeIfPresent([WorkspaceDirectoryEntry].self, forKey: .workspaceDirectory) ?? []
         currentSelection = try container.decodeIfPresent(CurrentAccountSelection.self, forKey: .currentSelection)
-        ignoredPendingWorkspaceIDs = try container.decodeIfPresent([String].self, forKey: .ignoredPendingWorkspaceIDs) ?? []
     }
 }
 
@@ -328,15 +418,27 @@ struct WorkspaceMetadata: Equatable, Sendable {
     var structure: String?
 }
 
+enum WorkspaceAuthorizationCandidateStatus: Equatable, Sendable {
+    case pending
+    case deactivated
+}
+
 struct WorkspaceAuthorizationCandidate: Equatable, Identifiable, Sendable {
     var workspaceID: String
     var workspaceName: String
     var email: String?
     var planType: String?
+    var status: WorkspaceAuthorizationCandidateStatus = .pending
 
     var id: String {
         workspaceID
     }
+}
+
+struct ConsentWorkspaceOption: Equatable, Sendable {
+    var workspaceID: String
+    var workspaceName: String
+    var kind: WorkspaceDirectoryKind
 }
 
 struct ChatGPTOAuthTokens: Equatable, Sendable {
@@ -344,4 +446,5 @@ struct ChatGPTOAuthTokens: Equatable, Sendable {
     var refreshToken: String
     var idToken: String
     var apiKey: String?
+    var consentWorkspaces: [ConsentWorkspaceOption] = []
 }

@@ -63,25 +63,20 @@ const CODEX_CLIENT_VERSION: &str = "0.101.0";
 const CODEX_USER_AGENT: &str = "codex_cli_rs/0.101.0 (Mac OS 26.0.1; arm64) Apple_Terminal/464";
 const SSE_DONE: &str = "data: [DONE]\n\n";
 const MODELS: &[&str] = &[
-    "gpt-5",
-    "gpt-5-4",
-    "gpt-5-mini",
-    "gpt-5-codex",
-    "gpt-5-codex-mini",
-    "gpt-5.1-codex",
-    "gpt-5.1-codex-mini",
-    "gpt-5.1-codex-max",
-    "gpt-5.2-codex",
-    "gpt-5.3-codex",
-    "gpt-5.3-codex-spark",
+    "GPT-5",
+    "GPT-5.4",
+    "GPT-5.4-Mini",
+    "GPT-5.2",
+    "GPT-5.3-Codex",
+    "GPT-5.2-Codex",
+    "GPT-5.1-Codex-Mini",
+    "GPT-5.1-Codex-Max",
 ];
 const REQUEST_MODEL_MAPPINGS: &[(&str, &str)] = &[
     ("gpt-5-4", "gpt-5.4"),
     ("gpt-5.4", "gpt-5.4"),
     ("gpt5.4", "gpt-5.4"),
 ];
-const RESPONSE_MODEL_NORMALIZATIONS: &[(&str, &str)] =
-    &[("gpt5.4", "gpt-5-4"), ("gpt-5.4", "gpt-5-4")];
 
 #[derive(Clone)]
 pub(crate) struct ProxyStorageContext {
@@ -813,6 +808,9 @@ fn normalize_openai_responses_request(mut request: Value) -> Result<(Value, bool
     object.insert("model".to_string(), Value::String(model));
     object.insert("stream".to_string(), Value::Bool(true));
     object.insert("store".to_string(), Value::Bool(false));
+    if let Some(input) = object.get("input").cloned() {
+        object.insert("input".to_string(), normalize_responses_input(input));
+    }
     if !object.contains_key("instructions") {
         object.insert("instructions".to_string(), Value::String(String::new()));
     }
@@ -856,16 +854,51 @@ fn normalize_openai_responses_request(mut request: Value) -> Result<(Value, bool
     Ok((request, downstream_stream))
 }
 
+fn normalize_responses_input(input: Value) -> Value {
+    match input {
+        Value::String(text) => Value::Array(vec![json!({
+            "type": "message",
+            "role": "user",
+            "content": [{
+                "type": "input_text",
+                "text": text,
+            }],
+        })]),
+        Value::Object(message) => {
+            if let Some(role) = message.get("role").and_then(Value::as_str) {
+                let codex_role = match role {
+                    "system" | "developer" => "developer",
+                    "assistant" => "assistant",
+                    _ => "user",
+                };
+                let content = message
+                    .get("content")
+                    .map(|value| convert_message_content_to_codex_parts(role, value))
+                    .unwrap_or_default();
+                Value::Array(vec![json!({
+                    "type": "message",
+                    "role": codex_role,
+                    "content": content,
+                })])
+            } else {
+                Value::Object(message)
+            }
+        }
+        other => other,
+    }
+}
+
 fn map_client_model_to_upstream(model: &str) -> Result<String, String> {
-    if let Some(mapped) = remap_model_name(model, REQUEST_MODEL_MAPPINGS) {
+    let normalized = model.trim().to_lowercase();
+    if let Some(mapped) = remap_model_name(&normalized, REQUEST_MODEL_MAPPINGS) {
         return Ok(mapped);
     }
 
-    Ok(model.to_string())
+    Ok(normalize_numeric_model_revision_if_needed(&normalized))
 }
 
 fn normalize_model_for_client(model: &str) -> String {
-    remap_model_name(model, RESPONSE_MODEL_NORMALIZATIONS).unwrap_or_else(|| model.to_string())
+    client_display_model_name(model)
 }
 
 fn remap_model_name(model: &str, mappings: &[(&str, &str)]) -> Option<String> {
@@ -881,6 +914,58 @@ fn remap_model_name(model: &str, mappings: &[(&str, &str)]) -> Option<String> {
     }
 
     None
+}
+
+fn normalize_numeric_model_revision_if_needed(model: &str) -> String {
+    if !model.starts_with("gpt-5-") {
+        return model.to_string();
+    }
+
+    let suffix = &model["gpt-5-".len()..];
+    let mut segments = suffix.splitn(2, '-');
+    let revision = segments.next().unwrap_or_default();
+    if revision.is_empty() || !revision.chars().all(|ch| ch.is_ascii_digit()) {
+        return model.to_string();
+    }
+
+    let remaining = segments.next().map(|value| format!("-{value}")).unwrap_or_default();
+    format!("gpt-5.{revision}{remaining}")
+}
+
+fn client_display_model_name(model: &str) -> String {
+    let lowercased = model.trim().to_lowercase();
+    let normalized = if lowercased == "gpt5.4" {
+        "gpt-5.4".to_string()
+    } else if let Some(rest) = lowercased.strip_prefix("gpt5.4-") {
+        format!("gpt-5.4-{rest}")
+    } else {
+        lowercased
+    };
+    let parts = normalized.split('-').collect::<Vec<_>>();
+    if parts.len() < 2 || parts[0] != "gpt" {
+        return model.to_string();
+    }
+
+    let (version, suffix_start) = if parts.len() >= 3
+        && parts[1] == "5"
+        && parts[2].chars().all(|ch| ch.is_ascii_digit())
+    {
+        (format!("5.{}", parts[2]), 3)
+    } else {
+        (parts[1].to_string(), 2)
+    };
+
+    let mut display_parts = vec!["GPT".to_string(), version];
+    display_parts.extend(parts.iter().skip(suffix_start).map(|segment| display_segment(segment)));
+    display_parts.join("-")
+}
+
+fn display_segment(segment: &str) -> String {
+    let mut chars = segment.chars();
+    match chars.next() {
+        Some(first) => format!("{}{}", first.to_ascii_uppercase(), chars.as_str().to_ascii_lowercase()),
+        None => String::new(),
+    }
 }
 
 fn rewrite_response_models_for_client(mut value: Value) -> Value {
@@ -2583,7 +2668,9 @@ mod tests {
     use super::convert_completed_response_to_chat_completion;
     use super::convert_openai_chat_request_to_codex;
     use super::extract_completed_response_from_sse;
+    use super::map_client_model_to_upstream;
     use super::normalize_openai_responses_request;
+    use super::normalize_model_for_client;
     use super::parse_proxy_request_body_limit_mib;
     use super::resolve_proxy_request_body_limit_bytes_from_mib_value;
     use super::rewrite_response_models_for_client;
@@ -2695,6 +2782,55 @@ mod tests {
         assert_eq!(
             payload.get("model").and_then(|value| value.as_str()),
             Some("gpt-5.4")
+        );
+        assert_eq!(
+            payload
+                .get("input")
+                .and_then(|value| value.as_array())
+                .and_then(|value| value.first())
+                .and_then(|value| value.get("type"))
+                .and_then(|value| value.as_str()),
+            Some("message")
+        );
+        assert_eq!(
+            payload
+                .get("input")
+                .and_then(|value| value.as_array())
+                .and_then(|value| value.first())
+                .and_then(|value| value.get("content"))
+                .and_then(|value| value.as_array())
+                .and_then(|value| value.first())
+                .and_then(|value| value.get("type"))
+                .and_then(|value| value.as_str()),
+            Some("input_text")
+        );
+    }
+
+    #[test]
+    fn maps_display_model_names_to_upstream() {
+        assert_eq!(
+            map_client_model_to_upstream("GPT-5.4").expect("display model should map"),
+            "gpt-5.4"
+        );
+        assert_eq!(
+            map_client_model_to_upstream("GPT-5.4-Mini").expect("display model should map"),
+            "gpt-5.4-mini"
+        );
+        assert_eq!(
+            map_client_model_to_upstream("GPT-5.3-Codex").expect("display model should map"),
+            "gpt-5.3-codex"
+        );
+    }
+
+    #[test]
+    fn normalizes_upstream_models_for_client_display() {
+        assert_eq!(normalize_model_for_client("gpt-5"), "GPT-5");
+        assert_eq!(normalize_model_for_client("gpt-5.3-codex"), "GPT-5.3-Codex");
+        assert_eq!(normalize_model_for_client("gpt-5-4"), "GPT-5.4");
+        assert_eq!(normalize_model_for_client("gpt-5-4-mini"), "GPT-5.4-Mini");
+        assert_eq!(
+            normalize_model_for_client("gpt5.4-2026-03-09"),
+            "GPT-5.4-2026-03-09"
         );
     }
 
@@ -2825,7 +2961,7 @@ data: {"type":"response.completed","response":{"id":"resp_123","created_at":1,"m
 
         assert_eq!(
             converted.get("model").and_then(|value| value.as_str()),
-            Some("gpt-5-4-2026-03-09")
+            Some("GPT-5.4-2026-03-09")
         );
     }
 
@@ -2847,7 +2983,7 @@ data: {"type":"response.completed","response":{"id":"resp_123","created_at":1,"m
                 .get("response")
                 .and_then(|value| value.get("model"))
                 .and_then(|value| value.as_str()),
-            Some("gpt-5-4")
+            Some("GPT-5.4")
         );
     }
 
@@ -2864,7 +3000,7 @@ data: {"type":"response.completed","response":{"id":"resp_123","created_at":1,"m
                 .get("response")
                 .and_then(|value| value.get("model"))
                 .and_then(|value| value.as_str()),
-            Some("gpt-5-4")
+            Some("GPT-5.4")
         );
     }
 

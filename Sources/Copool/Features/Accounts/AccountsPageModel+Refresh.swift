@@ -33,6 +33,7 @@ extension AccountsPageModel {
                 )
             }
             applyAccounts(accounts)
+            await refreshPendingWorkspaceAuthorizations(from: accounts)
             publishLocalAccounts(accounts)
             let noticeKey = manualRefreshService == nil
                 ? "accounts.notice.usage_refreshed"
@@ -65,6 +66,7 @@ extension AccountsPageModel {
                 }
             )
             applyAccounts(accounts)
+            await refreshPendingWorkspaceAuthorizations(from: accounts)
             publishAndSyncLocalAccountsMutation(accounts)
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)

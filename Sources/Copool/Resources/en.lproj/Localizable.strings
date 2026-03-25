@@ -252,6 +252,7 @@
 "error.accounts.account_not_found_for_update" = "Target account for update was not found";
 "error.accounts.account_not_found_for_switch" = "Target account for switch was not found";
 "error.accounts.add_account_timeout" = "Timed out waiting for browser sign-in to complete. Try again.";
+"error.accounts.workspace_deactivated" = "This workspace has been deactivated and cannot be imported.";
 
 "error.store.read_failed_format" = "Failed to read account store: %@";
 "error.store.serialize_failed_format" = "Failed to serialize account store: %@";

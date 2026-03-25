@@ -191,6 +191,48 @@ final class StoreFileRepositoryTests: XCTestCase {
         )
     }
 
+    func testStoreRoundTripsWorkspaceDirectoryEntries() throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let storePath = tempDir.appendingPathComponent("accounts.json")
+        let paths = FileSystemPaths(
+            applicationSupportDirectory: tempDir,
+            accountStorePath: storePath,
+            settingsStorePath: tempDir.appendingPathComponent("settings.json"),
+            codexAuthPath: tempDir.appendingPathComponent("auth.json"),
+            codexConfigPath: tempDir.appendingPathComponent("config.toml"),
+            proxyDaemonDataDirectory: tempDir.appendingPathComponent("proxyd", isDirectory: true),
+            proxyDaemonKeyPath: tempDir.appendingPathComponent("proxyd/api-proxy.key", isDirectory: false),
+            cloudflaredLogDirectory: tempDir.appendingPathComponent("cloudflared-logs", isDirectory: true)
+        )
+        let repository = StoreFileRepository(paths: paths)
+        let store = AccountsStore(
+            version: 1,
+            accounts: [],
+            workspaceDirectory: [
+                WorkspaceDirectoryEntry(
+                    workspaceID: "workspace-1",
+                    workspaceName: "Workspace One",
+                    email: "team@example.com",
+                    planType: "team",
+                    kind: .workspace,
+                    status: .deactivated,
+                    visibility: .deleted,
+                    lastSeenAt: 123,
+                    lastStatusCheckedAt: 456
+                )
+            ],
+            currentSelection: nil
+        )
+
+        try repository.saveStore(store)
+        let loaded = try repository.loadStore()
+
+        XCTAssertEqual(loaded.workspaceDirectory, store.workspaceDirectory)
+    }
+
     func testLoadSettingsMigratesLegacyMergedStoreIntoSeparateFiles() throws {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)

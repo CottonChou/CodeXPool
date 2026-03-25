@@ -13,6 +13,9 @@ extension SwiftNativeProxyRuntimeService {
         payload["model"] = model
         payload["stream"] = true
         payload["store"] = false
+        if let input = payload["input"] {
+            payload["input"] = normalizeResponsesInput(input)
+        }
         if payload["instructions"] == nil {
             payload["instructions"] = ""
         }
@@ -30,6 +33,30 @@ extension SwiftNativeProxyRuntimeService {
         payload["include"] = include
 
         return (payload, downstreamStream)
+    }
+
+    func normalizeResponsesInput(_ input: Any) -> Any {
+        if let text = input as? String {
+            return [[
+                "type": "message",
+                "role": "user",
+                "content": [[
+                    "type": "input_text",
+                    "text": text
+                ]]
+            ]]
+        }
+
+        if let message = input as? [String: Any],
+           let role = message["role"] as? String {
+            return [[
+                "type": "message",
+                "role": role == "assistant" ? "assistant" : (["system", "developer"].contains(role) ? "developer" : "user"),
+                "content": convertMessageContentToCodexParts(role: role, content: message["content"])
+            ]]
+        }
+
+        return input
     }
 
     func convertChatRequestToResponses(_ request: [String: Any]) throws -> (payload: [String: Any], downstreamStream: Bool) {

@@ -15,7 +15,8 @@ let package = Package(
             name: "Copool",
             path: "Sources/Copool",
             exclude: [
-                "Copool.icon"
+                "Copool.icon",
+                "Resources/proxyd-src/proxyd/target"
             ],
             resources: [
                 .process("Resources")

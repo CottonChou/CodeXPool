@@ -36,7 +36,7 @@ final class ProxyControlBridgeTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(metrics.pushLocalSnapshotCallCount, 1)
     }
 
-    func testInactiveAppReducesCommandPollingUntilReactivated() async throws {
+    func testInactiveAppKeepsCommandPollingResponsive() async throws {
         let cloudSyncService = SpyProxyControlCloudSyncService()
         let bridge = makeBridge(
             cloudSyncService: cloudSyncService,
@@ -46,16 +46,10 @@ final class ProxyControlBridgeTests: XCTestCase {
         await bridge.setAppActive(false)
         await bridge.start()
         try? await Task.sleep(for: .milliseconds(2_200))
-
-        let inactiveMetrics = await cloudSyncService.readMetrics()
-        XCTAssertEqual(inactiveMetrics.pullPendingCommandCallCount, 1)
-
-        await bridge.setAppActive(true)
-        try? await Task.sleep(for: .milliseconds(1_200))
         await bridge.stop()
 
-        let activeMetrics = await cloudSyncService.readMetrics()
-        XCTAssertGreaterThanOrEqual(activeMetrics.pullPendingCommandCallCount, 2)
+        let metrics = await cloudSyncService.readMetrics()
+        XCTAssertGreaterThanOrEqual(metrics.pullPendingCommandCallCount, 2)
     }
 
     func testStartPublishesSnapshotWithoutWaitingForSlowRemoteStatuses() async throws {

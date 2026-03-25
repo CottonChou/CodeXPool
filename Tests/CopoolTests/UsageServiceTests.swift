@@ -66,6 +66,40 @@ final class UsageServiceTests: XCTestCase {
         XCTAssertNil(configuration.httpCookieStorage)
         XCTAssertFalse(configuration.httpShouldSetCookies)
     }
+
+    func testUsageDebugRequestSummaryIncludesRequestDetails() throws {
+        var request = URLRequest(url: try XCTUnwrap(URL(string: "https://chatgpt.com/backend-api/wham/usage")))
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("account-1", forHTTPHeaderField: "ChatGPT-Account-Id")
+        request.setValue("codex-tools-swift/0.1", forHTTPHeaderField: "User-Agent")
+
+        let summary = DefaultUsageService.debugRequestLogSummary(for: request)
+        let payload = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: Data(summary.utf8)) as? NSDictionary
+        )
+
+        XCTAssertEqual(
+            payload,
+            [
+                "method": "GET",
+                "url": "https://chatgpt.com/backend-api/wham/usage",
+                "headers": [
+                    "Accept": "application/json",
+                    "ChatGPT-Account-Id": "account-1",
+                    "User-Agent": "codex-tools-swift/0.1"
+                ]
+            ] as NSDictionary
+        )
+    }
+
+    func testUsageDebugResponseBodyReturnsRawJSONPayload() {
+        let body = DefaultUsageService.debugResponseLogBody(
+            for: Data(#"{"detail":{"code":"deactivated_workspace"}}"#.utf8)
+        )
+
+        XCTAssertEqual(body, #"{"detail":{"code":"deactivated_workspace"}}"#)
+    }
 }
 
 private final class UsageMockURLProtocol: URLProtocol, @unchecked Sendable {

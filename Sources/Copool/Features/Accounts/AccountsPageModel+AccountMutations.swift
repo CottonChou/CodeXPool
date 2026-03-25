@@ -1,6 +1,11 @@
 import Foundation
+import OSLog
 
 extension AccountsPageModel {
+    private var authFlowLogger: Logger {
+        Logger(subsystem: "Copool", category: "AccountsPageAuthFlow")
+    }
+
     func importCurrentAuth() async {
         guard runtimePlatform == .macOS else {
             notice = NoticeMessage(style: .error, text: PlatformCapabilities.unsupportedOperationMessage)
@@ -26,13 +31,25 @@ extension AccountsPageModel {
         defer { isAdding = false }
 
         do {
+            authFlowLogger.log("AccountsPageModel.addAccountViaLogin started")
+            AuthFlowDebugLog.write("AccountsPageAuthFlow", "AccountsPageModel.addAccountViaLogin started")
             let imported = try await coordinator.addAccountViaLogin(customLabel: nil)
+            authFlowLogger.log("AccountsPageModel.addAccountViaLogin coordinator returned \(imported.accountID, privacy: .public)")
+            AuthFlowDebugLog.write("AccountsPageAuthFlow", "AccountsPageModel.addAccountViaLogin coordinator returned \(imported.accountID)")
             let accounts = try await coordinator.listAccounts()
+            authFlowLogger.log("AccountsPageModel.addAccountViaLogin listed \(accounts.count) accounts")
+            AuthFlowDebugLog.write("AccountsPageAuthFlow", "AccountsPageModel.addAccountViaLogin listed \(accounts.count) accounts")
             applyAccounts(accounts)
             await refreshPendingWorkspaceAuthorizations(from: accounts, preferredSourceAccountID: imported.id)
+            authFlowLogger.log("AccountsPageModel.addAccountViaLogin refreshed pending workspaces")
+            AuthFlowDebugLog.write("AccountsPageAuthFlow", "AccountsPageModel.addAccountViaLogin refreshed pending workspaces")
             publishAndSyncLocalAccountsMutation(accounts)
+            authFlowLogger.log("AccountsPageModel.addAccountViaLogin published local mutation")
+            AuthFlowDebugLog.write("AccountsPageAuthFlow", "AccountsPageModel.addAccountViaLogin published local mutation")
             notice = NoticeMessage(style: .success, text: L10n.tr("accounts.notice.imported_new_format", imported.label))
         } catch {
+            authFlowLogger.error("AccountsPageModel.addAccountViaLogin failed: \(error.localizedDescription, privacy: .public)")
+            AuthFlowDebugLog.write("AccountsPageAuthFlow", "AccountsPageModel.addAccountViaLogin failed: \(error.localizedDescription)")
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
         }
     }

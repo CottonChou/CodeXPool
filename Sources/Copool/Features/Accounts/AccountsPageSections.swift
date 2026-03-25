@@ -218,14 +218,18 @@ private struct PendingWorkspaceAuthorizationCard: View {
     let onAuthorize: () -> Void
     let onDelete: () -> Void
 
+    private var isDeactivated: Bool {
+        card.status == .deactivated
+    }
+
     private var planLabel: String {
         AccountSummary(
-            id: card.candidate.workspaceID,
-            label: card.candidate.workspaceName,
-            email: card.candidate.email,
-            accountID: card.candidate.workspaceID,
-            planType: card.candidate.planType,
-            teamName: card.candidate.workspaceName,
+            id: card.workspaceID,
+            label: card.workspaceName,
+            email: card.email,
+            accountID: card.workspaceID,
+            planType: card.planType,
+            teamName: card.workspaceName,
             teamAlias: nil,
             addedAt: 0,
             updatedAt: 0,
@@ -246,14 +250,14 @@ private struct PendingWorkspaceAuthorizationCard: View {
                             foregroundColor: .indigo
                         )
                         AccountTagView(
-                            text: card.candidate.workspaceName,
+                            text: card.workspaceName,
                             backgroundColor: Color.indigo.opacity(0.18),
                             foregroundColor: .indigo,
                             allowsCompression: true
                         )
                     }
 
-                    if let email = card.candidate.email, !email.isEmpty {
+                    if let email = card.email, !email.isEmpty {
                         Text(email)
                             .font(.headline)
                             .foregroundStyle(.primary)
@@ -263,53 +267,52 @@ private struct PendingWorkspaceAuthorizationCard: View {
                 }
                 Spacer(minLength: 0)
                 AccountTagView(
-                    text: L10n.tr("accounts.pending.tag"),
-                    backgroundColor: Color.orange.opacity(0.18),
-                    foregroundColor: .orange
+                    text: isDeactivated ? L10n.tr("accounts.card.status.deactivated") : L10n.tr("accounts.pending.tag"),
+                    backgroundColor: isDeactivated ? Color.red.opacity(0.18) : Color.orange.opacity(0.18),
+                    foregroundColor: isDeactivated ? .red : .orange
                 )
             }
 
-            Text(L10n.tr("accounts.pending.hint"))
+            Text(isDeactivated ? L10n.tr("error.accounts.workspace_deactivated") : L10n.tr("accounts.pending.hint"))
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(isDeactivated ? .red : .secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             HStack(alignment: .center, spacing: 10) {
-                Button(action: onAuthorize) {
-                    if card.authorizing {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Label(L10n.tr("accounts.pending.action.authorize"), systemImage: "checkmark.shield")
-                            .lineLimit(1)
+                if !isDeactivated && card.deletionMode == .dismissCandidate {
+                    Button(action: onAuthorize) {
+                        if card.authorizing {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Label(L10n.tr("accounts.pending.action.authorize"), systemImage: "checkmark.shield")
+                                .lineLimit(1)
+                        }
                     }
+                    .copoolActionButtonStyle(
+                        prominent: true,
+                        tint: .indigo,
+                        density: .compact,
+                        iOSStyle: .liquidGlass
+                    )
+                    .disabled(card.authorizing)
                 }
-                .copoolActionButtonStyle(
-                    prominent: true,
-                    tint: .indigo,
-                    density: .compact,
-                    iOSStyle: .liquidGlass
-                )
-                .disabled(card.authorizing)
 
                 Spacer(minLength: 0)
 
-                Button(action: onDelete) {
-                    Image(systemName: "trash")
-                        .font(.body.weight(.semibold))
-                        .frame(width: 36, height: 36)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .accessibilityLabel(L10n.tr("accounts.pending.action.delete"))
-                .disabled(card.authorizing)
+                AccountDeleteButton(action: onDelete, isDisabled: card.authorizing)
+                    .accessibilityLabel(L10n.tr("accounts.pending.action.delete"))
             }
         }
         .padding(12)
-        .frostedRoundedSurface(cornerRadius: 12, prominent: true, tint: .indigo.opacity(0.2))
+        .frostedRoundedSurface(
+            cornerRadius: 12,
+            prominent: true,
+            tint: isDeactivated ? .red.opacity(0.18) : .indigo.opacity(0.2)
+        )
         .overlay {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.indigo.opacity(0.2), lineWidth: 1)
+                .strokeBorder(isDeactivated ? Color.red.opacity(0.18) : Color.indigo.opacity(0.2), lineWidth: 1)
         }
     }
 }

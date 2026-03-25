@@ -38,9 +38,6 @@ struct AccountsPageView: View {
             onDeleteAccount: deleteAccount
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .task {
-            await model.loadIfNeeded()
-        }
         .onAppear {
             triggerInitialCardEntranceIfNeeded(for: contentAccountCount)
         }

@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 enum BackgroundNetworkSession {
     static let shared: URLSession = {
@@ -12,10 +13,12 @@ enum BackgroundNetworkSession {
 }
 
 final class DefaultUsageService: UsageService, @unchecked Sendable {
-private enum RequestPolicy {
+    private enum RequestPolicy {
         static let timeout: TimeInterval = 18
         static let scope = "usage"
     }
+
+    private static let logger = Logger(subsystem: "Copool", category: "Usage")
 
     private let session: URLSession
     private let configPath: URL
@@ -38,10 +41,15 @@ private enum RequestPolicy {
     }
 
     func fetchUsage(accessToken: String, accountID: String) async throws -> UsageSnapshot {
+        let candidateURLs = resolveUsageURLs()
+        let startedAt = Date()
+        Self.logger.debug(
+            "Usage request started for account \(accountID, privacy: .public). Candidates: \(candidateURLs.joined(separator: " | "), privacy: .public)"
+        )
         do {
-            let payload: UsageAPIResponse = try await endpointCoordinator.fetchFirstSuccessful(
+            let resolved: ResolvedUsagePayload = try await endpointCoordinator.fetchFirstSuccessful(
                 scope: RequestPolicy.scope,
-                candidateURLs: resolveUsageURLs()
+                candidateURLs: candidateURLs
             ) { endpoint in
                 var request = URLRequest(url: endpoint)
                 request.timeoutInterval = RequestPolicy.timeout
@@ -50,12 +58,29 @@ private enum RequestPolicy {
                 request.setValue(accountID, forHTTPHeaderField: "ChatGPT-Account-Id")
                 request.setValue("application/json", forHTTPHeaderField: "Accept")
                 request.setValue("codex-tools-swift/0.1", forHTTPHeaderField: "User-Agent")
+                Self.logger.debug(
+                    "Usage request: \(Self.requestLogSummary(for: request), privacy: .public)"
+                )
                 return request
             } validate: { result in
-                try JSONDecoder().decode(UsageAPIResponse.self, from: result.data)
+                Self.logger.debug(
+                    "Usage raw response from \(result.endpoint, privacy: .public) [status \(result.response.statusCode)] for account \(accountID, privacy: .public): \(Self.responseLogBody(for: result.data), privacy: .public)"
+                )
+                return ResolvedUsagePayload(
+                    endpoint: result.endpoint,
+                    payload: try JSONDecoder().decode(UsageAPIResponse.self, from: result.data)
+                )
             }
-            return mapPayload(payload)
+            let elapsedMilliseconds = Int(Date().timeIntervalSince(startedAt) * 1_000)
+            Self.logger.debug(
+                "Usage request succeeded via \(resolved.endpoint, privacy: .public) in \(elapsedMilliseconds) ms for account \(accountID, privacy: .public)"
+            )
+            return mapPayload(resolved.payload)
         } catch EndpointRequestError.allRequestsFailed(let errors) {
+            let elapsedMilliseconds = Int(Date().timeIntervalSince(startedAt) * 1_000)
+            Self.logger.error(
+                "Usage request failed after \(elapsedMilliseconds) ms for account \(accountID, privacy: .public). Candidates: \(candidateURLs.joined(separator: " | "), privacy: .public). Errors: \(errors.joined(separator: " | "), privacy: .public)"
+            )
             if let message = Self.preferredUserFacingFailureMessage(from: errors) {
                 throw AppError.network(message)
             }
@@ -76,6 +101,30 @@ private enum RequestPolicy {
             return detail
         }
         return nil
+    }
+
+    private static func requestLogSummary(for request: URLRequest) -> String {
+        let method = request.httpMethod ?? "GET"
+        let url = request.url?.absoluteString ?? ""
+        let headers = (request.allHTTPHeaderFields ?? [:])
+            .filter { $0.key.caseInsensitiveCompare("Authorization") != .orderedSame }
+        let payload: [String: Any] = [
+            "method": method,
+            "url": url,
+            "headers": headers
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
+              let text = String(data: data, encoding: .utf8) else {
+            return "\(method) \(url)"
+        }
+        return text
+    }
+
+    private static func responseLogBody(for data: Data) -> String {
+        if let text = String(data: data, encoding: .utf8) {
+            return text
+        }
+        return "<non-utf8 body: \(data.count) bytes>"
     }
 
     private func resolveUsageURLs() -> [String] {
@@ -141,6 +190,11 @@ private enum RequestPolicy {
             resetAt: raw.resetAt
         )
     }
+}
+
+private struct ResolvedUsagePayload: Sendable {
+    let endpoint: String
+    let payload: UsageAPIResponse
 }
 
 private struct UsageAPIResponse: Decodable {
@@ -212,3 +266,15 @@ private extension String {
         return trimmed.isEmpty ? nil : trimmed
     }
 }
+
+#if DEBUG
+extension DefaultUsageService {
+    static func debugRequestLogSummary(for request: URLRequest) -> String {
+        requestLogSummary(for: request)
+    }
+
+    static func debugResponseLogBody(for data: Data) -> String {
+        responseLogBody(for: data)
+    }
+}
+#endif

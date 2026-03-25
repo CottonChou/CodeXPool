@@ -54,14 +54,59 @@ actor AccountsCoordinator {
         try storeRepository.saveStore(store)
     }
 
-    func dismissPendingWorkspaceAuthorization(workspaceID: String) throws {
+    func listWorkspaceDirectory() throws -> [WorkspaceDirectoryEntry] {
+        try storeRepository.loadStore().workspaceDirectory
+    }
+
+    func updateWorkspaceDirectoryVisibility(
+        workspaceID: String,
+        visibility: WorkspaceDirectoryVisibility
+    ) throws {
         var store = try storeRepository.loadStore()
         let normalizedWorkspaceID = AccountIdentity.normalizedAccountID(workspaceID)
         guard !normalizedWorkspaceID.isEmpty else { return }
-        if !store.ignoredPendingWorkspaceIDs.contains(normalizedWorkspaceID) {
-            store.ignoredPendingWorkspaceIDs.append(normalizedWorkspaceID)
-            try storeRepository.saveStore(store)
+        guard let index = store.workspaceDirectory.firstIndex(where: {
+            AccountIdentity.normalizedAccountID($0.workspaceID) == normalizedWorkspaceID
+        }) else {
+            return
         }
+        store.workspaceDirectory[index].visibility = visibility
+        try storeRepository.saveStore(store)
+    }
+
+    func updateWorkspaceDirectoryStatus(
+        workspaceID: String,
+        workspaceName: String,
+        email: String?,
+        planType: String?,
+        kind: WorkspaceDirectoryKind,
+        status: WorkspaceDirectoryStatus
+    ) throws {
+        var store = try storeRepository.loadStore()
+        let normalizedWorkspaceID = AccountIdentity.normalizedAccountID(workspaceID)
+        guard !normalizedWorkspaceID.isEmpty else { return }
+        let now = dateProvider.unixSecondsNow()
+        let entry = WorkspaceDirectoryEntry(
+            workspaceID: workspaceID,
+            workspaceName: workspaceName,
+            email: email,
+            planType: planType,
+            kind: kind,
+            source: status == .deactivated ? .deactivated : .consent,
+            status: status,
+            visibility: .visible,
+            lastSeenAt: now,
+            lastStatusCheckedAt: now
+        )
+
+        if let index = store.workspaceDirectory.firstIndex(where: {
+            AccountIdentity.normalizedAccountID($0.workspaceID) == normalizedWorkspaceID
+        }) {
+            store.workspaceDirectory[index] = entry
+        } else {
+            store.workspaceDirectory.append(entry)
+        }
+        try storeRepository.saveStore(store)
     }
 
     func updateTeamAlias(id: String, alias: String?) throws -> AccountSummary {

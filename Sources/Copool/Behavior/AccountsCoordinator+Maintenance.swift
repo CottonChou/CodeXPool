@@ -1,10 +1,15 @@
 import Foundation
+import OSLog
 
 extension AccountsCoordinator {
+    private var authFlowLogger: Logger {
+        Logger(subsystem: "Copool", category: "AccountsAuthFlow")
+    }
+
     func listAccounts() async throws -> [AccountSummary] {
         var store = try storeRepository.loadStore()
         let didReconcile = Self.reconcileStoredAccountMetadata(in: &store, authRepository: authRepository)
-        let didEnrich = await enrichStoredWorkspaceMetadataIfNeeded(in: &store, forceRemoteCheck: false)
+        let didEnrich = try await enrichStoredWorkspaceMetadataIfNeeded(in: &store, forceRemoteCheck: false)
         if didReconcile || didEnrich {
             try storeRepository.saveStore(store)
         }
@@ -38,42 +43,113 @@ extension AccountsCoordinator {
 
     @discardableResult
     func addAccountViaLogin(customLabel: String?, timeoutSeconds: TimeInterval = 10 * 60) async throws -> AccountSummary {
+        authFlowLogger.log("addAccountViaLogin started")
+        AuthFlowDebugLog.write("AccountsAuthFlow", "addAccountViaLogin started")
         let tokens = try await chatGPTOAuthLoginService.signInWithChatGPT(timeoutSeconds: timeoutSeconds)
+        authFlowLogger.log("addAccountViaLogin received tokens with \(tokens.consentWorkspaces.count) consent workspaces")
+        AuthFlowDebugLog.write("AccountsAuthFlow", "addAccountViaLogin received tokens with \(tokens.consentWorkspaces.count) consent workspaces")
         let authJSON = try authRepository.makeChatGPTAuth(from: tokens)
-        return try await importAccount(authJSON: authJSON, customLabel: customLabel)
+        AuthFlowDebugLog.write("AccountsAuthFlow", "addAccountViaLogin made auth json")
+        let imported = try await importAccount(authJSON: authJSON, customLabel: customLabel)
+        authFlowLogger.log("addAccountViaLogin imported account \(imported.accountID, privacy: .public)")
+        AuthFlowDebugLog.write("AccountsAuthFlow", "addAccountViaLogin imported account \(imported.accountID)")
+        try persistConsentWorkspaceDirectory(
+            tokens.consentWorkspaces,
+            authorizedWorkspaceID: imported.accountID,
+            fallbackEmail: imported.email,
+            fallbackPlanType: imported.planType
+        )
+        authFlowLogger.log("addAccountViaLogin persisted consent workspace directory")
+        AuthFlowDebugLog.write("AccountsAuthFlow", "addAccountViaLogin persisted consent workspace directory")
+        return imported
     }
 
-    func discoverPendingWorkspaceAuthorizations(sourceAccountID: String) async throws -> [WorkspaceAuthorizationCandidate] {
-        guard runtimePlatform == .macOS else { return [] }
-        guard let workspaceMetadataService else { return [] }
-
-        let store = try storeRepository.loadStore()
-        guard let sourceAccount = store.accounts.first(where: { $0.id == sourceAccountID }) else {
-            return []
+    func syncWorkspaceDirectory() async throws -> [WorkspaceDirectoryEntry] {
+        var store = try storeRepository.loadStore()
+        guard let workspaceMetadataService,
+              let sourceAccount = preferredWorkspaceDirectorySourceAccount(in: store) else {
+            return store.workspaceDirectory
         }
-
         let extracted = try authRepository.extractAuth(from: sourceAccount.authJSON)
-        let metadata = try await workspaceMetadataService.fetchWorkspaceMetadata(accessToken: extracted.accessToken)
-        let existingWorkspaceIDs = Set(store.accounts.map { AccountIdentity.normalizedAccountID($0.accountID) })
-        let ignoredWorkspaceIDs = Set(store.ignoredPendingWorkspaceIDs.map(AccountIdentity.normalizedAccountID))
+        guard shouldLookupRemoteWorkspaceMetadata(extracted: extracted) else {
+            return store.workspaceDirectory
+        }
 
-        return metadata.compactMap { workspace in
-            let workspaceID = AccountIdentity.normalizedAccountID(workspace.accountID)
-            guard !workspaceID.isEmpty else { return nil }
-            guard !existingWorkspaceIDs.contains(workspaceID) else { return nil }
-            guard !ignoredWorkspaceIDs.contains(workspaceID) else { return nil }
-            guard let trimmedWorkspaceName = Self.visibleWorkspaceName(for: workspace) else { return nil }
+        let metadata = try await workspaceMetadataService.fetchWorkspaceMetadata(
+            accessToken: extracted.accessToken
+        )
+        let now = dateProvider.unixSecondsNow()
+        let authorizedWorkspaceIDs = Set(
+            store.accounts.map { AccountIdentity.normalizedAccountID($0.accountID) }
+        )
+        var nextEntriesByID = Dictionary(
+            uniqueKeysWithValues: store.workspaceDirectory.compactMap { entry -> (String, WorkspaceDirectoryEntry)? in
+                let normalizedWorkspaceID = AccountIdentity.normalizedAccountID(entry.workspaceID)
+                guard !normalizedWorkspaceID.isEmpty else { return nil }
+                return (normalizedWorkspaceID, entry)
+            }
+        )
 
-            return WorkspaceAuthorizationCandidate(
+        let discoveredWorkspaceIDs = Set(metadata.compactMap { entry -> String? in
+            let normalizedWorkspaceID = AccountIdentity.normalizedAccountID(entry.accountID)
+            guard !normalizedWorkspaceID.isEmpty else { return nil }
+            return normalizedWorkspaceID
+        })
+
+        for workspace in metadata {
+            let normalizedWorkspaceID = AccountIdentity.normalizedAccountID(workspace.accountID)
+            guard !normalizedWorkspaceID.isEmpty else { continue }
+            guard !authorizedWorkspaceIDs.contains(normalizedWorkspaceID) else {
+                nextEntriesByID.removeValue(forKey: normalizedWorkspaceID)
+                continue
+            }
+            guard let workspaceName = Self.visibleWorkspaceName(for: workspace) else {
+                nextEntriesByID.removeValue(forKey: normalizedWorkspaceID)
+                continue
+            }
+
+            let existingEntry = nextEntriesByID[normalizedWorkspaceID]
+            let shouldPreserveDeactivated = existingEntry?.status == .deactivated
+            let entry = WorkspaceDirectoryEntry(
                 workspaceID: workspace.accountID,
-                workspaceName: trimmedWorkspaceName,
-                email: sourceAccount.email ?? extracted.email,
-                planType: sourceAccount.planType ?? extracted.planType
+                workspaceName: workspaceName,
+                email: sourceAccount.email,
+                planType: sourceAccount.planType,
+                kind: workspaceDirectoryKind(for: workspace),
+                source: .legacyMetadata,
+                status: shouldPreserveDeactivated ? .deactivated : .active,
+                visibility: existingEntry?.visibility ?? .visible,
+                lastSeenAt: now,
+                lastStatusCheckedAt: existingEntry?.lastStatusCheckedAt
             )
+            nextEntriesByID[normalizedWorkspaceID] = entry
         }
-        .sorted { lhs, rhs in
-            lhs.workspaceName.localizedCaseInsensitiveCompare(rhs.workspaceName) == .orderedAscending
+
+        nextEntriesByID = nextEntriesByID.filter { workspaceID, entry in
+            if entry.status == .deactivated {
+                return true
+            }
+            if entry.visibility == .deleted {
+                return true
+            }
+            return discoveredWorkspaceIDs.contains(workspaceID)
         }
+
+        let retainedEntries = nextEntriesByID.values.sorted { lhs, rhs in
+            if lhs.kind != rhs.kind {
+                return lhs.kind == .workspace
+            }
+            let lhsName = lhs.workspaceName ?? ""
+            let rhsName = rhs.workspaceName ?? ""
+            return lhsName.localizedCaseInsensitiveCompare(rhsName) == .orderedAscending
+        }
+
+        if store.workspaceDirectory != retainedEntries {
+            store.workspaceDirectory = retainedEntries
+            try storeRepository.saveStore(store)
+        }
+
+        return retainedEntries
     }
 
     @discardableResult
@@ -86,16 +162,32 @@ extension AccountsCoordinator {
         guard runtimePlatform == .macOS else {
             throw AppError.invalidData(PlatformCapabilities.unsupportedOperationMessage)
         }
+        authFlowLogger.log("authorizeWorkspaceViaLogin started for workspace \(workspaceID, privacy: .public)")
+        AuthFlowDebugLog.write("AccountsAuthFlow", "authorizeWorkspaceViaLogin started for workspace \(workspaceID)")
         let tokens = try await chatGPTOAuthLoginService.signInWithChatGPT(
             timeoutSeconds: timeoutSeconds,
             forcedWorkspaceID: workspaceID
         )
+        authFlowLogger.log("authorizeWorkspaceViaLogin received tokens with \(tokens.consentWorkspaces.count) consent workspaces")
+        AuthFlowDebugLog.write("AccountsAuthFlow", "authorizeWorkspaceViaLogin received tokens with \(tokens.consentWorkspaces.count) consent workspaces")
         let authJSON = try authRepository.makeChatGPTAuth(from: tokens)
-        return try await importAccount(
+        AuthFlowDebugLog.write("AccountsAuthFlow", "authorizeWorkspaceViaLogin made auth json")
+        let imported = try await importAccount(
             authJSON: authJSON,
             customLabel: customLabel,
             prefetchedWorkspaceName: workspaceName
         )
+        authFlowLogger.log("authorizeWorkspaceViaLogin imported account \(imported.accountID, privacy: .public)")
+        AuthFlowDebugLog.write("AccountsAuthFlow", "authorizeWorkspaceViaLogin imported account \(imported.accountID)")
+        try persistConsentWorkspaceDirectory(
+            tokens.consentWorkspaces,
+            authorizedWorkspaceID: imported.accountID,
+            fallbackEmail: imported.email,
+            fallbackPlanType: imported.planType
+        )
+        authFlowLogger.log("authorizeWorkspaceViaLogin persisted consent workspace directory")
+        AuthFlowDebugLog.write("AccountsAuthFlow", "authorizeWorkspaceViaLogin persisted consent workspace directory")
+        return imported
     }
 
     func refreshUsage(
@@ -175,7 +267,7 @@ extension AccountsCoordinator {
             throw AppError.invalidData(PlatformCapabilities.unsupportedOperationMessage)
         }
         var store = try storeRepository.loadStore()
-        let didChange = await enrichStoredWorkspaceMetadataIfNeeded(
+        let didChange = try await enrichStoredWorkspaceMetadataIfNeeded(
             in: &store,
             forceRemoteCheck: forceRemoteCheck
         )
@@ -190,22 +282,22 @@ extension AccountsCoordinator {
         customLabel: String?,
         prefetchedWorkspaceName: String? = nil
     ) async throws -> AccountSummary {
+        authFlowLogger.log("importAccount started")
+        AuthFlowDebugLog.write("AccountsAuthFlow", "importAccount started")
         let now = dateProvider.unixSecondsNow()
         let currentAccountKey = authRepository.currentAuthAccountKey()
         var authJSON = authJSON
         var extracted = try authRepository.extractAuth(from: authJSON)
-        if let prefetchedWorkspaceName {
-            extracted.teamName = prefetchedWorkspaceName
-        } else if runtimePlatform == .macOS,
-           let remoteWorkspaceName = await resolveRemoteWorkspaceName(for: extracted, forceRemoteCheck: true) {
-            extracted.teamName = remoteWorkspaceName
-        }
+        authFlowLogger.log("importAccount extracted account \(extracted.accountID, privacy: .public)")
+        AuthFlowDebugLog.write("AccountsAuthFlow", "importAccount extracted account \(extracted.accountID)")
 
         var usage: UsageSnapshot?
         var usageError: String?
 
         if runtimePlatform == .macOS {
             do {
+                authFlowLogger.log("importAccount fetching usage snapshot")
+                AuthFlowDebugLog.write("AccountsAuthFlow", "importAccount fetching usage snapshot")
                 let refreshed = try await Self.fetchUsageSnapshot(
                     authJSON: authJSON,
                     authRepository: authRepository,
@@ -214,15 +306,37 @@ extension AccountsCoordinator {
                 )
                 authJSON = refreshed.authJSON
                 extracted = refreshed.extractedAuth
-                if let prefetchedWorkspaceName {
-                    extracted.teamName = prefetchedWorkspaceName
-                } else if let remoteWorkspaceName = await resolveRemoteWorkspaceName(for: extracted, forceRemoteCheck: true) {
-                    extracted.teamName = remoteWorkspaceName
-                }
                 usage = refreshed.usage
+                authFlowLogger.log("importAccount usage snapshot fetched for \(extracted.accountID, privacy: .public)")
+                AuthFlowDebugLog.write("AccountsAuthFlow", "importAccount usage snapshot fetched for \(extracted.accountID)")
             } catch {
+                if let deactivatedError = AppError.workspaceDeactivatedIfMatched(error) {
+                    throw deactivatedError
+                }
                 usageError = error.localizedDescription
+                authFlowLogger.error("importAccount usage snapshot failed: \(error.localizedDescription, privacy: .public)")
+                AuthFlowDebugLog.write("AccountsAuthFlow", "importAccount usage snapshot failed: \(error.localizedDescription)")
             }
+        }
+
+        if let prefetchedWorkspaceName {
+            extracted.teamName = prefetchedWorkspaceName
+        } else if runtimePlatform == .macOS,
+                  let workspaceMetadataService,
+                  shouldLookupRemoteWorkspaceMetadata(extracted: extracted) {
+            authFlowLogger.log("importAccount fetching workspace metadata")
+            AuthFlowDebugLog.write("AccountsAuthFlow", "importAccount fetching workspace metadata")
+            let directory = try await workspaceMetadataService.fetchWorkspaceMetadata(
+                accessToken: extracted.accessToken
+            )
+            if let remoteWorkspaceName = Self.remoteWorkspaceName(
+                for: extracted.accountID,
+                in: directory
+            ) {
+                extracted.teamName = remoteWorkspaceName
+            }
+            authFlowLogger.log("importAccount workspace metadata fetched")
+            AuthFlowDebugLog.write("AccountsAuthFlow", "importAccount workspace metadata fetched")
         }
 
         let generatedLabel = customLabel?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -231,6 +345,8 @@ extension AccountsCoordinator {
             : (extracted.email ?? "Codex \(String(extracted.accountID.prefix(8)))")
 
         var store = try storeRepository.loadStore()
+        authFlowLogger.log("importAccount loaded store with \(store.accounts.count) accounts")
+        AuthFlowDebugLog.write("AccountsAuthFlow", "importAccount loaded store with \(store.accounts.count) accounts")
         let account = StoredAccount(
             id: UUID().uuidString,
             label: label,
@@ -270,18 +386,26 @@ extension AccountsCoordinator {
         } else {
             store.accounts.append(account)
         }
-        store.ignoredPendingWorkspaceIDs.removeAll {
-            AccountIdentity.normalizedAccountID($0) == AccountIdentity.normalizedAccountID(extracted.accountID)
+        store.workspaceDirectory.removeAll {
+            AccountIdentity.normalizedAccountID($0.workspaceID)
+                == AccountIdentity.normalizedAccountID(extracted.accountID)
         }
-
+        authFlowLogger.log("importAccount saving store")
+        AuthFlowDebugLog.write("AccountsAuthFlow", "importAccount saving store")
         try storeRepository.saveStore(store)
+        authFlowLogger.log("importAccount saved store")
+        AuthFlowDebugLog.write("AccountsAuthFlow", "importAccount saved store")
         Self.persistCurrentAuthIfNeeded(
             authJSON,
             extracted: extracted,
             currentAccountKey: currentAccountKey,
             authRepository: authRepository
         )
+        authFlowLogger.log("importAccount persisted current auth if needed")
+        AuthFlowDebugLog.write("AccountsAuthFlow", "importAccount persisted current auth if needed")
         let savedAccount = Self.matchingStoredAccount(for: extracted, in: store.accounts)!
+        authFlowLogger.log("importAccount finished for \(savedAccount.accountID, privacy: .public)")
+        AuthFlowDebugLog.write("AccountsAuthFlow", "importAccount finished for \(savedAccount.accountID)")
         return toSummary(savedAccount, currentAccountKey: authRepository.currentAuthAccountKey())
     }
 
@@ -289,29 +413,10 @@ extension AccountsCoordinator {
         AccountsStore(accounts: [account]).accountSummaries(currentAccountKey: currentAccountKey)[0]
     }
 
-    private func resolveRemoteWorkspaceName(
-        for extracted: ExtractedAuth,
-        forceRemoteCheck: Bool
-    ) async -> String? {
-        guard let workspaceMetadataService else { return nil }
-        guard shouldLookupRemoteWorkspaceMetadata(extracted: extracted) else {
-            return extracted.teamName
-        }
-        guard forceRemoteCheck || Self.normalizedTeamName(extracted.teamName) == nil else {
-            return extracted.teamName
-        }
-        guard let directory = try? await workspaceMetadataService.fetchWorkspaceMetadata(
-            accessToken: extracted.accessToken
-        ) else {
-            return extracted.teamName
-        }
-        return Self.remoteWorkspaceName(for: extracted.accountID, in: directory) ?? extracted.teamName
-    }
-
     private func enrichStoredWorkspaceMetadataIfNeeded(
         in store: inout AccountsStore,
         forceRemoteCheck: Bool
-    ) async -> Bool {
+    ) async throws -> Bool {
         guard let workspaceMetadataService else { return false }
 
         var didChange = false
@@ -319,16 +424,20 @@ extension AccountsCoordinator {
 
         for index in store.accounts.indices {
             let storedAccount = store.accounts[index]
-            guard let extracted = try? authRepository.extractAuth(from: storedAccount.authJSON) else { continue }
+            let extracted = try authRepository.extractAuth(from: storedAccount.authJSON)
             guard shouldLookupRemoteWorkspaceMetadata(extracted: extracted) else { continue }
+            if !forceRemoteCheck,
+               Self.normalizedTeamName(storedAccount.teamName) != nil {
+                continue
+            }
 
             let directory: [WorkspaceMetadata]
             if let cached = cachedDirectories[extracted.accessToken] {
                 directory = cached
             } else {
-                guard let fetched = try? await workspaceMetadataService.fetchWorkspaceMetadata(
+                let fetched = try await workspaceMetadataService.fetchWorkspaceMetadata(
                     accessToken: extracted.accessToken
-                ) else { continue }
+                )
                 cachedDirectories[extracted.accessToken] = fetched
                 directory = fetched
             }
@@ -356,6 +465,14 @@ extension AccountsCoordinator {
     private func shouldLookupRemoteWorkspaceMetadata(extracted: ExtractedAuth) -> Bool {
         let normalizedPlan = (extracted.planType ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return normalizedPlan == "team" || normalizedPlan == "business" || normalizedPlan == "enterprise"
+    }
+
+    private func preferredWorkspaceDirectorySourceAccount(in store: AccountsStore) -> StoredAccount? {
+        if let currentAccountKey = authRepository.currentAuthAccountKey(),
+           let current = store.accounts.first(where: { $0.accountKey == currentAccountKey }) {
+            return current
+        }
+        return store.accounts.first
     }
 
     private static func refreshAccount(
@@ -396,7 +513,12 @@ extension AccountsCoordinator {
                 authRepository: authRepository
             )
         } catch {
-            account.usageError = error.localizedDescription
+            if let deactivatedError = AppError.workspaceDeactivatedIfMatched(error) {
+                account.workspaceStatus = .deactivated
+                account.usageError = deactivatedError.localizedDescription
+            } else {
+                account.usageError = error.localizedDescription
+            }
             account.usageStateUpdatedAt = now
         }
 
@@ -425,7 +547,46 @@ extension AccountsCoordinator {
             merged.principalID = refreshed.principalID
             return merged
         }
+        reconcileWorkspaceDirectory(for: refreshed, in: &store)
         return store
+    }
+
+    private static func reconcileWorkspaceDirectory(
+        for account: StoredAccount,
+        in store: inout AccountsStore
+    ) {
+        let normalizedWorkspaceID = AccountIdentity.normalizedAccountID(account.accountID)
+        guard !normalizedWorkspaceID.isEmpty else { return }
+
+        if account.workspaceStatus == .deactivated {
+            let existingIndex = store.workspaceDirectory.firstIndex {
+                AccountIdentity.normalizedAccountID($0.workspaceID) == normalizedWorkspaceID
+            }
+            let existingEntry = existingIndex.map { store.workspaceDirectory[$0] }
+            let entry = WorkspaceDirectoryEntry(
+                workspaceID: account.accountID,
+                workspaceName: normalizedTeamName(account.teamName),
+                email: account.email,
+                planType: account.planType,
+                kind: workspaceDirectoryKind(for: account),
+                source: .deactivated,
+                status: .deactivated,
+                visibility: existingEntry?.visibility ?? .visible,
+                lastSeenAt: account.updatedAt,
+                lastStatusCheckedAt: account.updatedAt
+            )
+
+            if let existingIndex {
+                store.workspaceDirectory[existingIndex] = entry
+            } else {
+                store.workspaceDirectory.append(entry)
+            }
+            return
+        }
+
+        store.workspaceDirectory.removeAll {
+            AccountIdentity.normalizedAccountID($0.workspaceID) == normalizedWorkspaceID
+        }
     }
 
     private static func refreshAuthIfNeeded(
@@ -613,6 +774,76 @@ extension AccountsCoordinator {
             }
         }
         return false
+    }
+
+    private func workspaceDirectoryKind(for metadata: WorkspaceMetadata) -> WorkspaceDirectoryKind {
+        let normalizedStructure = (metadata.structure ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        return normalizedStructure == "personal" ? .personal : .workspace
+    }
+
+    private static func workspaceDirectoryKind(for account: StoredAccount) -> WorkspaceDirectoryKind {
+        normalizedTeamName(account.teamName) == nil ? .personal : .workspace
+    }
+
+    private func persistConsentWorkspaceDirectory(
+        _ workspaces: [ConsentWorkspaceOption],
+        authorizedWorkspaceID: String,
+        fallbackEmail: String?,
+        fallbackPlanType: String?
+    ) throws {
+        guard !workspaces.isEmpty else { return }
+
+        var store = try storeRepository.loadStore()
+        let now = dateProvider.unixSecondsNow()
+        let normalizedAuthorizedWorkspaceID = AccountIdentity.normalizedAccountID(authorizedWorkspaceID)
+        let authorizedWorkspaceIDs = Set(
+            store.accounts.map { AccountIdentity.normalizedAccountID($0.accountID) }
+        )
+
+        var nextEntriesByID = Dictionary(
+            uniqueKeysWithValues: store.workspaceDirectory.compactMap { entry -> (String, WorkspaceDirectoryEntry)? in
+                let normalizedWorkspaceID = AccountIdentity.normalizedAccountID(entry.workspaceID)
+                guard !normalizedWorkspaceID.isEmpty else { return nil }
+                guard entry.source != .consent else { return nil }
+                return (normalizedWorkspaceID, entry)
+            }
+        )
+
+        for workspace in workspaces {
+            let normalizedWorkspaceID = AccountIdentity.normalizedAccountID(workspace.workspaceID)
+            guard !normalizedWorkspaceID.isEmpty else { continue }
+
+            if normalizedWorkspaceID == normalizedAuthorizedWorkspaceID
+                || authorizedWorkspaceIDs.contains(normalizedWorkspaceID) {
+                nextEntriesByID.removeValue(forKey: normalizedWorkspaceID)
+                continue
+            }
+
+            nextEntriesByID[normalizedWorkspaceID] = WorkspaceDirectoryEntry(
+                workspaceID: workspace.workspaceID,
+                workspaceName: workspace.workspaceName,
+                email: fallbackEmail,
+                planType: fallbackPlanType,
+                kind: workspace.kind,
+                source: .consent,
+                status: .active,
+                visibility: .visible,
+                lastSeenAt: now,
+                lastStatusCheckedAt: nil
+            )
+        }
+
+        store.workspaceDirectory = nextEntriesByID.values.sorted { lhs, rhs in
+            if lhs.kind != rhs.kind {
+                return lhs.kind == .workspace
+            }
+            let lhsName = lhs.workspaceName ?? ""
+            let rhsName = rhs.workspaceName ?? ""
+            return lhsName.localizedCaseInsensitiveCompare(rhsName) == .orderedAscending
+        }
+        try storeRepository.saveStore(store)
     }
 
 }

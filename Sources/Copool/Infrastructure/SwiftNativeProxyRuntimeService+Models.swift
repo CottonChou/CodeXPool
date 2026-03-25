@@ -3,11 +3,14 @@ import Foundation
 extension SwiftNativeProxyRuntimeService {
     static var clientVisibleModels: [String] {
         [
-            "gpt-5",
-            "gpt-5.4",
-            "gpt-5-mini",
-            "gpt-5.2",
-            "gpt-5.3-codex"
+            "GPT-5",
+            "GPT-5.4",
+            "GPT-5.4-Mini",
+            "GPT-5.2",
+            "GPT-5.3-Codex",
+            "GPT-5.2-Codex",
+            "GPT-5.1-Codex-Mini",
+            "GPT-5.1-Codex-Max"
         ]
     }
 
@@ -57,11 +60,7 @@ extension SwiftNativeProxyRuntimeService {
     }
 
     func normalizeModelForClient(_ model: String) -> String {
-        let normalized = model.lowercased()
-        if normalized == "gpt5.4" || normalized == "gpt-5.4" {
-            return "gpt-5-4"
-        }
-        return model
+        Self.clientDisplayModelName(for: model)
     }
 
     func responsesEndpoint(forUpstreamModel model: String) -> URL {
@@ -74,5 +73,40 @@ extension SwiftNativeProxyRuntimeService {
         let defaultOrigin = "https://chatgpt.com"
         let configured = readChatGPTBaseURLFromConfig() ?? defaultOrigin
         return Self.resolveUpstreamBaseURL(configuredBaseURL: configured, routeFamily: routeFamily)
+    }
+
+    static func clientDisplayModelName(for model: String) -> String {
+        let lowercased = model.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let normalized: String
+        if lowercased == "gpt5.4" {
+            normalized = "gpt-5.4"
+        } else if lowercased.hasPrefix("gpt5.4-") {
+            normalized = "gpt-5.4" + lowercased.dropFirst("gpt5.4".count)
+        } else {
+            normalized = lowercased
+        }
+        let parts = normalized.split(separator: "-", omittingEmptySubsequences: false).map(String.init)
+        guard parts.count >= 2, parts[0] == "gpt" else {
+            return model
+        }
+
+        let version: String
+        let suffixStart: Int
+        if parts.count >= 3, parts[1] == "5", parts[2].allSatisfy(\.isNumber) {
+            version = "5.\(parts[2])"
+            suffixStart = 3
+        } else {
+            version = parts[1]
+            suffixStart = 2
+        }
+
+        var displayParts = ["GPT", version]
+        displayParts.append(contentsOf: parts.dropFirst(suffixStart).map(Self.displaySegment))
+        return displayParts.joined(separator: "-")
+    }
+
+    private static func displaySegment(_ value: String) -> String {
+        guard let first = value.first else { return value }
+        return String(first).uppercased() + value.dropFirst().lowercased()
     }
 }

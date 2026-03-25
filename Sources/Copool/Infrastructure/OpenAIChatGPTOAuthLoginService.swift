@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import OSLog
 
 #if os(macOS)
 import AppKit
@@ -22,11 +23,15 @@ final class OpenAIChatGPTOAuthLoginService: ChatGPTOAuthLoginServiceProtocol, @u
 
     private let configPath: URL
     private let session: URLSession
+    private let logger = Logger(subsystem: "Copool", category: "AuthLogin")
     #if os(iOS)
     @MainActor private static let authenticationSessionDriver = IOSWebAuthenticationSessionDriver()
     #endif
 
-    init(configPath: URL, session: URLSession = .shared) {
+    init(
+        configPath: URL,
+        session: URLSession = .shared
+    ) {
         self.configPath = configPath
         self.session = session
     }
@@ -36,7 +41,10 @@ final class OpenAIChatGPTOAuthLoginService: ChatGPTOAuthLoginServiceProtocol, @u
     }
 
     func signInWithChatGPT(timeoutSeconds: TimeInterval, forcedWorkspaceID: String?) async throws -> ChatGPTOAuthTokens {
+        logger.log("Auth login started")
+        AuthFlowDebugLog.write("AuthLogin", "Auth login started")
         let callback = OAuthCallbackBox<ChatGPTOAuthTokens>()
+        let consentWorkspaces = ConsentWorkspaceCapture()
         let pkce = PKCECodes.make()
         let state = OpenAIChatGPTOAuthSupport.randomBase64URL(byteCount: 32)
         let effectiveForcedWorkspaceID = forcedWorkspaceID ?? resolveForcedWorkspaceID()
@@ -58,25 +66,47 @@ final class OpenAIChatGPTOAuthLoginService: ChatGPTOAuthLoginServiceProtocol, @u
         server.start()
         defer { server.stop() }
 
-        try await beginAuthorizationSession(url: authorizeURL, callback: callback)
+        try await beginAuthorizationSession(
+            url: authorizeURL,
+            callback: callback,
+            consentWorkspaces: consentWorkspaces
+        )
 
         do {
-            let tokens = try await callback.wait(timeoutSeconds: timeoutSeconds) {
+            var tokens = try await callback.wait(timeoutSeconds: timeoutSeconds) {
                 AppError.io(L10n.tr("error.accounts.add_account_timeout"))
             }
+            logger.log("Auth callback resolved successfully")
+            AuthFlowDebugLog.write("AuthLogin", "Auth callback resolved successfully")
+            tokens.consentWorkspaces = consentWorkspaces.values()
+            logger.log("Captured consent workspaces count: \(tokens.consentWorkspaces.count)")
+            AuthFlowDebugLog.write("AuthLogin", "Captured consent workspaces count: \(tokens.consentWorkspaces.count)")
+            logger.log("Ending authorization session after success")
+            AuthFlowDebugLog.write("AuthLogin", "Ending authorization session after success")
             await endAuthorizationSession()
+            logger.log("Authorization session ended after success")
+            AuthFlowDebugLog.write("AuthLogin", "Authorization session ended after success")
             return tokens
         } catch {
+            logger.error("Auth login failed before token import: \(error.localizedDescription, privacy: .public)")
+            AuthFlowDebugLog.write("AuthLogin", "Auth login failed before token import: \(error.localizedDescription)")
+            logger.log("Ending authorization session after failure")
+            AuthFlowDebugLog.write("AuthLogin", "Ending authorization session after failure")
             await endAuthorizationSession()
+            logger.log("Authorization session ended after failure")
+            AuthFlowDebugLog.write("AuthLogin", "Authorization session ended after failure")
             throw error
         }
     }
 
     private func beginAuthorizationSession(
         url: URL,
-        callback: OAuthCallbackBox<ChatGPTOAuthTokens>
+        callback: OAuthCallbackBox<ChatGPTOAuthTokens>,
+        consentWorkspaces: ConsentWorkspaceCapture
     ) async throws {
         #if os(macOS)
+        _ = callback
+        _ = consentWorkspaces
         guard NSWorkspace.shared.open(url) else {
             throw AppError.io(L10n.tr("error.oauth.browser_open_failed"))
         }
@@ -171,8 +201,12 @@ final class OpenAIChatGPTOAuthLoginService: ChatGPTOAuthLoginServiceProtocol, @u
                             code: code,
                             forcedWorkspaceID: forcedWorkspaceID
                         )
+                        Logger(subsystem: "Copool", category: "AuthLogin").log("OAuth token exchange succeeded")
+                        AuthFlowDebugLog.write("AuthLogin", "OAuth token exchange succeeded")
                         callback.succeed(tokens)
                     } catch {
+                        Logger(subsystem: "Copool", category: "AuthLogin").error("OAuth token exchange failed: \(error.localizedDescription, privacy: .public)")
+                        AuthFlowDebugLog.write("AuthLogin", "OAuth token exchange failed: \(error.localizedDescription)")
                         callback.fail(error)
                     }
                 }
@@ -307,6 +341,23 @@ final class OpenAIChatGPTOAuthLoginService: ChatGPTOAuthLoginServiceProtocol, @u
 
     private static func redirectURI(for port: UInt16) -> String {
         "http://localhost:\(port)\(Configuration.callbackPath)"
+    }
+}
+
+private final class ConsentWorkspaceCapture: @unchecked Sendable {
+    private let lock = NSLock()
+    private var workspaces: [ConsentWorkspaceOption] = []
+
+    func replace(with workspaces: [ConsentWorkspaceOption]) {
+        lock.lock()
+        self.workspaces = workspaces
+        lock.unlock()
+    }
+
+    func values() -> [ConsentWorkspaceOption] {
+        lock.lock()
+        defer { lock.unlock() }
+        return workspaces
     }
 }
 

@@ -5,7 +5,7 @@ struct RemoteProxydBinaryBuilder {
     let fileManager: FileManager
     let commandRunner: RemoteShellCommandRunner
 
-    func buildBinary(for server: RemoteServerConfig) throws -> URL {
+    func buildBinary(for server: RemoteServerConfig, forceRebuild: Bool = true) throws -> URL {
         let platform = try detectRemoteLinuxPlatform(for: server)
         guard let manifestPath = proxydManifestPath() else {
             throw AppError.io(L10n.tr("error.remote.unavailable_missing_proxyd_source"))
@@ -26,7 +26,7 @@ struct RemoteProxydBinaryBuilder {
                 .appendingPathComponent("release", isDirectory: true)
                 .appendingPathComponent(RepositoryLocator.proxydBinaryName, isDirectory: false)
 
-            if fileManager.isExecutableFile(atPath: binaryPath.path) {
+            if try prepareBinaryPathForBuild(binaryPath, forceRebuild: forceRebuild) {
                 return binaryPath
             }
 
@@ -48,6 +48,17 @@ struct RemoteProxydBinaryBuilder {
 
         let suffix = buildErrors.isEmpty ? "" : " \(buildErrors.joined(separator: " | "))"
         throw AppError.io("\(L10n.tr("error.remote.build_proxyd_failed")):\(suffix)")
+    }
+
+    func prepareBinaryPathForBuild(_ binaryPath: URL, forceRebuild: Bool) throws -> Bool {
+        if fileManager.isExecutableFile(atPath: binaryPath.path) {
+            if forceRebuild {
+                try fileManager.removeItem(at: binaryPath)
+                return false
+            }
+            return true
+        }
+        return false
     }
 
     private func proxydManifestPath() -> URL? {

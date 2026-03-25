@@ -104,6 +104,70 @@ final class SwiftNativeProxyRuntimeServiceTests: XCTestCase {
         )
     }
 
+    func testMapsDisplayModelNamesToUpstream() async throws {
+        let runtime = SwiftNativeProxyRuntimeService(
+            paths: FileSystemPaths(
+                applicationSupportDirectory: URL(fileURLWithPath: "/tmp"),
+                accountStorePath: URL(fileURLWithPath: "/tmp/accounts.json"),
+                settingsStorePath: URL(fileURLWithPath: "/tmp/settings.json"),
+                codexAuthPath: URL(fileURLWithPath: "/tmp/auth.json"),
+                codexConfigPath: URL(fileURLWithPath: "/tmp/config.toml"),
+                proxyDaemonDataDirectory: URL(fileURLWithPath: "/tmp/proxyd", isDirectory: true),
+                proxyDaemonKeyPath: URL(fileURLWithPath: "/tmp/proxyd/api-proxy.key"),
+                cloudflaredLogDirectory: URL(fileURLWithPath: "/tmp/cloudflared-logs", isDirectory: true)
+            ),
+            storeRepository: MockStoreRepository(),
+            settingsRepository: MockSettingsRepository(),
+            authRepository: MockAuthRepository()
+        )
+
+        let mapped = try await runtime.withIsolation { runtime in
+            (
+                try runtime.mapClientModelToUpstream("GPT-5.4"),
+                try runtime.mapClientModelToUpstream("GPT-5.4-Mini"),
+                try runtime.mapClientModelToUpstream("GPT-5.3-Codex")
+            )
+        }
+
+        XCTAssertEqual(mapped.0, "gpt-5.4")
+        XCTAssertEqual(mapped.1, "gpt-5.4-mini")
+        XCTAssertEqual(mapped.2, "gpt-5.3-codex")
+    }
+
+    func testNormalizesUpstreamModelsForClientDisplay() async {
+        let runtime = SwiftNativeProxyRuntimeService(
+            paths: FileSystemPaths(
+                applicationSupportDirectory: URL(fileURLWithPath: "/tmp"),
+                accountStorePath: URL(fileURLWithPath: "/tmp/accounts.json"),
+                settingsStorePath: URL(fileURLWithPath: "/tmp/settings.json"),
+                codexAuthPath: URL(fileURLWithPath: "/tmp/auth.json"),
+                codexConfigPath: URL(fileURLWithPath: "/tmp/config.toml"),
+                proxyDaemonDataDirectory: URL(fileURLWithPath: "/tmp/proxyd", isDirectory: true),
+                proxyDaemonKeyPath: URL(fileURLWithPath: "/tmp/proxyd/api-proxy.key"),
+                cloudflaredLogDirectory: URL(fileURLWithPath: "/tmp/cloudflared-logs", isDirectory: true)
+            ),
+            storeRepository: MockStoreRepository(),
+            settingsRepository: MockSettingsRepository(),
+            authRepository: MockAuthRepository()
+        )
+
+        let normalized = await runtime.withIsolation { runtime in
+            (
+                runtime.normalizeModelForClient("gpt-5"),
+                runtime.normalizeModelForClient("gpt-5.3-codex"),
+                runtime.normalizeModelForClient("gpt-5-4"),
+                runtime.normalizeModelForClient("gpt-5-4-mini"),
+                runtime.normalizeModelForClient("gpt5.4-2026-03-09")
+            )
+        }
+
+        XCTAssertEqual(normalized.0, "GPT-5")
+        XCTAssertEqual(normalized.1, "GPT-5.3-Codex")
+        XCTAssertEqual(normalized.2, "GPT-5.4")
+        XCTAssertEqual(normalized.3, "GPT-5.4-Mini")
+        XCTAssertEqual(normalized.4, "GPT-5.4-2026-03-09")
+    }
+
     func testResolvesUpstreamBaseURLForBothRouteFamilies() {
         let codexFromOrigin = SwiftNativeProxyRuntimeService.resolveUpstreamBaseURL(
             configuredBaseURL: "https://chatgpt.com",
@@ -182,10 +246,19 @@ final class SwiftNativeProxyRuntimeServiceTests: XCTestCase {
         XCTAssertNotNil(modelItems)
         XCTAssertTrue((modelItems?.count ?? 0) > 0)
         let ids = (modelItems ?? []).compactMap { $0["id"] as? String }
-        XCTAssertTrue(ids.contains("gpt-5.4"))
-        XCTAssertTrue(ids.contains("gpt-5.3-codex"))
-        XCTAssertTrue(ids.contains("gpt-5.2"))
-        XCTAssertFalse(ids.contains("gpt-5-4"))
+        XCTAssertEqual(
+            ids,
+            [
+                "GPT-5",
+                "GPT-5.4",
+                "GPT-5.4-Mini",
+                "GPT-5.2",
+                "GPT-5.3-Codex",
+                "GPT-5.2-Codex",
+                "GPT-5.1-Codex-Mini",
+                "GPT-5.1-Codex-Max"
+            ]
+        )
 
         var modelsByAPIKeyHeader = URLRequest(url: modelsURL)
         modelsByAPIKeyHeader.setValue(started.apiKey ?? "", forHTTPHeaderField: "x-api-key")
@@ -306,6 +379,44 @@ final class SwiftNativeProxyRuntimeServiceTests: XCTestCase {
         XCTAssertNotNil(error)
     }
 
+    func testResponsesNormalizesStringInputToMessageArray() async throws {
+        let runtime = SwiftNativeProxyRuntimeService(
+            paths: FileSystemPaths(
+                applicationSupportDirectory: URL(fileURLWithPath: "/tmp"),
+                accountStorePath: URL(fileURLWithPath: "/tmp/accounts.json"),
+                settingsStorePath: URL(fileURLWithPath: "/tmp/settings.json"),
+                codexAuthPath: URL(fileURLWithPath: "/tmp/auth.json"),
+                codexConfigPath: URL(fileURLWithPath: "/tmp/config.toml"),
+                proxyDaemonDataDirectory: URL(fileURLWithPath: "/tmp/proxyd", isDirectory: true),
+                proxyDaemonKeyPath: URL(fileURLWithPath: "/tmp/proxyd/api-proxy.key"),
+                cloudflaredLogDirectory: URL(fileURLWithPath: "/tmp/cloudflared-logs", isDirectory: true)
+            ),
+            storeRepository: MockStoreRepository(),
+            settingsRepository: MockSettingsRepository(),
+            authRepository: MockAuthRepository()
+        )
+
+        let normalized = try await runtime.withIsolation { runtime in
+            snapshot(
+                from: try runtime.normalizeResponsesRequest([
+                "model": "gpt-5.4",
+                "input": "reply with exactly OK",
+                "stream": false
+                ])
+            )
+        }
+
+        XCTAssertEqual(normalized.downstreamStream, false)
+        XCTAssertEqual(normalized.model, "gpt-5.4")
+        XCTAssertEqual(normalized.stream, true)
+        XCTAssertEqual(normalized.input.count, 1)
+        XCTAssertEqual(normalized.input[0].type, "message")
+        XCTAssertEqual(normalized.input[0].role, "user")
+        XCTAssertEqual(normalized.input[0].content.count, 1)
+        XCTAssertEqual(normalized.input[0].content[0].type, "input_text")
+        XCTAssertEqual(normalized.input[0].content[0].text, "reply with exactly OK")
+    }
+
     func testPayloadOversizeDetectionFromContentLengthHeader() {
         let oversized = ProxyRuntimeLimits.maxInboundRequestBytes + 1
         let raw = """
@@ -422,4 +533,54 @@ private final class CountingAuthRepository: AuthRepository, @unchecked Sendable 
         extractAuthCallCount += 1
         return ExtractedAuth(accountID: "acct", accessToken: "token", email: nil, planType: nil, teamName: nil)
     }
+}
+
+private struct NormalizedResponsesSnapshot: Sendable {
+    let downstreamStream: Bool
+    let model: String?
+    let stream: Bool?
+    let input: [NormalizedInputMessage]
+}
+
+private struct NormalizedInputMessage: Sendable {
+    let type: String?
+    let role: String?
+    let content: [NormalizedInputContent]
+}
+
+private struct NormalizedInputContent: Sendable {
+    let type: String?
+    let text: String?
+}
+
+private extension SwiftNativeProxyRuntimeService {
+    func withIsolation<T: Sendable>(
+        _ body: @Sendable (isolated SwiftNativeProxyRuntimeService) throws -> T
+    ) async rethrows -> T {
+        try body(self)
+    }
+}
+
+private func snapshot(
+    from normalized: (payload: [String: Any], downstreamStream: Bool)
+) -> NormalizedResponsesSnapshot {
+    let input = (normalized.payload["input"] as? [[String: Any]] ?? []).map { message in
+        NormalizedInputMessage(
+            type: message["type"] as? String,
+            role: message["role"] as? String,
+            content: (message["content"] as? [[String: Any]] ?? []).map { item in
+                NormalizedInputContent(
+                    type: item["type"] as? String,
+                    text: item["text"] as? String
+                )
+            }
+        )
+    }
+
+    return NormalizedResponsesSnapshot(
+        downstreamStream: normalized.downstreamStream,
+        model: normalized.payload["model"] as? String,
+        stream: normalized.payload["stream"] as? Bool,
+        input: input
+    )
 }
