@@ -5,6 +5,10 @@ struct AccountsPageContentPresentation: Equatable {
     let pendingWorkspaceCards: [PendingWorkspaceAuthorizationCardViewState]
     let pendingWorkspaceError: String?
     let isOverviewMode: Bool
+
+    var shouldShowPendingWorkspaceSection: Bool {
+        !pendingWorkspaceCards.isEmpty
+    }
 }
 
 struct AccountsActionBarPresentation: Equatable {

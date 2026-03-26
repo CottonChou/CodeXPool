@@ -3473,6 +3473,37 @@ final class AccountsCoordinatorTests: XCTestCase {
     }
 
     @MainActor
+    func testContentPresentationHidesPendingSectionForErrorWithoutCards() {
+        let account = makeAccountSummary(
+            id: "acct-1",
+            accountID: "account-1",
+            isCurrent: true,
+            usage: nil
+        )
+        let model = AccountsPageModel(
+            coordinator: AccountsCoordinator(
+                storeRepository: InMemoryAccountsStoreRepository(store: AccountsStore()),
+                settingsRepository: TestSettingsRepository(),
+                authRepository: StubAuthRepository(),
+                usageService: CountingUsageService(result: makeUsageSnapshot(fetchedAt: 1)),
+                chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+                codexCLIService: StubCodexCLIService(),
+                editorAppService: StubEditorAppService(),
+                opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+                dateProvider: FixedDateProvider(now: 1)
+            ),
+            initialAccounts: [account]
+        )
+        model.pendingWorkspaceAuthorizationError = L10n.tr("error.workspace.discovery_forbidden")
+
+        let contentPresentation = model.makeContentPresentation()
+
+        XCTAssertTrue(contentPresentation.pendingWorkspaceCards.isEmpty)
+        XCTAssertEqual(contentPresentation.pendingWorkspaceError, L10n.tr("error.workspace.discovery_forbidden"))
+        XCTAssertFalse(contentPresentation.shouldShowPendingWorkspaceSection)
+    }
+
+    @MainActor
     func testTrayMenuModelPushesInitialLocalAccountsBaselineDuringCloudReconciliation() async {
         let now: Int64 = 1_763_216_000
         let storeRepository = InMemoryAccountsStoreRepository(
@@ -3673,6 +3704,148 @@ final class AccountsCoordinatorTests: XCTestCase {
 
         let pullCallCount = await cloudSyncService.readPullCallCount()
         XCTAssertEqual(pullCallCount, 1)
+    }
+
+    func testBackgroundRefreshPolicyForMacUsesFastCurrentSelectionRefreshAndWorkspaceHealthChecks() {
+        let policy = TrayMenuModel.BackgroundRefreshPolicy.forPlatform(.macOS)
+
+        XCTAssertEqual(policy.currentSelectionUsageRefreshInterval, .seconds(10))
+        XCTAssertEqual(policy.workspaceHealthCheckInterval, .seconds(600))
+        XCTAssertEqual(policy.usageRefreshInterval, .seconds(30))
+    }
+
+    @MainActor
+    func testTrayMenuModelStartBackgroundRefreshRefreshesCurrentSelectionUsageOnIndependentTick() async {
+        let now: Int64 = 1_763_216_000
+        let usageService = RecordingAccountUsageService(
+            results: [
+                "account-1": makeUsageSnapshot(fetchedAt: now)
+            ]
+        )
+        let storeRepository = InMemoryAccountsStoreRepository(
+            store: AccountsStore(
+                accounts: [
+                    makeStoredAccount(id: "acct-1", accountID: "account-1", now: now)
+                ],
+                currentSelection: CurrentAccountSelection(
+                    accountID: "account-1",
+                    selectedAt: now * 1_000,
+                    sourceDeviceID: "macos-local",
+                    accountKey: nil
+                )
+            )
+        )
+        let coordinator = AccountsCoordinator(
+            storeRepository: storeRepository,
+            settingsRepository: TestSettingsRepository(),
+            authRepository: RecordingAuthRepository(),
+            usageService: usageService,
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+        let trayModel = TrayMenuModel(
+            accountsCoordinator: coordinator,
+            settingsCoordinator: SettingsCoordinator(
+                settingsRepository: TestSettingsRepository(),
+                launchAtStartupService: StubLaunchAtStartupService()
+            ),
+            cloudSyncService: nil,
+            currentAccountSelectionSyncService: nil,
+            backgroundRefreshPolicy: .init(
+                initialRefreshDelay: .zero,
+                cloudReconciliationInterval: .seconds(30),
+                usageRefreshInterval: .seconds(30),
+                currentSelectionUsageRefreshInterval: .milliseconds(30),
+                workspaceHealthCheckInterval: .seconds(600),
+                refreshUsageOnRecurringTick: false,
+                cloudSyncMode: .pushLocalAccounts,
+                applyRemoteSelectionSwitchEffects: false
+            ),
+            dateProvider: FixedDateProvider(now: now),
+            initialAccounts: []
+        )
+
+        trayModel.startBackgroundRefresh()
+        try? await Task.sleep(for: .milliseconds(120))
+        trayModel.stopBackgroundRefresh()
+
+        let requestedAccountIDs = await usageService.readRequestedAccountIDs()
+        XCTAssertFalse(requestedAccountIDs.isEmpty)
+        XCTAssertTrue(requestedAccountIDs.allSatisfy { $0 == "account-1" })
+    }
+
+    @MainActor
+    func testTrayMenuModelStartBackgroundRefreshRunsWorkspaceHealthCheckOnIndependentTick() async {
+        let now: Int64 = 1_763_216_000
+        let metadataService = RecordingWorkspaceMetadataService(
+            metadata: [
+                WorkspaceMetadata(accountID: "account-1", workspaceName: "remote-space", structure: "workspace")
+            ]
+        )
+        let storeRepository = InMemoryAccountsStoreRepository(
+            store: AccountsStore(
+                accounts: [
+                    StoredAccount(
+                        id: "acct-1",
+                        label: "acct-1",
+                        email: "account-1@example.com",
+                        accountID: "account-1",
+                        planType: "team",
+                        teamName: "workspace-a",
+                        teamAlias: nil,
+                        authJSON: .object([
+                            "account_id": .string("account-1")
+                        ]),
+                        addedAt: now,
+                        updatedAt: now,
+                        usage: nil,
+                        usageError: nil
+                    )
+                ]
+            )
+        )
+        let coordinator = AccountsCoordinator(
+            storeRepository: storeRepository,
+            settingsRepository: TestSettingsRepository(),
+            authRepository: RemoteLookupAuthRepository(),
+            usageService: CountingUsageService(result: makeUsageSnapshot(fetchedAt: now)),
+            workspaceMetadataService: metadataService,
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+        let trayModel = TrayMenuModel(
+            accountsCoordinator: coordinator,
+            settingsCoordinator: SettingsCoordinator(
+                settingsRepository: TestSettingsRepository(),
+                launchAtStartupService: StubLaunchAtStartupService()
+            ),
+            cloudSyncService: nil,
+            currentAccountSelectionSyncService: nil,
+            backgroundRefreshPolicy: .init(
+                initialRefreshDelay: .zero,
+                cloudReconciliationInterval: .seconds(30),
+                usageRefreshInterval: .seconds(30),
+                currentSelectionUsageRefreshInterval: .seconds(10),
+                workspaceHealthCheckInterval: .milliseconds(30),
+                refreshUsageOnRecurringTick: false,
+                cloudSyncMode: .pushLocalAccounts,
+                applyRemoteSelectionSwitchEffects: false
+            ),
+            dateProvider: FixedDateProvider(now: now),
+            initialAccounts: []
+        )
+
+        trayModel.startBackgroundRefresh()
+        try? await Task.sleep(for: .milliseconds(120))
+        trayModel.stopBackgroundRefresh()
+
+        XCTAssertGreaterThanOrEqual(metadataService.callCount, 1)
     }
 }
 

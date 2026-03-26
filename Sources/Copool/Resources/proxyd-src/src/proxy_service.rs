@@ -61,6 +61,12 @@ const DEFAULT_PROXY_REQUEST_BODY_LIMIT_BYTES: usize =
 const PROXY_REQUEST_BODY_LIMIT_MIB_ENV_VAR: &str = "CODEX_TOOLS_PROXY_MAX_BODY_MIB";
 const CODEX_CLIENT_VERSION: &str = "0.101.0";
 const CODEX_USER_AGENT: &str = "codex_cli_rs/0.101.0 (Mac OS 26.0.1; arm64) Apple_Terminal/464";
+const UNSUPPORTED_RESPONSES_FORWARDING_KEYS: &[&str] = &[
+    "prompt_cache_key",
+    "prompt_cache_retention",
+    "safety_identifier",
+    "service_tier",
+];
 const SSE_DONE: &str = "data: [DONE]\n\n";
 const MODELS: &[&str] = &[
     "GPT-5",
@@ -805,6 +811,9 @@ fn normalize_openai_responses_request(mut request: Value) -> Result<(Value, bool
         .and_then(Value::as_bool)
         .unwrap_or(false);
 
+    for key in UNSUPPORTED_RESPONSES_FORWARDING_KEYS {
+        object.remove(*key);
+    }
     object.insert("model".to_string(), Value::String(model));
     object.insert("stream".to_string(), Value::Bool(true));
     object.insert("store".to_string(), Value::Bool(false));
@@ -2864,6 +2873,26 @@ mod tests {
             payload.get("model").and_then(|value| value.as_str()),
             Some("gpt-5.4")
         );
+    }
+
+    #[test]
+    fn drops_unsupported_forwarding_fields_from_responses_request() {
+        let request = json!({
+            "model": "gpt-5.4",
+            "input": "hello",
+            "prompt_cache_key": "factory-droid",
+            "prompt_cache_retention": "24h",
+            "safety_identifier": "user-123",
+            "service_tier": "auto"
+        });
+
+        let (payload, _) =
+            normalize_openai_responses_request(request).expect("request should normalize");
+
+        assert!(payload.get("prompt_cache_key").is_none());
+        assert!(payload.get("prompt_cache_retention").is_none());
+        assert!(payload.get("safety_identifier").is_none());
+        assert!(payload.get("service_tier").is_none());
     }
 
     #[test]

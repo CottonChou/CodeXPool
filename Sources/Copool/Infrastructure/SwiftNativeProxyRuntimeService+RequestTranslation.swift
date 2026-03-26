@@ -1,6 +1,13 @@
 import Foundation
 
 extension SwiftNativeProxyRuntimeService {
+    private static let unsupportedResponsesForwardingKeys: Set<String> = [
+        "prompt_cache_key",
+        "prompt_cache_retention",
+        "safety_identifier",
+        "service_tier"
+    ]
+
     func normalizeResponsesRequest(_ request: [String: Any]) throws -> (payload: [String: Any], downstreamStream: Bool) {
         guard let rawModel = request["model"] as? String, !rawModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw AppError.invalidData(L10n.tr("error.proxy_runtime.missing_model"))
@@ -10,6 +17,9 @@ extension SwiftNativeProxyRuntimeService {
         var payload = request
         let downstreamStream = (request["stream"] as? Bool) ?? false
 
+        for key in Self.unsupportedResponsesForwardingKeys {
+            payload.removeValue(forKey: key)
+        }
         payload["model"] = model
         payload["stream"] = true
         payload["store"] = false

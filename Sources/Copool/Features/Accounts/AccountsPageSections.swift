@@ -24,7 +24,7 @@ struct AccountsPageContentSection: View {
                 .padding(.horizontal, LayoutRules.pagePadding)
         case .content(let cards):
             VStack(alignment: .leading, spacing: LayoutRules.sectionSpacing) {
-                if !presentation.pendingWorkspaceCards.isEmpty || presentation.pendingWorkspaceError != nil {
+                if presentation.shouldShowPendingWorkspaceSection {
                     PendingWorkspaceAuthorizationSection(
                         cards: presentation.pendingWorkspaceCards,
                         errorMessage: presentation.pendingWorkspaceError,

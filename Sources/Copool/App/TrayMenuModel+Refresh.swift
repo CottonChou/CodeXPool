@@ -107,6 +107,22 @@ extension TrayMenuModel {
                 await self.refreshNow(forceUsageRefresh: true)
             }
         }
+        currentSelectionUsageRefreshTask = Task { [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(for: self.backgroundRefreshPolicy.initialRefreshDelay)
+            while !Task.isCancelled {
+                try? await Task.sleep(for: self.backgroundRefreshPolicy.currentSelectionUsageRefreshInterval)
+                await self.refreshCurrentSelectionUsageNow()
+            }
+        }
+        workspaceHealthCheckTask = Task { [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(for: self.backgroundRefreshPolicy.workspaceHealthCheckInterval)
+            while !Task.isCancelled {
+                self.scheduleWorkspaceMetadataRefresh(forceRemoteCheck: true)
+                try? await Task.sleep(for: self.backgroundRefreshPolicy.workspaceHealthCheckInterval)
+            }
+        }
     }
 
     func stopBackgroundRefresh() {
@@ -114,6 +130,10 @@ extension TrayMenuModel {
         cloudReconciliationTask = nil
         usageRefreshTask?.cancel()
         usageRefreshTask = nil
+        currentSelectionUsageRefreshTask?.cancel()
+        currentSelectionUsageRefreshTask = nil
+        workspaceHealthCheckTask?.cancel()
+        workspaceHealthCheckTask = nil
         workspaceMetadataRefreshTask?.cancel()
         workspaceMetadataRefreshTask = nil
         accountsSnapshotPushCancellable = nil
@@ -227,6 +247,25 @@ extension TrayMenuModel {
             }
         }
         return try await accountsCoordinator.listAccounts()
+    }
+
+    func refreshCurrentSelectionUsageNow() async {
+        let latestAccounts = (try? await accountsCoordinator.listAccounts()) ?? accounts
+        guard let currentAccount = latestAccounts.first(where: \.isCurrent) else { return }
+
+        beginRemoteUsageRefreshActivity()
+        defer { endRemoteUsageRefreshActivity() }
+
+        do {
+            let refreshedAccounts = try await refreshLocalAccounts(
+                forceUsageRefresh: true,
+                prefersSerialUsageRefresh: false,
+                bypassUsageThrottle: true,
+                targetAccountIDs: [currentAccount.id],
+                onPartialUpdate: nil
+            )
+            accounts = refreshedAccounts
+        } catch {}
     }
 
     func pullCloudAccountsIfNeeded(

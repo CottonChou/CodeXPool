@@ -417,6 +417,49 @@ final class SwiftNativeProxyRuntimeServiceTests: XCTestCase {
         XCTAssertEqual(normalized.input[0].content[0].text, "reply with exactly OK")
     }
 
+    func testResponsesNormalizationDropsUnsupportedForwardingFields() async throws {
+        let runtime = SwiftNativeProxyRuntimeService(
+            paths: FileSystemPaths(
+                applicationSupportDirectory: URL(fileURLWithPath: "/tmp"),
+                accountStorePath: URL(fileURLWithPath: "/tmp/accounts.json"),
+                settingsStorePath: URL(fileURLWithPath: "/tmp/settings.json"),
+                codexAuthPath: URL(fileURLWithPath: "/tmp/auth.json"),
+                codexConfigPath: URL(fileURLWithPath: "/tmp/config.toml"),
+                proxyDaemonDataDirectory: URL(fileURLWithPath: "/tmp/proxyd", isDirectory: true),
+                proxyDaemonKeyPath: URL(fileURLWithPath: "/tmp/proxyd/api-proxy.key"),
+                cloudflaredLogDirectory: URL(fileURLWithPath: "/tmp/cloudflared-logs", isDirectory: true)
+            ),
+            storeRepository: MockStoreRepository(),
+            settingsRepository: MockSettingsRepository(),
+            authRepository: MockAuthRepository()
+        )
+
+        let retainedUnsupportedKeys = try await runtime.withIsolation { runtime in
+            let normalized = try runtime.normalizeResponsesRequest([
+                "model": "gpt-5.4",
+                "input": [[
+                    "role": "user",
+                    "content": [[
+                        "type": "input_text",
+                        "text": "hello"
+                    ]]
+                ]],
+                "prompt_cache_key": "factory-droid",
+                "prompt_cache_retention": "24h",
+                "safety_identifier": "user-123",
+                "service_tier": "auto"
+            ])
+            return [
+                "prompt_cache_key",
+                "prompt_cache_retention",
+                "safety_identifier",
+                "service_tier"
+            ].filter { normalized.payload[$0] != nil }
+        }
+
+        XCTAssertEqual(retainedUnsupportedKeys, [])
+    }
+
     func testPayloadOversizeDetectionFromContentLengthHeader() {
         let oversized = ProxyRuntimeLimits.maxInboundRequestBytes + 1
         let raw = """
