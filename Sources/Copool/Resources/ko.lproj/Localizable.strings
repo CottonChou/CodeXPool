@@ -7,6 +7,7 @@
 "common.copy" = "복사";
 "common.refresh" = "새로고침";
 "common.close" = "닫기";
+"common.cancel" = "취소";
 "common.refresh_usage" = "사용량 새로고침";
 "common.refreshing" = "새로고침 중...";
 "common.start" = "시작";
@@ -67,7 +68,9 @@
 "settings.error.remote_servers_json_decode_format" = "원격 서버 JSON 파싱 실패: %@";
 
 "accounts.action.smart_switch" = "스마트 전환";
+"accounts.action.import_account" = "계정 가져오기";
 "accounts.action.import_current_auth" = "현재 인증 가져오기";
+"accounts.action.import_auth_file" = "JSON 파일 가져오기";
 "accounts.action.importing" = "가져오는 중...";
 "accounts.action.add_account" = "계정 추가";
 "accounts.action.waiting_for_login" = "로그인 대기 중...";

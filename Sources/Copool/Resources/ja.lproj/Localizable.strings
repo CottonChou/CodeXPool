@@ -7,6 +7,7 @@
 "common.copy" = "コピー";
 "common.refresh" = "更新";
 "common.close" = "閉じる";
+"common.cancel" = "キャンセル";
 "common.refresh_usage" = "使用量を更新";
 "common.refreshing" = "更新中...";
 "common.start" = "開始";
@@ -67,7 +68,9 @@
 "settings.error.remote_servers_json_decode_format" = "Remote servers JSON の解析に失敗しました: %@";
 
 "accounts.action.smart_switch" = "スマート切替";
+"accounts.action.import_account" = "アカウントを取り込む";
 "accounts.action.import_current_auth" = "現在の認証を取り込む";
+"accounts.action.import_auth_file" = "JSON ファイルを取り込む";
 "accounts.action.importing" = "取り込み中...";
 "accounts.action.add_account" = "アカウント追加";
 "accounts.action.waiting_for_login" = "ログイン待機中...";

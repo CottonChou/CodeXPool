@@ -27,13 +27,21 @@ extension AccountsPageModel {
     }
 
     func addAccountViaLogin() async {
+        guard addAccountTask == nil else { return }
         isAdding = true
-        defer { isAdding = false }
+        let task = Task { [coordinator] in
+            try await coordinator.addAccountViaLogin(customLabel: nil)
+        }
+        addAccountTask = task
+        defer {
+            addAccountTask = nil
+            isAdding = false
+        }
 
         do {
             authFlowLogger.log("AccountsPageModel.addAccountViaLogin started")
             AuthFlowDebugLog.write("AccountsPageAuthFlow", "AccountsPageModel.addAccountViaLogin started")
-            let imported = try await coordinator.addAccountViaLogin(customLabel: nil)
+            let imported = try await task.value
             authFlowLogger.log("AccountsPageModel.addAccountViaLogin coordinator returned \(imported.accountID, privacy: .public)")
             AuthFlowDebugLog.write("AccountsPageAuthFlow", "AccountsPageModel.addAccountViaLogin coordinator returned \(imported.accountID)")
             let accounts = try await coordinator.listAccounts()
@@ -47,11 +55,21 @@ extension AccountsPageModel {
             authFlowLogger.log("AccountsPageModel.addAccountViaLogin published local mutation")
             AuthFlowDebugLog.write("AccountsPageAuthFlow", "AccountsPageModel.addAccountViaLogin published local mutation")
             notice = NoticeMessage(style: .success, text: L10n.tr("accounts.notice.imported_new_format", imported.label))
+        } catch is CancellationError {
+            authFlowLogger.log("AccountsPageModel.addAccountViaLogin cancelled")
+            AuthFlowDebugLog.write("AccountsPageAuthFlow", "AccountsPageModel.addAccountViaLogin cancelled")
+            notice = NoticeMessage(style: .error, text: L10n.tr("error.oauth.request_cancelled"))
         } catch {
             authFlowLogger.error("AccountsPageModel.addAccountViaLogin failed: \(error.localizedDescription, privacy: .public)")
             AuthFlowDebugLog.write("AccountsPageAuthFlow", "AccountsPageModel.addAccountViaLogin failed: \(error.localizedDescription)")
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
         }
+    }
+
+    func cancelAddAccount() {
+        authFlowLogger.log("AccountsPageModel.cancelAddAccount requested")
+        AuthFlowDebugLog.write("AccountsPageAuthFlow", "AccountsPageModel.cancelAddAccount requested")
+        addAccountTask?.cancel()
     }
 
     func importAuthDocument(from url: URL, setAsCurrent: Bool) async {

@@ -147,7 +147,8 @@ final class OAuthCallbackBox<Value: Sendable>: @unchecked Sendable {
 
     func wait(
         timeoutSeconds: TimeInterval,
-        timeoutError: @escaping @Sendable () -> AppError
+        timeoutError: @escaping @Sendable () -> AppError,
+        cancelError: @escaping @Sendable () -> AppError
     ) async throws -> Value {
         let timeoutTask = Task { [weak self] in
             let nanoseconds = UInt64(max(timeoutSeconds, 0) * 1_000_000_000)
@@ -156,15 +157,19 @@ final class OAuthCallbackBox<Value: Sendable>: @unchecked Sendable {
         }
         defer { timeoutTask.cancel() }
 
-        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Value, any Error>) in
-            lock.lock()
-            if let result {
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Value, any Error>) in
+                lock.lock()
+                if let result {
+                    lock.unlock()
+                    resume(continuation, with: result)
+                    return
+                }
+                self.continuation = continuation
                 lock.unlock()
-                resume(continuation, with: result)
-                return
             }
-            self.continuation = continuation
-            lock.unlock()
+        } onCancel: { [weak self] in
+            self?.fail(cancelError())
         }
     }
 

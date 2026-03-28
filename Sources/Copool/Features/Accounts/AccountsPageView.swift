@@ -1,8 +1,10 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct AccountsPageView: View {
     @State private var areCardsPresented = false
     @State private var didRunInitialCardEntrance = false
+    @State private var isImportingAuthFile = false
     @StateObject private var store: AccountsPageViewStore
 
     let model: AccountsPageModel
@@ -38,6 +40,13 @@ struct AccountsPageView: View {
             onDeleteAccount: deleteAccount
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .fileImporter(
+            isPresented: $isImportingAuthFile,
+            allowedContentTypes: [.json],
+            allowsMultipleSelection: false
+        ) { result in
+            handleImportAuthFile(result)
+        }
         .onAppear {
             triggerInitialCardEntranceIfNeeded(for: contentAccountCount)
         }
@@ -58,7 +67,23 @@ struct AccountsPageView: View {
     }
 
     private func triggerAction(_ intent: AccountsPageActionIntent) {
+        #if os(iOS)
+        if intent == .importAuthFile {
+            isImportingAuthFile = true
+            return
+        }
+        #endif
         Task { await model.handlePageAction(intent) }
+    }
+
+    private func handleImportAuthFile(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            Task { await model.importAuthDocument(from: url, setAsCurrent: false) }
+        case .failure(let error):
+            model.notice = NoticeMessage(style: .error, text: error.localizedDescription)
+        }
     }
 
     private func toggleCollapse() {

@@ -2,7 +2,9 @@ import Foundation
 
 enum AccountsPageActionIntent: String, Hashable {
     case importCurrentAuth
+    case importAuthFile
     case addAccount
+    case cancelAddAccount
     case toggleUsageProgressDisplay
     case smartSwitch
     case refreshUsage
@@ -29,9 +31,20 @@ struct AccountsActionButtonDescriptor<Intent: Hashable>: Identifiable, Equatable
     let isSpinning: Bool
     let contentStyle: AccountsActionContentStyle
     let surfaceStyle: AccountsActionSurfaceStyle
+    let menuItems: [AccountsActionMenuItem<Intent>]
 
     var id: String {
         String(describing: intent)
+    }
+}
+
+struct AccountsActionMenuItem<Intent: Hashable>: Identifiable, Equatable {
+    let intent: Intent
+    let title: String
+    let systemImage: String
+
+    var id: String {
+        "\(String(describing: intent))-\(title)"
     }
 }
 
@@ -53,29 +66,42 @@ enum AccountsActionPresentation {
                 intent: .importCurrentAuth,
                 title: isImporting
                     ? L10n.tr("accounts.action.importing")
-                    : L10n.tr("accounts.action.import_current_auth"),
+                    : L10n.tr("accounts.action.import_account"),
                 systemImage: "square.and.arrow.down",
                 accessibilityLabel: isImporting
                     ? L10n.tr("accounts.action.importing")
-                    : L10n.tr("accounts.action.import_current_auth"),
+                    : L10n.tr("accounts.action.import_account"),
                 isEnabled: !isImporting && !isAdding,
                 isSpinning: false,
                 contentStyle: .label,
-                surfaceStyle: .prominent
+                surfaceStyle: .prominent,
+                menuItems: [
+                    AccountsActionMenuItem(
+                        intent: .importCurrentAuth,
+                        title: L10n.tr("accounts.action.import_current_auth"),
+                        systemImage: "square.and.arrow.down"
+                    ),
+                    AccountsActionMenuItem(
+                        intent: .importAuthFile,
+                        title: L10n.tr("accounts.action.import_auth_file"),
+                        systemImage: "doc.badge.plus"
+                    )
+                ]
             ),
             AccountsActionButtonDescriptor(
-                intent: .addAccount,
+                intent: isAdding ? .cancelAddAccount : .addAccount,
                 title: isAdding
-                    ? L10n.tr("accounts.action.waiting_for_login")
+                    ? L10n.tr("common.cancel")
                     : L10n.tr("accounts.action.add_account"),
-                systemImage: "plus",
+                systemImage: isAdding ? "xmark" : "plus",
                 accessibilityLabel: isAdding
-                    ? L10n.tr("accounts.action.waiting_for_login")
+                    ? L10n.tr("common.cancel")
                     : L10n.tr("accounts.action.add_account"),
-                isEnabled: !isImporting && !isAdding,
+                isEnabled: isAdding || (!isImporting && !isAdding),
                 isSpinning: false,
                 contentStyle: .label,
-                surfaceStyle: .prominent
+                surfaceStyle: .prominent,
+                menuItems: []
             ),
             AccountsActionButtonDescriptor(
                 intent: .smartSwitch,
@@ -85,7 +111,8 @@ enum AccountsActionPresentation {
                 isEnabled: !isImporting && !isAdding && switchingAccountID == nil,
                 isSpinning: false,
                 contentStyle: .label,
-                surfaceStyle: .prominent
+                surfaceStyle: .prominent,
+                menuItems: []
             ),
             AccountsActionButtonDescriptor(
                 intent: .refreshUsage,
@@ -95,7 +122,8 @@ enum AccountsActionPresentation {
                 isEnabled: canRefreshUsage,
                 isSpinning: isRefreshSpinnerActive,
                 contentStyle: .icon,
-                surfaceStyle: .mint
+                surfaceStyle: .mint,
+                menuItems: []
             )
         ]
     }
@@ -113,19 +141,43 @@ enum AccountsActionPresentation {
                 isEnabled: !isImporting && !isAdding,
                 isSpinning: false,
                 contentStyle: .icon,
-                surfaceStyle: .neutral
+                surfaceStyle: .neutral,
+                menuItems: []
             ),
             AccountsActionButtonDescriptor(
-                intent: .addAccount,
+                intent: .importCurrentAuth,
                 title: nil,
-                systemImage: "plus",
-                accessibilityLabel: isAdding
-                    ? L10n.tr("accounts.action.waiting_for_login")
-                    : L10n.tr("accounts.action.add_account"),
+                systemImage: "square.and.arrow.down",
+                accessibilityLabel: L10n.tr("accounts.action.import_account"),
                 isEnabled: !isImporting && !isAdding,
                 isSpinning: false,
                 contentStyle: .icon,
-                surfaceStyle: .neutral
+                surfaceStyle: .neutral,
+                menuItems: [
+                    AccountsActionMenuItem(
+                        intent: .importCurrentAuth,
+                        title: L10n.tr("accounts.action.import_current_auth"),
+                        systemImage: "square.and.arrow.down"
+                    ),
+                    AccountsActionMenuItem(
+                        intent: .importAuthFile,
+                        title: L10n.tr("accounts.action.import_auth_file"),
+                        systemImage: "doc.badge.plus"
+                    )
+                ]
+            ),
+            AccountsActionButtonDescriptor(
+                intent: isAdding ? .cancelAddAccount : .addAccount,
+                title: nil,
+                systemImage: isAdding ? "xmark" : "plus",
+                accessibilityLabel: isAdding
+                    ? L10n.tr("common.cancel")
+                    : L10n.tr("accounts.action.add_account"),
+                isEnabled: isAdding || (!isImporting && !isAdding),
+                isSpinning: false,
+                contentStyle: .icon,
+                surfaceStyle: .neutral,
+                menuItems: []
             )
         ]
     }
@@ -144,7 +196,8 @@ enum AccountsActionPresentation {
                 isEnabled: canRefreshUsage,
                 isSpinning: isRefreshSpinnerActive,
                 contentStyle: .icon,
-                surfaceStyle: .neutral
+                surfaceStyle: .neutral,
+                menuItems: []
             ),
             AccountsActionButtonDescriptor(
                 intent: .toggleCollapse,
@@ -156,7 +209,8 @@ enum AccountsActionPresentation {
                 isEnabled: true,
                 isSpinning: false,
                 contentStyle: .icon,
-                surfaceStyle: .neutral
+                surfaceStyle: .neutral,
+                menuItems: []
             )
         ]
     }

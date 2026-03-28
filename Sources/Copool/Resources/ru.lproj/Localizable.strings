@@ -7,6 +7,7 @@
 "common.copy" = "Копировать";
 "common.refresh" = "Обновить";
 "common.close" = "Закрыть";
+"common.cancel" = "Отмена";
 "common.refresh_usage" = "Обновить использование";
 "common.refreshing" = "Обновление...";
 "common.start" = "Запустить";
@@ -67,7 +68,9 @@
 "settings.error.remote_servers_json_decode_format" = "Не удалось разобрать JSON удаленных серверов: %@";
 
 "accounts.action.smart_switch" = "Умное переключение";
+"accounts.action.import_account" = "Импортировать аккаунт";
 "accounts.action.import_current_auth" = "Импортировать текущую auth";
+"accounts.action.import_auth_file" = "Импортировать JSON-файл";
 "accounts.action.importing" = "Импорт...";
 "accounts.action.add_account" = "Добавить аккаунт";
 "accounts.action.waiting_for_login" = "Ожидание входа...";

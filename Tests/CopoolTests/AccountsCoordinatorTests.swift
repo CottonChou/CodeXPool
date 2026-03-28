@@ -1695,6 +1695,191 @@ final class AccountsCoordinatorTests: XCTestCase {
     }
 
     @MainActor
+    func testAccountsPageModelCancelAddAccountStopsPendingLoginTask() async {
+        let loginService = HangingChatGPTOAuthLoginService()
+        let coordinator = AccountsCoordinator(
+            storeRepository: InMemoryAccountsStoreRepository(store: AccountsStore()),
+            settingsRepository: TestSettingsRepository(),
+            authRepository: StubAuthRepository(),
+            usageService: CountingUsageService(
+                result: UsageSnapshot(
+                    fetchedAt: 1,
+                    planType: "pro",
+                    fiveHour: nil,
+                    oneWeek: nil,
+                    credits: nil
+                )
+            ),
+            workspaceMetadataService: StubWorkspaceMetadataService(metadata: []),
+            chatGPTOAuthLoginService: loginService,
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: 1)
+        )
+        let model = AccountsPageModel(coordinator: coordinator)
+
+        let addTask = Task { await model.addAccountViaLogin() }
+        await loginService.waitUntilStarted()
+        XCTAssertTrue(model.isAdding)
+
+        model.cancelAddAccount()
+        await addTask.value
+
+        XCTAssertFalse(model.isAdding)
+        XCTAssertEqual(model.notice?.text, L10n.tr("error.oauth.request_cancelled"))
+    }
+
+    @MainActor
+    func testAccountsPageModelImportAuthDocumentAddsNewAccountWithoutChangingCurrentSelection() async throws {
+        let now: Int64 = 1_763_216_000
+        let currentAuth = JSONValue.object([
+            "tokens": .object([
+                "access_token": .string("token-account-current"),
+                "account_id": .string("account-current")
+            ])
+        ])
+        let importedAuth = JSONValue.object([
+            "tokens": .object([
+                "access_token": .string("token-account-imported"),
+                "account_id": .string("account-imported")
+            ])
+        ])
+        let importURL = URL(fileURLWithPath: "/tmp/imported-auth.json")
+        let storeRepository = InMemoryAccountsStoreRepository(
+            store: AccountsStore(
+                accounts: [
+                    StoredAccount(
+                        id: "acct-current",
+                        label: "Current",
+                        email: "current@example.com",
+                        accountID: "account-current",
+                        planType: "pro",
+                        teamName: nil,
+                        teamAlias: nil,
+                        authJSON: currentAuth,
+                        addedAt: now,
+                        updatedAt: now,
+                        usage: makeUsageSnapshot(fetchedAt: now, fiveHourResetAt: now + 300),
+                        usageError: nil
+                    )
+                ]
+            )
+        )
+        let authRepository = URLMappedAuthRepository(
+            currentAuth: currentAuth,
+            importedAuthByURL: [importURL: importedAuth],
+            extractedByAccessToken: [
+                "token-account-current": makeExtractedAuth(accountID: "account-current"),
+                "token-account-imported": makeExtractedAuth(accountID: "account-imported")
+            ]
+        )
+        let usageService = RecordingAccountUsageService(
+            results: [
+                "account-imported": makeUsageSnapshot(fetchedAt: now, fiveHourResetAt: now + 600)
+            ]
+        )
+        let coordinator = AccountsCoordinator(
+            storeRepository: storeRepository,
+            settingsRepository: TestSettingsRepository(),
+            authRepository: authRepository,
+            usageService: usageService,
+            workspaceMetadataService: StubWorkspaceMetadataService(metadata: []),
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+        let model = AccountsPageModel(coordinator: coordinator)
+
+        await model.importAuthDocument(from: importURL, setAsCurrent: false)
+
+        guard case .content(let accounts) = model.state else {
+            return XCTFail("Expected imported accounts content state")
+        }
+        XCTAssertEqual(accounts.map { $0.accountID }, ["account-current", "account-imported"])
+        XCTAssertEqual(model.notice?.text, L10n.tr("accounts.notice.imported_new_format", "account-imported@example.com"))
+        XCTAssertEqual(try authRepository.readCurrentAuth(), currentAuth)
+    }
+
+    @MainActor
+    func testAccountsPageModelImportAuthFileImportsSelectedDocumentWithoutChangingCurrentSelection() async throws {
+        let now: Int64 = 1_763_216_000
+        let currentAuth = JSONValue.object([
+            "tokens": .object([
+                "access_token": .string("token-account-current"),
+                "account_id": .string("account-current")
+            ])
+        ])
+        let importedAuth = JSONValue.object([
+            "tokens": .object([
+                "access_token": .string("token-account-imported"),
+                "account_id": .string("account-imported")
+            ])
+        ])
+        let importURL = URL(fileURLWithPath: "/tmp/imported-auth.json")
+        let storeRepository = InMemoryAccountsStoreRepository(
+            store: AccountsStore(
+                accounts: [
+                    StoredAccount(
+                        id: "acct-current",
+                        label: "Current",
+                        email: "current@example.com",
+                        accountID: "account-current",
+                        planType: "pro",
+                        teamName: nil,
+                        teamAlias: nil,
+                        authJSON: currentAuth,
+                        addedAt: now,
+                        updatedAt: now,
+                        usage: makeUsageSnapshot(fetchedAt: now, fiveHourResetAt: now + 300),
+                        usageError: nil
+                    )
+                ]
+            )
+        )
+        let authRepository = URLMappedAuthRepository(
+            currentAuth: currentAuth,
+            importedAuthByURL: [importURL: importedAuth],
+            extractedByAccessToken: [
+                "token-account-current": makeExtractedAuth(accountID: "account-current"),
+                "token-account-imported": makeExtractedAuth(accountID: "account-imported")
+            ]
+        )
+        let usageService = RecordingAccountUsageService(
+            results: [
+                "account-imported": makeUsageSnapshot(fetchedAt: now, fiveHourResetAt: now + 600)
+            ]
+        )
+        let coordinator = AccountsCoordinator(
+            storeRepository: storeRepository,
+            settingsRepository: TestSettingsRepository(),
+            authRepository: authRepository,
+            usageService: usageService,
+            workspaceMetadataService: StubWorkspaceMetadataService(metadata: []),
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+        let model = AccountsPageModel(
+            coordinator: coordinator,
+            chooseAuthDocumentURL: { importURL }
+        )
+
+        await model.handlePageAction(.importAuthFile)
+
+        guard case .content(let accounts) = model.state else {
+            return XCTFail("Expected imported accounts content state")
+        }
+        XCTAssertEqual(accounts.map { $0.accountID }, ["account-current", "account-imported"])
+        XCTAssertEqual(model.notice?.text, L10n.tr("accounts.notice.imported_new_format", "account-imported@example.com"))
+        XCTAssertEqual(try authRepository.readCurrentAuth(), currentAuth)
+    }
+
+    @MainActor
     func testAccountsPageModelAuthorizePendingWorkspaceImportsAndClearsCandidate() async {
         let now: Int64 = 1_763_216_000
         let loginService = RecordingWorkspaceAwareChatGPTOAuthLoginService(
@@ -4800,6 +4985,46 @@ private final class MultiAccountAuthRepository: AuthRepository, @unchecked Senda
     }
 }
 
+private final class URLMappedAuthRepository: AuthRepository, @unchecked Sendable {
+    private let currentAuth: JSONValue
+    private let importedAuthByURL: [URL: JSONValue]
+    private let extractedByAccessToken: [String: ExtractedAuth]
+
+    init(
+        currentAuth: JSONValue,
+        importedAuthByURL: [URL: JSONValue],
+        extractedByAccessToken: [String: ExtractedAuth]
+    ) {
+        self.currentAuth = currentAuth
+        self.importedAuthByURL = importedAuthByURL
+        self.extractedByAccessToken = extractedByAccessToken
+    }
+
+    func readCurrentAuth() throws -> JSONValue { currentAuth }
+    func readCurrentAuthOptional() throws -> JSONValue? { currentAuth }
+    func readAuth(from url: URL) throws -> JSONValue {
+        guard let auth = importedAuthByURL[url] else {
+            throw AppError.io("Missing test auth for URL \(url.path)")
+        }
+        return auth
+    }
+    func writeCurrentAuth(_ auth: JSONValue) throws {
+        _ = auth
+    }
+    func removeCurrentAuth() throws {}
+    func makeChatGPTAuth(from tokens: ChatGPTOAuthTokens) throws -> JSONValue {
+        _ = tokens
+        return .null
+    }
+    func extractAuth(from auth: JSONValue) throws -> ExtractedAuth {
+        guard let accessToken = auth["tokens"]?["access_token"]?.stringValue,
+              let extracted = extractedByAccessToken[accessToken] else {
+            throw AppError.invalidData("Missing extracted auth for test access token")
+        }
+        return extracted
+    }
+}
+
 private final class TokenMappedAuthRepository: AuthRepository, @unchecked Sendable {
     private let extractedByAccessToken: [String: ExtractedAuth]
 
@@ -5045,6 +5270,39 @@ private actor WorkspaceLoginRecorder {
 
     func values() -> [String] {
         forcedWorkspaceIDs
+    }
+}
+
+private actor HangingLoginState {
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var hasStarted = false
+
+    func markStarted() {
+        hasStarted = true
+        continuation?.resume()
+        continuation = nil
+    }
+
+    func waitUntilStarted() async {
+        guard !hasStarted else { return }
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+}
+
+private final class HangingChatGPTOAuthLoginService: ChatGPTOAuthLoginServiceProtocol, @unchecked Sendable {
+    private let state = HangingLoginState()
+
+    func signInWithChatGPT(timeoutSeconds: TimeInterval) async throws -> ChatGPTOAuthTokens {
+        _ = timeoutSeconds
+        await state.markStarted()
+        try await Task.sleep(nanoseconds: 3_600_000_000_000)
+        return ChatGPTOAuthTokens(accessToken: "", refreshToken: "", idToken: "", apiKey: nil)
+    }
+
+    func waitUntilStarted() async {
+        await state.waitUntilStarted()
     }
 }
 

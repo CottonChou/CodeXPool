@@ -75,6 +75,8 @@ final class OpenAIChatGPTOAuthLoginService: ChatGPTOAuthLoginServiceProtocol, @u
         do {
             var tokens = try await callback.wait(timeoutSeconds: timeoutSeconds) {
                 AppError.io(L10n.tr("error.accounts.add_account_timeout"))
+            } cancelError: {
+                AppError.io(L10n.tr("error.oauth.request_cancelled"))
             }
             logger.log("Auth callback resolved successfully")
             AuthFlowDebugLog.write("AuthLogin", "Auth callback resolved successfully")

@@ -7,6 +7,7 @@
 "common.copy" = "Kopieren";
 "common.refresh" = "Aktualisieren";
 "common.close" = "Schließen";
+"common.cancel" = "Abbrechen";
 "common.refresh_usage" = "Nutzung aktualisieren";
 "common.refreshing" = "Aktualisiere...";
 "common.start" = "Starten";
@@ -67,7 +68,9 @@
 "settings.error.remote_servers_json_decode_format" = "Fehler beim Parsen der Remote-Server-JSON: %@";
 
 "accounts.action.smart_switch" = "Intelligenter Wechsel";
+"accounts.action.import_account" = "Konto importieren";
 "accounts.action.import_current_auth" = "Aktuelle Auth importieren";
+"accounts.action.import_auth_file" = "JSON-Datei importieren";
 "accounts.action.importing" = "Importiere...";
 "accounts.action.add_account" = "Konto hinzufügen";
 "accounts.action.waiting_for_login" = "Warte auf Anmeldung...";

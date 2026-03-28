@@ -10,12 +10,14 @@ final class AccountsPageModel: ObservableObject {
     let localAccountsMutationSyncService: AccountsLocalMutationSyncServiceProtocol?
     let currentAccountSelectionSyncService: CurrentAccountSelectionSyncServiceProtocol?
     let cloudSyncAvailabilityService: CloudSyncAvailabilityService?
+    let chooseAuthDocumentURL: (() -> URL?)?
     let onLocalAccountsChanged: (([AccountSummary]) -> Void)?
     let onSettingsUpdated: ((AppSettings) -> Void)?
     let runtimePlatform: RuntimePlatform
 
     private let noticeScheduler = NoticeAutoDismissScheduler()
     var pendingWorkspaceRefreshTask: Task<Void, Never>?
+    var addAccountTask: Task<AccountSummary, Error>?
 
     var hasLoaded = false
     var isCloudSyncAvailable = true
@@ -49,6 +51,7 @@ final class AccountsPageModel: ObservableObject {
         localAccountsMutationSyncService: AccountsLocalMutationSyncServiceProtocol? = nil,
         currentAccountSelectionSyncService: CurrentAccountSelectionSyncServiceProtocol? = nil,
         cloudSyncAvailabilityService: CloudSyncAvailabilityService? = nil,
+        chooseAuthDocumentURL: (() -> URL?)? = nil,
         runtimePlatform: RuntimePlatform = PlatformCapabilities.currentPlatform,
         usageProgressDisplayMode: UsageProgressDisplayMode = .used,
         onLocalAccountsChanged: (([AccountSummary]) -> Void)? = nil,
@@ -62,6 +65,7 @@ final class AccountsPageModel: ObservableObject {
         self.localAccountsMutationSyncService = localAccountsMutationSyncService
         self.currentAccountSelectionSyncService = currentAccountSelectionSyncService
         self.cloudSyncAvailabilityService = cloudSyncAvailabilityService
+        self.chooseAuthDocumentURL = chooseAuthDocumentURL
         self.runtimePlatform = runtimePlatform
         self.usageProgressDisplayMode = usageProgressDisplayMode
         self.onLocalAccountsChanged = onLocalAccountsChanged
@@ -106,6 +110,7 @@ final class AccountsPageModel: ObservableObject {
     }
 
     deinit {
+        addAccountTask?.cancel()
         pendingWorkspaceRefreshTask?.cancel()
     }
 
@@ -161,8 +166,13 @@ final class AccountsPageModel: ObservableObject {
         switch intent {
         case .importCurrentAuth:
             await importCurrentAuth()
+        case .importAuthFile:
+            guard let url = chooseAuthDocumentURL?() else { return }
+            await importAuthDocument(from: url, setAsCurrent: false)
         case .addAccount:
             await addAccountViaLogin()
+        case .cancelAddAccount:
+            cancelAddAccount()
         case .toggleUsageProgressDisplay:
             await toggleUsageProgressDisplay()
         case .smartSwitch:

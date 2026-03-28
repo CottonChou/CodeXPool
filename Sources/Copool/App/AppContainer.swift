@@ -131,6 +131,22 @@ final class AppContainer {
                 localAccountsMutationSyncService: trayModel,
                 currentAccountSelectionSyncService: currentAccountSelectionSyncService,
                 cloudSyncAvailabilityService: cloudSyncAvailabilityService,
+                chooseAuthDocumentURL: {
+                    #if canImport(AppKit)
+                    let panel = NSOpenPanel()
+                    panel.canChooseFiles = true
+                    panel.canChooseDirectories = false
+                    panel.allowsMultipleSelection = false
+                    panel.canCreateDirectories = false
+                    panel.allowedContentTypes = [.json]
+                    panel.title = L10n.tr("accounts.action.import_auth_file")
+                    NSApp.activate(ignoringOtherApps: true)
+                    guard panel.runModal() == .OK else { return nil }
+                    return panel.url
+                    #else
+                    return nil
+                    #endif
+                },
                 runtimePlatform: PlatformCapabilities.currentPlatform,
                 usageProgressDisplayMode: initialSettings.usageProgressDisplayMode,
                 onLocalAccountsChanged: { accounts in

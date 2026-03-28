@@ -35,10 +35,26 @@ private struct AccountsActionBarButton<Intent: Hashable>: View {
     let onTrigger: (Intent) -> Void
 
     var body: some View {
-        Button {
-            onTrigger(descriptor.intent)
-        } label: {
-            AccountsActionLabel(descriptor: descriptor)
+        Group {
+            if descriptor.menuItems.isEmpty {
+                Button {
+                    onTrigger(descriptor.intent)
+                } label: {
+                    AccountsActionLabel(descriptor: descriptor)
+                }
+            } else {
+                Menu {
+                    ForEach(descriptor.menuItems) { item in
+                        Button {
+                            onTrigger(item.intent)
+                        } label: {
+                            Label(item.title, systemImage: item.systemImage)
+                        }
+                    }
+                } label: {
+                    AccountsActionLabel(descriptor: descriptor)
+                }
+            }
         }
         .disabled(!descriptor.isEnabled)
         .copoolActionButtonStyle(
@@ -64,19 +80,39 @@ private struct AccountsToolbarButton<Intent: Hashable>: View {
     let onTrigger: (Intent) -> Void
 
     var body: some View {
-        Button {
-            onTrigger(descriptor.intent)
-        } label: {
-            ToolbarIconLabel(
-                systemImage: descriptor.systemImage,
-                isSpinning: descriptor.isSpinning,
-                opticalScale: descriptor.systemImage == "arrow.trianglehead.clockwise.rotate.90"
-                    ? LayoutRules.toolbarRefreshIconOpticalScale
-                    : 1
-            )
+        Group {
+            if descriptor.menuItems.isEmpty {
+                Button {
+                    onTrigger(descriptor.intent)
+                } label: {
+                    iconLabel
+                }
+            } else {
+                Menu {
+                    ForEach(descriptor.menuItems) { item in
+                        Button {
+                            onTrigger(item.intent)
+                        } label: {
+                            Label(item.title, systemImage: item.systemImage)
+                        }
+                    }
+                } label: {
+                    iconLabel
+                }
+            }
         }
         .disabled(!descriptor.isEnabled)
         .accessibilityLabel(Text(descriptor.accessibilityLabel))
+    }
+
+    private var iconLabel: some View {
+        ToolbarIconLabel(
+            systemImage: descriptor.systemImage,
+            isSpinning: descriptor.isSpinning,
+            opticalScale: descriptor.systemImage == "arrow.trianglehead.clockwise.rotate.90"
+                ? LayoutRules.toolbarRefreshIconOpticalScale
+                : 1
+        )
     }
 }
 
