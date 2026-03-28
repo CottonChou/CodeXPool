@@ -78,6 +78,10 @@ private struct AccountsGridSection: View {
         LayoutRules.accountsGridColumns(context: gridContext)
     }
 
+    private var cardFrameWidth: CGFloat? {
+        LayoutRules.accountsCardFrameWidth(context: gridContext)
+    }
+
     var body: some View {
         LazyVGrid(
             columns: columns,
@@ -89,6 +93,7 @@ private struct AccountsGridSection: View {
                     AccountCardGridItem(
                         store: cardStore,
                         areCardsPresented: areCardsPresented,
+                        frameWidth: cardFrameWidth,
                         index: index,
                         onSwitch: { onSwitchAccount(cardID) },
                         onRefresh: { onRefreshAccountUsage(cardID) },
@@ -97,10 +102,6 @@ private struct AccountsGridSection: View {
                 }
             }
         }
-        .animation(
-            AccountsAnimationRules.contentReorder,
-            value: cardIDs
-        )
         .padding(.horizontal, LayoutRules.pagePadding)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -109,6 +110,7 @@ private struct AccountsGridSection: View {
 private struct AccountCardGridItem: View {
     @ObservedObject var store: AccountCardStore
     let areCardsPresented: Bool
+    let frameWidth: CGFloat?
     let index: Int
     let onSwitch: () -> Void
     let onRefresh: () -> Void
@@ -129,6 +131,7 @@ private struct AccountCardGridItem: View {
             onRefresh: onRefresh,
             onDelete: onDelete
         )
+        .frame(width: frameWidth)
         .copoolCardEntrance(index: index, isPresented: areCardsPresented)
         .modifier(AccountCardFrameModifier())
     }

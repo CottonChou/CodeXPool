@@ -19,7 +19,7 @@ final class AccountsPageModel: ObservableObject {
 
     var hasLoaded = false
     var isCloudSyncAvailable = true
-    var usageProgressDisplayMode: UsageProgressDisplayMode
+    @Published var usageProgressDisplayMode: UsageProgressDisplayMode
 
     @Published var state: ViewState<[AccountSummary]>
     @Published var notice: NoticeMessage? {

@@ -66,7 +66,7 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
                     workspaceHealthCheckInterval: .seconds(600),
                     refreshUsageOnRecurringTick: true,
                     cloudSyncMode: .pullRemoteAccounts,
-                    applyRemoteSelectionSwitchEffects: false
+                    applyRemoteSelectionSwitchEffects: true
                 )
             }
         }

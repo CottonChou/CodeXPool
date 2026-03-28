@@ -176,8 +176,6 @@ actor AccountsCoordinator {
             accountKey: matchedAccount.accountKey
         )
         try storeRepository.saveStore(store)
-
-        guard runtimePlatform == .macOS else { return }
         try authRepository.writeCurrentAuth(authJSON)
     }
 

@@ -113,7 +113,20 @@ enum LayoutRules {
     }
 
     static func accountsGridColumns(context: AccountsGridContext) -> [GridItem] {
-        Array(
+        if context.platform == .macOS {
+            let width = context.isOverviewMode ? accountsCollapsedCardWidth : accountsCardWidth
+            let count = accountsGridColumnCount(context: context)
+            return Array(
+                repeating: GridItem(
+                    .fixed(width),
+                    spacing: accountsRowSpacing,
+                    alignment: .top
+                ),
+                count: count
+            )
+        }
+
+        return Array(
             repeating: GridItem(
                 .flexible(minimum: 0, maximum: .infinity),
                 spacing: accountsRowSpacing,
@@ -124,7 +137,11 @@ enum LayoutRules {
     }
 
     static func accountsGridColumnCount(context: AccountsGridContext) -> Int {
-        min(
+        if context.platform == .macOS {
+            return accountsGridTargetColumnCount(context: context)
+        }
+
+        return min(
             accountsGridTargetColumnCount(context: context),
             accountsGridMaximumColumnCount(context: context)
         )
@@ -157,7 +174,21 @@ enum LayoutRules {
     #endif
 
     static func accountsCardFrameWidth(isOverviewMode: Bool, isCompactWidth: Bool) -> CGFloat? {
-        nil
+        accountsCardFrameWidth(
+            context: AccountsGridContext(
+                platform: isCompactWidth ? .iPhone : .macOS,
+                isOverviewMode: isOverviewMode,
+                viewportSize: CGSize(
+                    width: isCompactWidth ? 390 : accountsPageTargetWidth,
+                    height: isCompactWidth ? 844 : defaultPanelHeight
+                )
+            )
+        )
+    }
+
+    static func accountsCardFrameWidth(context: AccountsGridContext) -> CGFloat? {
+        guard context.platform == .macOS else { return nil }
+        return context.isOverviewMode ? accountsCollapsedCardWidth : accountsCardWidth
     }
 
     static func accountsPageContentWidth(isCompactWidth: Bool) -> CGFloat? {

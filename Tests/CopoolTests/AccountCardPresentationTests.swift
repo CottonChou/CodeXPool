@@ -2,6 +2,13 @@ import XCTest
 @testable import Copool
 
 final class AccountCardPresentationTests: XCTestCase {
+    func testCurrentAccountPaletteKeepsTealSelectionHighlight() {
+        let palette = AccountCardPalette(accent: .orange, isCurrent: true)
+
+        XCTAssertEqual(palette.selectionBorderAccent, .teal)
+        XCTAssertNotNil(palette.surfaceTint)
+    }
+
     func testCollapsedPresentationUsesAliasAccentAndShortEmail() {
         let account = AccountSummary(
             id: "acct-1",

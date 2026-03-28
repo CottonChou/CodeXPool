@@ -24,21 +24,31 @@ enum AccountCardSwitchButtonLabelStyle {
 struct AccountCardPalette {
     let toneColor: Color
     let surfaceTint: Color?
+    let selectionBorderAccent: AccountCardAccent?
 
     init(accent: AccountCardAccent, isCurrent: Bool) {
+        toneColor = Self.color(for: accent)
+        selectionBorderAccent = isCurrent ? .teal : nil
+        surfaceTint = selectionBorderAccent.map { Self.color(for: $0).opacity(0.14) }
+    }
+
+    var selectionBorderColor: Color? {
+        selectionBorderAccent.map { Self.color(for: $0).opacity(0.45) }
+    }
+
+    private static func color(for accent: AccountCardAccent) -> Color {
         switch accent {
         case .orange:
-            toneColor = .orange
+            .orange
         case .pink:
-            toneColor = .pink
+            .pink
         case .gray:
-            toneColor = .gray
+            .gray
         case .indigo:
-            toneColor = .indigo
+            .indigo
         case .teal:
-            toneColor = .teal
+            .teal
         }
-        surfaceTint = isCurrent ? .teal.opacity(0.14) : nil
     }
 }
 

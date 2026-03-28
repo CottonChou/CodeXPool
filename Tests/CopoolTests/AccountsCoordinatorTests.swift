@@ -984,7 +984,7 @@ final class AccountsCoordinatorTests: XCTestCase {
         XCTAssertEqual(accounts, partialUpdates.last)
     }
 
-    func testSwitchAccountOnIOSSkipsMacOnlySideEffects() async throws {
+    func testSwitchAccountOnIOSUpdatesAuthButSkipsMacOnlySideEffects() async throws {
         let now: Int64 = 1_763_216_000
         let account = StoredAccount(
             id: "acct-1",
@@ -1042,7 +1042,7 @@ final class AccountsCoordinatorTests: XCTestCase {
 
         _ = try await coordinator.switchAccountAndApplySettings(id: account.id)
 
-        XCTAssertEqual(authRepository.writtenAccountCount, 0)
+        XCTAssertEqual(authRepository.writtenAccountCount, 1)
         XCTAssertEqual(codexService.launchCallCount, 0)
         XCTAssertEqual(editorService.restartCallCount, 0)
         XCTAssertEqual(try storeRepository.loadStore().currentSelection?.accountID, account.accountID)
@@ -3836,6 +3836,13 @@ final class AccountsCoordinatorTests: XCTestCase {
         XCTAssertEqual(try storeRepository.loadStore().currentSelection?.accountID, "account-2")
         XCTAssertEqual(recordedAccountIDs, ["account-2"])
         XCTAssertEqual(pushCallCount, 1)
+    }
+
+    func testIOSBackgroundRefreshPolicyAppliesRemoteSelectionSwitchEffects() {
+        let policy = TrayMenuModel.BackgroundRefreshPolicy.forPlatform(.iOS)
+
+        XCTAssertEqual(policy.cloudSyncMode, .pullRemoteAccounts)
+        XCTAssertTrue(policy.applyRemoteSelectionSwitchEffects)
     }
 
     @MainActor

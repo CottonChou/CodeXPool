@@ -36,42 +36,74 @@ final class AccountsPageViewStore: ObservableObject {
     }
 
     private func bind() {
-        model.objectWillChange
-        .sink { [weak self] in
-            guard let self else { return }
-            Task { @MainActor [weak self] in
-                self?.refreshPresentations()
+        contentDependenciesPublisher()
+            .sink { [weak self] in
+                Task { @MainActor [weak self] in
+                    self?.refreshContentPresentation()
+                }
             }
-        }
-        .store(in: &cancellables)
+            .store(in: &cancellables)
+
+        macActionBarDependenciesPublisher()
+            .sink { [weak self] in
+                Task { @MainActor [weak self] in
+                    self?.refreshMacActionBarPresentation()
+                }
+            }
+            .store(in: &cancellables)
+
+        leadingToolbarDependenciesPublisher()
+            .sink { [weak self] in
+                Task { @MainActor [weak self] in
+                    self?.refreshLeadingToolbarButtons()
+                }
+            }
+            .store(in: &cancellables)
+
+        trailingToolbarDependenciesPublisher()
+            .sink { [weak self] in
+                Task { @MainActor [weak self] in
+                    self?.refreshTrailingToolbarButtons()
+                }
+            }
+            .store(in: &cancellables)
     }
 
     func syncFromModel() {
-        refreshPresentations()
+        refreshContentPresentation()
+        refreshMacActionBarPresentation()
+        refreshLeadingToolbarButtons()
+        refreshTrailingToolbarButtons()
     }
 
     func cardStore(for id: String) -> AccountCardStore? {
         cardStoresByID[id]
     }
 
-    private func refreshPresentations() {
+    private func refreshContentPresentation() {
         syncCardStores(with: model.makeAccountCardViewStates())
 
         let nextContent = model.makeContentPresentation()
         if contentPresentation != nextContent {
             contentPresentation = nextContent
         }
+    }
 
+    private func refreshMacActionBarPresentation() {
         let nextMacActionBar = model.makeMacActionBarPresentation()
         if macActionBarPresentation != nextMacActionBar {
             macActionBarPresentation = nextMacActionBar
         }
+    }
 
+    private func refreshLeadingToolbarButtons() {
         let nextLeading = model.leadingToolbarButtons
         if leadingToolbarButtons != nextLeading {
             leadingToolbarButtons = nextLeading
         }
+    }
 
+    private func refreshTrailingToolbarButtons() {
         let nextTrailing = model.trailingToolbarButtons
         if trailingToolbarButtons != nextTrailing {
             trailingToolbarButtons = nextTrailing
@@ -89,5 +121,60 @@ final class AccountsPageViewStore: ObservableObject {
                 cardStoresByID[presentation.id] = AccountCardStore(presentation: presentation)
             }
         }
+    }
+
+    private func contentDependenciesPublisher() -> AnyPublisher<Void, Never> {
+        Publishers.MergeMany(
+            dependencyPublisher(model.$state),
+            dependencyPublisher(model.$collapsedAccountIDs),
+            dependencyPublisher(model.$switchingAccountID),
+            dependencyPublisher(model.$refreshingAccountIDs),
+            dependencyPublisher(model.$isManualRefreshing),
+            dependencyPublisher(model.$isRemoteUsageRefreshing),
+            dependencyPublisher(model.$usageProgressDisplayMode),
+            dependencyPublisher(model.$pendingWorkspaceAuthorizations),
+            dependencyPublisher(model.$pendingWorkspaceAuthorizationError),
+            dependencyPublisher(model.$authorizingWorkspaceID)
+        )
+        .eraseToAnyPublisher()
+    }
+
+    private func macActionBarDependenciesPublisher() -> AnyPublisher<Void, Never> {
+        Publishers.MergeMany(
+            dependencyPublisher(model.$state),
+            dependencyPublisher(model.$collapsedAccountIDs),
+            dependencyPublisher(model.$isImporting),
+            dependencyPublisher(model.$isAdding),
+            dependencyPublisher(model.$switchingAccountID),
+            dependencyPublisher(model.$isManualRefreshing)
+        )
+        .eraseToAnyPublisher()
+    }
+
+    private func leadingToolbarDependenciesPublisher() -> AnyPublisher<Void, Never> {
+        Publishers.MergeMany(
+            dependencyPublisher(model.$isImporting),
+            dependencyPublisher(model.$isAdding)
+        )
+        .eraseToAnyPublisher()
+    }
+
+    private func trailingToolbarDependenciesPublisher() -> AnyPublisher<Void, Never> {
+        Publishers.MergeMany(
+            dependencyPublisher(model.$state),
+            dependencyPublisher(model.$collapsedAccountIDs),
+            dependencyPublisher(model.$isAdding),
+            dependencyPublisher(model.$isManualRefreshing)
+        )
+        .eraseToAnyPublisher()
+    }
+
+    private func dependencyPublisher<Value: Equatable>(
+        _ publisher: Published<Value>.Publisher
+    ) -> AnyPublisher<Void, Never> {
+        publisher
+            .removeDuplicates()
+            .map { _ in () }
+            .eraseToAnyPublisher()
     }
 }
