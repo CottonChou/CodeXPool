@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use std::process::Child;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::RwLock;
 
@@ -15,6 +16,8 @@ pub(crate) struct ApiProxyRuntimeSnapshot {
     pub(crate) active_account_id: Option<String>,
     pub(crate) active_account_label: Option<String>,
     pub(crate) last_error: Option<String>,
+    pub(crate) sticky_account_id: Option<String>,
+    pub(crate) cooldown_until_by_account_id: HashMap<String, i64>,
 }
 
 pub(crate) struct ApiProxyRuntimeHandle {

@@ -130,11 +130,13 @@ pub(crate) fn sync_current_auth_account_on_startup_in_path(path: &Path) -> Resul
         email: extracted.email,
         account_id: extracted.account_id,
         plan_type: extracted.plan_type,
+        team_alias: None,
         auth_json,
         added_at: now,
         updated_at: now,
         usage: None,
         usage_error: None,
+        principal_id: None,
     };
     store.accounts.push(stored);
     save_store_to_path(path, &store)?;

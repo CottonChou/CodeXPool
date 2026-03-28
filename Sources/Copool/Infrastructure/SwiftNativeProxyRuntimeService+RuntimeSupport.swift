@@ -5,17 +5,18 @@ extension SwiftNativeProxyRuntimeService {
         let modificationDate = accountsStoreModificationDate()
         if let cachedCandidates,
            cachedCandidatesStoreModificationDate == modificationDate {
-            return cachedCandidates
+            return applyRuntimeCandidateOrdering(to: cachedCandidates)
         }
 
         let candidates = try loadCandidates()
         cachedCandidates = candidates
         cachedCandidatesStoreModificationDate = modificationDate
-        return candidates
+        return applyRuntimeCandidateOrdering(to: candidates)
     }
 
     func loadCandidates() throws -> [ProxyCandidate] {
         let store = try storeRepository.loadStore()
+        let currentSelection = store.currentSelection
 
         let candidates = try store.accounts.compactMap { account -> ProxyCandidate? in
             let extracted = try authRepository.extractAuth(from: account.authJSON)
@@ -23,15 +24,60 @@ extension SwiftNativeProxyRuntimeService {
                 id: account.id,
                 label: account.label,
                 accountID: extracted.accountID,
+                accountKey: account.accountKey,
                 accessToken: extracted.accessToken,
                 authJSON: account.authJSON,
+                addedAt: account.addedAt,
+                isPreferredCurrent: currentSelection.map { AccountIdentity.matches(selection: $0, account: account) } ?? false,
                 oneWeekUsed: account.usage?.oneWeek?.usedPercent,
                 fiveHourUsed: account.usage?.fiveHour?.usedPercent
             )
         }
 
         return candidates.sorted { lhs, rhs in
-            lhs.remainingScore > rhs.remainingScore
+            if lhs.isPreferredCurrent != rhs.isPreferredCurrent {
+                return lhs.isPreferredCurrent
+            }
+            if lhs.remainingScore != rhs.remainingScore {
+                return lhs.remainingScore > rhs.remainingScore
+            }
+            if lhs.addedAt != rhs.addedAt {
+                return lhs.addedAt < rhs.addedAt
+            }
+            return lhs.id < rhs.id
+        }
+    }
+
+    func applyRuntimeCandidateOrdering(to candidates: [ProxyCandidate]) -> [ProxyCandidate] {
+        let now = currentUnixSeconds()
+        cooldownUntilByAccountID = cooldownUntilByAccountID.filter { $0.value > now }
+
+        var available: [ProxyCandidate] = []
+        available.reserveCapacity(candidates.count)
+        for candidate in candidates {
+            if let cooldownUntil = cooldownUntilByAccountID[candidate.accountID],
+               cooldownUntil > now {
+                continue
+            }
+            available.append(candidate)
+        }
+
+        return available.sorted { lhs, rhs in
+            let lhsSticky = lhs.accountID == stickyAccountID
+            let rhsSticky = rhs.accountID == stickyAccountID
+            if lhsSticky != rhsSticky {
+                return lhsSticky
+            }
+            if lhs.isPreferredCurrent != rhs.isPreferredCurrent {
+                return lhs.isPreferredCurrent
+            }
+            if lhs.remainingScore != rhs.remainingScore {
+                return lhs.remainingScore > rhs.remainingScore
+            }
+            if lhs.addedAt != rhs.addedAt {
+                return lhs.addedAt < rhs.addedAt
+            }
+            return lhs.id < rhs.id
         }
     }
 
@@ -241,8 +287,11 @@ struct ProxyCandidate {
     var id: String
     var label: String
     var accountID: String
+    var accountKey: String
     var accessToken: String
     var authJSON: JSONValue
+    var addedAt: Int64
+    var isPreferredCurrent: Bool
     var oneWeekUsed: Double?
     var fiveHourUsed: Double?
 

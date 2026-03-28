@@ -22,6 +22,8 @@ actor SwiftNativeProxyRuntimeService: ProxyRuntimeService {
     private var lastError: String?
     var cachedCandidates: [ProxyCandidate]?
     var cachedCandidatesStoreModificationDate: Date?
+    var stickyAccountID: String?
+    var cooldownUntilByAccountID: [String: Int64] = [:]
 
     private let models = SwiftNativeProxyRuntimeService.clientVisibleModels
 
@@ -102,6 +104,8 @@ actor SwiftNativeProxyRuntimeService: ProxyRuntimeService {
         runningPort = nil
         activeAccountID = nil
         activeAccountLabel = nil
+        stickyAccountID = nil
+        cooldownUntilByAccountID = [:]
         return await status()
     }
 
@@ -254,9 +258,7 @@ actor SwiftNativeProxyRuntimeService: ProxyRuntimeService {
             do {
                 let response = try await sendUpstream(payload: payload, candidate: candidate, downstreamHeaders: downstreamHeaders)
                 if response.statusCode >= 200 && response.statusCode < 300 {
-                    activeAccountID = candidate.accountID
-                    activeAccountLabel = candidate.label
-                    lastError = nil
+                    try? recordSuccessfulCandidate(candidate)
                     return response
                 }
 
@@ -265,6 +267,7 @@ actor SwiftNativeProxyRuntimeService: ProxyRuntimeService {
                 failureDetails.append(detail)
 
                 if let retryFailure = classifyRetryFailure(statusCode: response.statusCode, bodyText: bodyText) {
+                    markCooldown(for: candidate.accountID, category: retryFailure.category)
                     retryFailures.append(retryFailure)
                     continue
                 } else {
@@ -375,6 +378,52 @@ actor SwiftNativeProxyRuntimeService: ProxyRuntimeService {
 
         let afterRevision = String(suffix.dropFirst(firstSegment.count))
         return "gpt-5.\(firstSegment)\(afterRevision)"
+    }
+
+    func currentUnixSeconds() -> Int64 {
+        dateProvider.unixSecondsNow()
+    }
+
+    func currentUnixMilliseconds() -> Int64 {
+        dateProvider.unixMillisecondsNow()
+    }
+
+    func cooldownDuration(for category: RetryFailureCategory) -> Int64 {
+        switch category {
+        case .rateLimited:
+            return 60
+        case .quotaExceeded, .modelRestricted, .authentication, .permission:
+            return 300
+        }
+    }
+
+    func markCooldown(for accountID: String, category: RetryFailureCategory) {
+        cooldownUntilByAccountID[accountID] = currentUnixSeconds() + cooldownDuration(for: category)
+        if stickyAccountID == accountID {
+            stickyAccountID = nil
+        }
+    }
+
+    func recordSuccessfulCandidate(_ candidate: ProxyCandidate) throws {
+        activeAccountID = candidate.accountID
+        activeAccountLabel = candidate.label
+        stickyAccountID = candidate.accountID
+        cooldownUntilByAccountID.removeValue(forKey: candidate.accountID)
+        try persistCurrentSelection(for: candidate)
+        lastError = nil
+    }
+
+    func persistCurrentSelection(for candidate: ProxyCandidate) throws {
+        var store = try storeRepository.loadStore()
+        guard store.accounts.contains(where: { $0.id == candidate.id }) else { return }
+        store.currentSelection = CurrentAccountSelection(
+            accountID: candidate.accountID,
+            selectedAt: currentUnixMilliseconds(),
+            sourceDeviceID: PlatformCapabilities.currentPlatform == .macOS ? "macos-local" : "ios-local",
+            accountKey: candidate.accountKey
+        )
+        try storeRepository.saveStore(store)
+        cachedCandidatesStoreModificationDate = nil
     }
 
 }

@@ -186,6 +186,9 @@ extension AccountsPageModel {
             return
         }
 
+        let remainingAccounts = accounts.filter { $0.id != id }
+        applyAccounts(remainingAccounts)
+
         do {
             try await coordinator.updateWorkspaceDirectoryStatus(
                 workspaceID: account.accountID,
@@ -206,6 +209,7 @@ extension AccountsPageModel {
             publishAndSyncLocalAccountsMutation(refreshedAccounts)
             notice = NoticeMessage(style: .info, text: L10n.tr("accounts.notice.account_deleted"))
         } catch {
+            applyAccounts(accounts)
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
         }
     }

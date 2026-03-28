@@ -6,6 +6,8 @@ enum RepositoryLocator {
         "src-tauri/proxyd/Cargo.toml",
     ]
     static let proxydBundledManifestRelativePath = "proxyd-src/proxyd/Cargo.toml"
+    static let proxydPrebuiltBinaryRelativeDirectory = "Sources/Copool/Resources/proxyd-prebuilt"
+    static let proxydBundledPrebuiltBinaryRelativeDirectory = "proxyd-prebuilt"
     static let proxydBinaryName = "codex-tools-proxyd"
 
     static func proxydManifestURL(in root: URL) -> URL? {
@@ -48,5 +50,12 @@ enum RepositoryLocator {
         }
 
         return nil
+    }
+
+    static func proxydPrebuiltBinaryURL(in root: URL, target: String) -> URL {
+        root
+            .appendingPathComponent(proxydPrebuiltBinaryRelativeDirectory, isDirectory: true)
+            .appendingPathComponent(target, isDirectory: true)
+            .appendingPathComponent(proxydBinaryName, isDirectory: false)
     }
 }

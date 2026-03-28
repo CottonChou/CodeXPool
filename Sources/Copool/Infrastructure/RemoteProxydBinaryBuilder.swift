@@ -5,8 +5,11 @@ struct RemoteProxydBinaryBuilder {
     let fileManager: FileManager
     let commandRunner: RemoteShellCommandRunner
 
-    func buildBinary(for server: RemoteServerConfig, forceRebuild: Bool = true) throws -> URL {
+    func buildBinary(for server: RemoteServerConfig, forceRebuild: Bool = false) throws -> URL {
         let platform = try detectRemoteLinuxPlatform(for: server)
+        if let prebuilt = prebuiltBinary(for: platform), !forceRebuild {
+            return prebuilt
+        }
         guard let manifestPath = proxydManifestPath() else {
             throw AppError.io(L10n.tr("error.remote.unavailable_missing_proxyd_source"))
         }
@@ -59,6 +62,34 @@ struct RemoteProxydBinaryBuilder {
             return true
         }
         return false
+    }
+
+    func prebuiltBinary(for platform: RemoteLinuxPlatform) -> URL? {
+        for target in [platform.primaryTarget, platform.fallbackTarget] {
+            if let binary = prebuiltBinary(forTarget: target) {
+                return binary
+            }
+        }
+        return nil
+    }
+
+    func prebuiltBinary(forTarget target: String) -> URL? {
+        if let repoRoot {
+            let repoBinary = RepositoryLocator.proxydPrebuiltBinaryURL(in: repoRoot, target: target)
+            if fileManager.isExecutableFile(atPath: repoBinary.path) {
+                return repoBinary
+            }
+        }
+
+        let bundledBinary = Bundle.main.resourceURL?
+            .appendingPathComponent(RepositoryLocator.proxydBundledPrebuiltBinaryRelativeDirectory, isDirectory: true)
+            .appendingPathComponent(target, isDirectory: true)
+            .appendingPathComponent(RepositoryLocator.proxydBinaryName, isDirectory: false)
+        if let bundledBinary, fileManager.isExecutableFile(atPath: bundledBinary.path) {
+            return bundledBinary
+        }
+
+        return nil
     }
 
     private func proxydManifestPath() -> URL? {
@@ -230,7 +261,7 @@ struct RemoteProxydBinaryBuilder {
     }
 }
 
-private struct RemoteLinuxPlatform {
+struct RemoteLinuxPlatform {
     let primaryTarget: String
     let fallbackTarget: String
 }

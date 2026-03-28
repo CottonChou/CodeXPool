@@ -326,17 +326,25 @@ extension AccountsCoordinator {
                   shouldLookupRemoteWorkspaceMetadata(extracted: extracted) {
             authFlowLogger.log("importAccount fetching workspace metadata")
             AuthFlowDebugLog.write("AccountsAuthFlow", "importAccount fetching workspace metadata")
-            let directory = try await workspaceMetadataService.fetchWorkspaceMetadata(
-                accessToken: extracted.accessToken
-            )
-            if let remoteWorkspaceName = Self.remoteWorkspaceName(
-                for: extracted.accountID,
-                in: directory
-            ) {
-                extracted.teamName = remoteWorkspaceName
+            do {
+                let directory = try await workspaceMetadataService.fetchWorkspaceMetadata(
+                    accessToken: extracted.accessToken
+                )
+                if let remoteWorkspaceName = Self.remoteWorkspaceName(
+                    for: extracted.accountID,
+                    in: directory
+                ) {
+                    extracted.teamName = remoteWorkspaceName
+                }
+                authFlowLogger.log("importAccount workspace metadata fetched")
+                AuthFlowDebugLog.write("AccountsAuthFlow", "importAccount workspace metadata fetched")
+            } catch {
+                if let deactivatedError = AppError.workspaceDeactivatedIfMatched(error) {
+                    throw deactivatedError
+                }
+                authFlowLogger.error("importAccount workspace metadata failed: \(error.localizedDescription, privacy: .public)")
+                AuthFlowDebugLog.write("AccountsAuthFlow", "importAccount workspace metadata failed: \(error.localizedDescription)")
             }
-            authFlowLogger.log("importAccount workspace metadata fetched")
-            AuthFlowDebugLog.write("AccountsAuthFlow", "importAccount workspace metadata fetched")
         }
 
         let generatedLabel = customLabel?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -435,11 +443,27 @@ extension AccountsCoordinator {
             if let cached = cachedDirectories[extracted.accessToken] {
                 directory = cached
             } else {
-                let fetched = try await workspaceMetadataService.fetchWorkspaceMetadata(
-                    accessToken: extracted.accessToken
-                )
-                cachedDirectories[extracted.accessToken] = fetched
-                directory = fetched
+                do {
+                    let fetched = try await workspaceMetadataService.fetchWorkspaceMetadata(
+                        accessToken: extracted.accessToken
+                    )
+                    cachedDirectories[extracted.accessToken] = fetched
+                    directory = fetched
+                } catch {
+                    if let deactivatedError = AppError.workspaceDeactivatedIfMatched(error) {
+                        if store.accounts[index].workspaceStatus != .deactivated {
+                            store.accounts[index].workspaceStatus = .deactivated
+                            didChange = true
+                        }
+                        authFlowLogger.error("workspace metadata lookup marked \(storedAccount.accountID, privacy: .public) deactivated: \(deactivatedError.localizedDescription, privacy: .public)")
+                        continue
+                    }
+                    if forceRemoteCheck {
+                        throw error
+                    }
+                    authFlowLogger.error("workspace metadata lookup skipped for \(storedAccount.accountID, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                    continue
+                }
             }
 
             guard let remoteWorkspace = Self.remoteWorkspaceSnapshot(

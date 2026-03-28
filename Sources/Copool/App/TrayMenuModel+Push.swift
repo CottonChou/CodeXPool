@@ -23,7 +23,7 @@ extension TrayMenuModel {
     }
 
     func configureCurrentSelectionPushHandlingIfNeeded() {
-        guard backgroundRefreshPolicy.applyRemoteSelectionSwitchEffects else { return }
+        guard currentAccountSelectionSyncService != nil else { return }
         guard currentSelectionPushCancellable == nil else { return }
 
         currentSelectionPushCancellable = NotificationCenter.default

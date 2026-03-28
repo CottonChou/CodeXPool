@@ -39,6 +39,7 @@ use crate::auth::extract_auth;
 use crate::auth::refresh_chatgpt_auth_tokens;
 use crate::auth::write_active_codex_auth;
 use crate::models::ApiProxyStatus;
+use crate::models::CurrentAccountSelection;
 use crate::models::StoredAccount;
 use crate::models::UsageSnapshot;
 use crate::models::UsageWindow;
@@ -93,11 +94,15 @@ pub(crate) struct ProxyStorageContext {
 
 #[derive(Clone)]
 struct ProxyCandidate {
+    id: String,
     label: String,
     account_id: String,
+    account_key: String,
     access_token: String,
     auth_json: Value,
     plan_type: Option<String>,
+    added_at: i64,
+    is_preferred_current: bool,
     usage: Option<UsageSnapshot>,
 }
 
@@ -1219,6 +1224,7 @@ async fn send_codex_request_over_candidates(
             return Err(json_error_response(StatusCode::BAD_GATEWAY, &error));
         }
     };
+    let candidates = order_proxy_candidates_for_runtime(context, candidates).await;
 
     let mut attempt_errors = Vec::new();
     let mut retriable_failures = Vec::new();
@@ -1240,6 +1246,7 @@ async fn send_codex_request_over_candidates(
 
             let status = upstream.status();
             if status.is_success() {
+                record_successful_candidate(context, &candidate).await;
                 return Ok((candidate, upstream));
             }
 
@@ -1269,6 +1276,7 @@ async fn send_codex_request_over_candidates(
             }
 
             if let Some(failure) = classify_retriable_failure(status, &upstream_body) {
+                mark_candidate_cooldown(context, &candidate, failure.category).await;
                 retriable_failures.push(failure);
                 break;
             }
@@ -1360,21 +1368,32 @@ async fn load_proxy_candidates(
 ) -> Result<Vec<ProxyCandidate>, String> {
     let _guard = storage.store_lock.lock().await;
     let store = load_store_from_path(&account_store_path_from_data_dir(&storage.data_dir))?;
+    let current_selection = store.current_selection.clone();
 
     let mut candidates = store
         .accounts
         .into_iter()
-        .filter_map(account_to_proxy_candidate)
+        .filter_map(|account| account_to_proxy_candidate(account, current_selection.as_ref()))
         .collect::<Vec<_>>();
     candidates.sort_by(compare_proxy_candidates);
     Ok(candidates)
 }
 
-fn account_to_proxy_candidate(account: StoredAccount) -> Option<ProxyCandidate> {
+fn account_to_proxy_candidate(
+    account: StoredAccount,
+    current_selection: Option<&CurrentAccountSelection>,
+) -> Option<ProxyCandidate> {
     let extracted = extract_auth(&account.auth_json).ok()?;
+    let account_key = account_identity_key(
+        account.principal_id.as_deref(),
+        account.email.as_deref(),
+        &account.account_id,
+    );
     Some(ProxyCandidate {
+        id: account.id,
         label: account.label,
         account_id: extracted.account_id,
+        account_key: account_key.clone(),
         access_token: extracted.access_token,
         auth_json: account.auth_json,
         plan_type: account
@@ -1383,61 +1402,156 @@ fn account_to_proxy_candidate(account: StoredAccount) -> Option<ProxyCandidate> 
             .and_then(|usage| usage.plan_type.clone())
             .or(account.plan_type)
             .or(extracted.plan_type),
+        added_at: account.added_at,
+        is_preferred_current: current_selection
+            .map(|selection| current_selection_matches(selection, &account_key, &account.account_id))
+            .unwrap_or(false),
         usage: account.usage,
     })
 }
 
 fn compare_proxy_candidates(left: &ProxyCandidate, right: &ProxyCandidate) -> Ordering {
-    match is_free_plan(&right.plan_type).cmp(&is_free_plan(&left.plan_type)) {
+    match right
+        .is_preferred_current
+        .cmp(&left.is_preferred_current)
+    {
         Ordering::Equal => {}
         ordering => return ordering,
     }
 
-    match remaining_percent(
-        right
-            .usage
-            .as_ref()
-            .and_then(|usage| usage.one_week.as_ref()),
-    )
-    .cmp(&remaining_percent(
-        left.usage
-            .as_ref()
-            .and_then(|usage| usage.one_week.as_ref()),
-    )) {
+    match remaining_score(right).cmp(&remaining_score(left)) {
         Ordering::Equal => {}
         ordering => return ordering,
     }
 
-    match remaining_percent(
-        right
-            .usage
-            .as_ref()
-            .and_then(|usage| usage.five_hour.as_ref()),
-    )
-    .cmp(&remaining_percent(
-        left.usage
-            .as_ref()
-            .and_then(|usage| usage.five_hour.as_ref()),
-    )) {
+    match left.added_at.cmp(&right.added_at) {
         Ordering::Equal => {}
         ordering => return ordering,
     }
 
-    left.label.cmp(&right.label)
-}
-
-fn is_free_plan(plan_type: &Option<String>) -> bool {
-    plan_type
-        .as_deref()
-        .map(|value| value.eq_ignore_ascii_case("free"))
-        .unwrap_or(false)
+    left.id.cmp(&right.id)
 }
 
 fn remaining_percent(window: Option<&UsageWindow>) -> i32 {
     match window {
         Some(window) => (100.0 - window.used_percent).round().clamp(0.0, 100.0) as i32,
-        None => -1,
+        None => 0,
     }
+}
+
+fn remaining_score(candidate: &ProxyCandidate) -> i32 {
+    let week = remaining_percent(candidate.usage.as_ref().and_then(|usage| usage.one_week.as_ref()));
+    let five = remaining_percent(candidate.usage.as_ref().and_then(|usage| usage.five_hour.as_ref()));
+    week * 7 + five * 3
+}
+
+fn normalized_identifier(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| {
+            if value.contains('@') {
+                value.to_ascii_lowercase()
+            } else {
+                value.to_string()
+            }
+        })
+}
+
+fn normalized_account_id(value: &str) -> String {
+    value.trim().to_string()
+}
+
+fn account_identity_key(principal_id: Option<&str>, email: Option<&str>, account_id: &str) -> String {
+    let principal = normalized_identifier(principal_id)
+        .or_else(|| normalized_identifier(email))
+        .unwrap_or_else(|| normalized_account_id(account_id));
+    format!("{}|{}", principal, normalized_account_id(account_id))
+}
+
+fn current_selection_matches(
+    selection: &CurrentAccountSelection,
+    account_key: &str,
+    account_id: &str,
+) -> bool {
+    if let Some(selection_key) = normalized_identifier(selection.account_key.as_deref()) {
+        return selection_key == *account_key;
+    }
+    normalized_account_id(&selection.account_id) == normalized_account_id(account_id)
+}
+
+async fn order_proxy_candidates_for_runtime(
+    context: &ProxyContext,
+    candidates: Vec<ProxyCandidate>,
+) -> Vec<ProxyCandidate> {
+    let now = now_unix_seconds();
+    let (sticky_account_id, cooldowns) = {
+        let mut snapshot = context.shared.lock().await;
+        snapshot
+            .cooldown_until_by_account_id
+            .retain(|_, until| *until > now);
+        (
+            snapshot.sticky_account_id.clone(),
+            snapshot.cooldown_until_by_account_id.clone(),
+        )
+    };
+
+    let mut ordered = candidates
+        .into_iter()
+        .filter(|candidate| {
+            cooldowns
+                .get(&candidate.account_id)
+                .map(|until| *until <= now)
+                .unwrap_or(true)
+        })
+        .collect::<Vec<_>>();
+
+    let sticky_account_id = sticky_account_id.as_deref();
+    ordered.sort_by(|left, right| {
+        let left_sticky = sticky_account_id == Some(left.account_id.as_str());
+        let right_sticky = sticky_account_id == Some(right.account_id.as_str());
+        match right_sticky.cmp(&left_sticky) {
+            Ordering::Equal => compare_proxy_candidates(left, right),
+            ordering => ordering,
+        }
+    });
+    ordered
+}
+
+fn cooldown_duration_seconds(category: RetryFailureCategory) -> i64 {
+    match category {
+        RetryFailureCategory::RateLimited => 60,
+        RetryFailureCategory::QuotaExceeded
+        | RetryFailureCategory::ModelRestricted
+        | RetryFailureCategory::Authentication
+        | RetryFailureCategory::Permission => 300,
+    }
+}
+
+async fn mark_candidate_cooldown(
+    context: &ProxyContext,
+    candidate: &ProxyCandidate,
+    category: RetryFailureCategory,
+) {
+    let mut snapshot = context.shared.lock().await;
+    snapshot.cooldown_until_by_account_id.insert(
+        candidate.account_id.clone(),
+        now_unix_seconds() + cooldown_duration_seconds(category),
+    );
+    if snapshot.sticky_account_id.as_deref() == Some(candidate.account_id.as_str()) {
+        snapshot.sticky_account_id = None;
+    }
+}
+
+async fn record_successful_candidate(context: &ProxyContext, candidate: &ProxyCandidate) {
+    {
+        let mut snapshot = context.shared.lock().await;
+        snapshot.sticky_account_id = Some(candidate.account_id.clone());
+        snapshot
+            .cooldown_until_by_account_id
+            .remove(&candidate.account_id);
+    }
+    let _ = persist_current_selection(&context.storage, candidate).await;
 }
 
 async fn refresh_proxy_candidate_auth(
@@ -1451,13 +1565,33 @@ async fn refresh_proxy_candidate_auth(
         .map_err(|error| format!("刷新后解析账号登录态失败: {error}"))?;
 
     Ok(ProxyCandidate {
+        id: candidate.id.clone(),
         label: candidate.label.clone(),
         account_id: extracted.account_id,
+        account_key: candidate.account_key.clone(),
         access_token: extracted.access_token,
         auth_json: refreshed_auth_json,
         plan_type: candidate.plan_type.clone().or(extracted.plan_type),
+        added_at: candidate.added_at,
+        is_preferred_current: candidate.is_preferred_current,
         usage: candidate.usage.clone(),
     })
+}
+
+async fn persist_current_selection(
+    storage: &ProxyStorageContext,
+    candidate: &ProxyCandidate,
+) -> Result<(), String> {
+    let _guard = storage.store_lock.lock().await;
+    let store_path = account_store_path_from_data_dir(&storage.data_dir);
+    let mut store = load_store_from_path(&store_path)?;
+    store.current_selection = Some(CurrentAccountSelection {
+        account_id: candidate.account_id.clone(),
+        selected_at: now_unix_seconds() * 1000,
+        source_device_id: "remote-proxy".to_string(),
+        account_key: Some(candidate.account_key.clone()),
+    });
+    save_store_to_path(&store_path, &store)
 }
 
 async fn persist_refreshed_candidate_auth(
@@ -2674,18 +2808,24 @@ fn parse_proxy_request_body_limit_mib(value: Option<&str>) -> Option<usize> {
 
 #[cfg(test)]
 mod tests {
+    use super::compare_proxy_candidates;
     use super::convert_completed_response_to_chat_completion;
     use super::convert_openai_chat_request_to_codex;
+    use super::current_selection_matches;
     use super::extract_completed_response_from_sse;
     use super::map_client_model_to_upstream;
     use super::normalize_openai_responses_request;
     use super::normalize_model_for_client;
+    use super::ProxyCandidate;
     use super::parse_proxy_request_body_limit_mib;
     use super::resolve_proxy_request_body_limit_bytes_from_mib_value;
     use super::rewrite_response_models_for_client;
     use super::rewrite_sse_event_data_models_for_client;
     use super::translate_sse_event_to_chat_chunk;
     use super::ChatStreamState;
+    use crate::models::CurrentAccountSelection;
+    use crate::models::UsageSnapshot;
+    use crate::models::UsageWindow;
     use super::SseEvent;
     use super::DEFAULT_PROXY_REQUEST_BODY_LIMIT_BYTES;
     use serde_json::json;
@@ -2767,8 +2907,18 @@ mod tests {
             payload.get("model").and_then(|value| value.as_str()),
             Some("gpt-5.4")
         );
+        let input = payload
+            .get("input")
+            .and_then(|value| value.as_array())
+            .expect("input should normalize to message array");
+        assert_eq!(input.len(), 1);
         assert_eq!(
-            payload.get("input").and_then(|value| value.as_str()),
+            input[0]
+                .get("content")
+                .and_then(|value| value.as_array())
+                .and_then(|value| value.first())
+                .and_then(|value| value.get("text"))
+                .and_then(|value| value.as_str()),
             Some("hello")
         );
         assert_eq!(
@@ -3138,5 +3288,74 @@ data: {"type":"response.completed","response":{"id":"resp_123","created_at":1,"m
             resolve_proxy_request_body_limit_bytes_from_mib_value(Some("1")),
             1024 * 1024
         );
+    }
+
+    #[test]
+    fn current_selection_prefers_matching_account_key() {
+        let selection = CurrentAccountSelection {
+            account_id: "acc-b".to_string(),
+            selected_at: 1,
+            source_device_id: "remote-proxy".to_string(),
+            account_key: Some("user@example.com|acc-b".to_string()),
+        };
+
+        assert!(current_selection_matches(
+            &selection,
+            "user@example.com|acc-b",
+            "acc-b"
+        ));
+        assert!(!current_selection_matches(
+            &selection,
+            "user@example.com|acc-a",
+            "acc-a"
+        ));
+    }
+
+    #[test]
+    fn compare_proxy_candidates_prefers_current_then_remaining_then_age() {
+        let preferred = make_proxy_candidate("preferred", "acc-b", true, None, None, 20);
+        let richer = make_proxy_candidate("richer", "acc-a", false, Some(5.0), Some(5.0), 10);
+        let older = make_proxy_candidate("older", "acc-c", false, None, None, 5);
+        let newer = make_proxy_candidate("newer", "acc-d", false, None, None, 15);
+
+        assert_eq!(compare_proxy_candidates(&preferred, &richer), std::cmp::Ordering::Less);
+        assert_eq!(compare_proxy_candidates(&richer, &older), std::cmp::Ordering::Less);
+        assert_eq!(compare_proxy_candidates(&older, &newer), std::cmp::Ordering::Less);
+    }
+
+    fn make_proxy_candidate(
+        id: &str,
+        account_id: &str,
+        is_preferred_current: bool,
+        one_week_used: Option<f64>,
+        five_hour_used: Option<f64>,
+        added_at: i64,
+    ) -> ProxyCandidate {
+        ProxyCandidate {
+            id: id.to_string(),
+            label: id.to_string(),
+            account_id: account_id.to_string(),
+            account_key: format!("{}|{}", account_id, account_id),
+            access_token: "token".to_string(),
+            auth_json: json!({}),
+            plan_type: None,
+            added_at,
+            is_preferred_current,
+            usage: Some(UsageSnapshot {
+                fetched_at: 0,
+                plan_type: None,
+                five_hour: five_hour_used.map(|used_percent| UsageWindow {
+                    used_percent,
+                    window_seconds: 1,
+                    reset_at: None,
+                }),
+                one_week: one_week_used.map(|used_percent| UsageWindow {
+                    used_percent,
+                    window_seconds: 1,
+                    reset_at: None,
+                }),
+                credits: None,
+            }),
+        }
     }
 }

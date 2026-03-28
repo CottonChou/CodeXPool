@@ -9,6 +9,8 @@ pub(crate) struct AccountsStore {
     #[serde(default)]
     pub(crate) accounts: Vec<StoredAccount>,
     #[serde(default)]
+    pub(crate) current_selection: Option<CurrentAccountSelection>,
+    #[serde(default)]
     pub(crate) settings: AppSettings,
 }
 
@@ -21,6 +23,7 @@ impl Default for AccountsStore {
         Self {
             version: default_store_version(),
             accounts: Vec::new(),
+            current_selection: None,
             settings: AppSettings::default(),
         }
     }
@@ -34,11 +37,24 @@ pub(crate) struct StoredAccount {
     pub(crate) email: Option<String>,
     pub(crate) account_id: String,
     pub(crate) plan_type: Option<String>,
+    pub(crate) team_alias: Option<String>,
     pub(crate) auth_json: Value,
     pub(crate) added_at: i64,
     pub(crate) updated_at: i64,
     pub(crate) usage: Option<UsageSnapshot>,
     pub(crate) usage_error: Option<String>,
+    #[serde(default)]
+    pub(crate) principal_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CurrentAccountSelection {
+    pub(crate) account_id: String,
+    pub(crate) selected_at: i64,
+    pub(crate) source_device_id: String,
+    #[serde(default)]
+    pub(crate) account_key: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -242,8 +242,9 @@ extension TrayMenuModel {
                     }
                 }
             )
-            if autoSmartSwitchEnabled {
-                _ = try await accountsCoordinator.autoSmartSwitchIfNeeded()
+            if autoSmartSwitchEnabled,
+               let (selectedAccount, _) = try await accountsCoordinator.autoSmartSwitchIfNeeded() {
+                await syncCurrentAccountSelectionIfNeeded(accountID: selectedAccount.accountID)
             }
         }
         return try await accountsCoordinator.listAccounts()
@@ -352,5 +353,14 @@ extension TrayMenuModel {
         if remoteUsageRefreshActivityCount == 0, isFetchingRemoteUsage {
             isFetchingRemoteUsage = false
         }
+    }
+
+    private func syncCurrentAccountSelectionIfNeeded(accountID: String) async {
+        guard let currentAccountSelectionSyncService else { return }
+
+        do {
+            try await currentAccountSelectionSyncService.recordLocalSelection(accountID: accountID)
+            try await currentAccountSelectionSyncService.pushLocalSelectionIfNeeded()
+        } catch {}
     }
 }

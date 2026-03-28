@@ -2,6 +2,131 @@ import XCTest
 @testable import Copool
 
 final class SwiftNativeProxyRuntimeServiceTests: XCTestCase {
+    func testLoadCandidatesPrefersCurrentSelectionWhenUsageIsUnavailable() async throws {
+        let runtime = makeRuntime(
+            store: AccountsStore(
+                accounts: [
+                    makeStoredAccount(id: "a", label: "Account A", accountID: "acct-a", addedAt: 1),
+                    makeStoredAccount(id: "b", label: "Account B", accountID: "acct-b", addedAt: 2)
+                ],
+                currentSelection: CurrentAccountSelection(
+                    accountID: "acct-b",
+                    selectedAt: 2,
+                    sourceDeviceID: "macos-local",
+                    accountKey: "acct-b|acct-b"
+                )
+            )
+        )
+
+        let candidates = try await runtime.withIsolation { runtime in
+            try runtime.loadCandidates()
+        }
+
+        XCTAssertEqual(candidates.map(\.accountID), ["acct-b", "acct-a"])
+    }
+
+    func testLoadCandidatesUsesAddedAtAsStableTieBreakerForEqualScores() async throws {
+        let runtime = makeRuntime(
+            store: AccountsStore(
+                accounts: [
+                    makeStoredAccount(id: "later", label: "Later", accountID: "acct-later", addedAt: 20),
+                    makeStoredAccount(id: "earlier", label: "Earlier", accountID: "acct-earlier", addedAt: 10)
+                ]
+            )
+        )
+
+        let candidates = try await runtime.withIsolation { runtime in
+            try runtime.loadCandidates()
+        }
+
+        XCTAssertEqual(candidates.map(\.accountID), ["acct-earlier", "acct-later"])
+    }
+
+    func testCurrentCandidatesPrefersStickyAccountAfterSuccessfulSelection() async throws {
+        let runtime = makeRuntime(
+            store: AccountsStore(
+                accounts: [
+                    makeStoredAccount(id: "a", label: "Account A", accountID: "acct-a", addedAt: 1),
+                    makeStoredAccount(id: "b", label: "Account B", accountID: "acct-b", addedAt: 2)
+                ]
+            )
+        )
+
+        let candidates = try await runtime.withIsolation { runtime in
+            try runtime.recordSuccessfulCandidate(
+                ProxyCandidate(
+                    id: "b",
+                    label: "Account B",
+                    accountID: "acct-b",
+                    accountKey: "acct-b|acct-b",
+                    accessToken: "token-acct-b",
+                    authJSON: .object([:]),
+                    addedAt: 2,
+                    isPreferredCurrent: false,
+                    oneWeekUsed: nil,
+                    fiveHourUsed: nil
+                )
+            )
+            return try runtime.currentCandidates()
+        }
+
+        XCTAssertEqual(candidates.map(\.accountID), ["acct-b", "acct-a"])
+    }
+
+    func testCurrentCandidatesSkipsAccountInCooldownWindow() async throws {
+        let runtime = makeRuntime(
+            store: AccountsStore(
+                accounts: [
+                    makeStoredAccount(id: "a", label: "Account A", accountID: "acct-a", addedAt: 1),
+                    makeStoredAccount(id: "b", label: "Account B", accountID: "acct-b", addedAt: 2)
+                ]
+            ),
+            dateProvider: FixedDateProvider(unixSeconds: 100, unixMilliseconds: 100_000)
+        )
+
+        let candidates = try await runtime.withIsolation { runtime in
+            runtime.markCooldown(for: "acct-a", category: .rateLimited)
+            return try runtime.currentCandidates()
+        }
+
+        XCTAssertEqual(candidates.map(\.accountID), ["acct-b"])
+    }
+
+    func testPersistCurrentSelectionUsesSuccessfulCandidateAsCurrentSelection() async throws {
+        let repository = InMemoryAccountsStoreRepository(
+            store: AccountsStore(
+                accounts: [
+                    makeStoredAccount(id: "a", label: "Account A", accountID: "acct-a", addedAt: 1),
+                ]
+            )
+        )
+        let runtime = makeRuntime(
+            storeRepository: repository,
+            dateProvider: FixedDateProvider(unixSeconds: 100, unixMilliseconds: 123_456)
+        )
+
+        try await runtime.withIsolation { runtime in
+            try runtime.persistCurrentSelection(
+                for: ProxyCandidate(
+                    id: "a",
+                    label: "Account A",
+                    accountID: "acct-a",
+                    accountKey: "acct-a|acct-a",
+                    accessToken: "token-acct-a",
+                    authJSON: .object([:]),
+                    addedAt: 1,
+                    isPreferredCurrent: false,
+                    oneWeekUsed: nil,
+                    fiveHourUsed: nil
+                )
+            )
+        }
+
+        XCTAssertEqual(repository.store.currentSelection?.accountID, "acct-a")
+        XCTAssertEqual(repository.store.currentSelection?.accountKey, "acct-a|acct-a")
+        XCTAssertEqual(repository.store.currentSelection?.selectedAt, 123_456)
+    }
+
     func testNormalizesReasoningSummaryForUpstream() {
         XCTAssertEqual(
             SwiftNativeProxyRuntimeService.normalizedReasoningSummaryForUpstream("none"),
@@ -497,6 +622,90 @@ final class SwiftNativeProxyRuntimeServiceTests: XCTestCase {
         let object = try JSONSerialization.jsonObject(with: data)
         return object as? [String: Any] ?? [:]
     }
+
+    private func makeRuntime(
+        store: AccountsStore,
+        dateProvider: DateProviding = SystemDateProvider()
+    ) -> SwiftNativeProxyRuntimeService {
+        makeRuntime(
+            storeRepository: CountingStoreRepository(store: store),
+            dateProvider: dateProvider
+        )
+    }
+
+    private func makeRuntime(
+        storeRepository: AccountsStoreRepository,
+        dateProvider: DateProviding = SystemDateProvider()
+    ) -> SwiftNativeProxyRuntimeService {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        return SwiftNativeProxyRuntimeService(
+            paths: FileSystemPaths(
+                applicationSupportDirectory: tempDir,
+                accountStorePath: tempDir.appendingPathComponent("accounts.json"),
+                settingsStorePath: tempDir.appendingPathComponent("settings.json"),
+                codexAuthPath: tempDir.appendingPathComponent("auth.json"),
+                codexConfigPath: tempDir.appendingPathComponent("config.toml"),
+                proxyDaemonDataDirectory: tempDir.appendingPathComponent("proxyd", isDirectory: true),
+                proxyDaemonKeyPath: tempDir.appendingPathComponent("proxyd/api-proxy.key"),
+                cloudflaredLogDirectory: tempDir.appendingPathComponent("cloudflared-logs", isDirectory: true)
+            ),
+            storeRepository: storeRepository,
+            settingsRepository: MockSettingsRepository(),
+            authRepository: ExtractingAuthRepository(),
+            dateProvider: dateProvider
+        )
+    }
+
+    private func makeStoredAccount(
+        id: String,
+        label: String,
+        accountID: String,
+        addedAt: Int64
+    ) -> StoredAccount {
+        StoredAccount(
+            id: id,
+            label: label,
+            email: nil,
+            accountID: accountID,
+            planType: nil,
+            teamName: nil,
+            teamAlias: nil,
+            authJSON: .object([
+                "tokens": .object([
+                    "access_token": .string("token-\(accountID)"),
+                    "account_id": .string(accountID)
+                ])
+            ]),
+            addedAt: addedAt,
+            updatedAt: addedAt,
+            usage: nil,
+            usageError: nil
+        )
+    }
+}
+
+private struct FixedDateProvider: DateProviding {
+    let unixSeconds: Int64
+    let unixMilliseconds: Int64
+
+    func unixSecondsNow() -> Int64 { unixSeconds }
+    func unixMillisecondsNow() -> Int64 { unixMilliseconds }
+}
+
+private final class InMemoryAccountsStoreRepository: AccountsStoreRepository, @unchecked Sendable {
+    var store: AccountsStore
+
+    init(store: AccountsStore) {
+        self.store = store
+    }
+
+    func loadStore() throws -> AccountsStore {
+        store
+    }
+
+    func saveStore(_ store: AccountsStore) throws {
+        self.store = store
+    }
 }
 
 private final class MockStoreRepository: AccountsStoreRepository, @unchecked Sendable {
@@ -575,6 +784,39 @@ private final class CountingAuthRepository: AuthRepository, @unchecked Sendable 
         _ = auth
         extractAuthCallCount += 1
         return ExtractedAuth(accountID: "acct", accessToken: "token", email: nil, planType: nil, teamName: nil)
+    }
+}
+
+private final class ExtractingAuthRepository: AuthRepository, @unchecked Sendable {
+    func readCurrentAuth() throws -> JSONValue { .null }
+    func readCurrentAuthOptional() throws -> JSONValue? { nil }
+    func readAuth(from url: URL) throws -> JSONValue {
+        _ = url
+        return .null
+    }
+    func writeCurrentAuth(_ auth: JSONValue) throws {
+        _ = auth
+    }
+    func removeCurrentAuth() throws {}
+    func makeChatGPTAuth(from tokens: ChatGPTOAuthTokens) throws -> JSONValue {
+        _ = tokens
+        return .null
+    }
+    func extractAuth(from auth: JSONValue) throws -> ExtractedAuth {
+        guard case .object(let root) = auth,
+              case .object(let tokens)? = root["tokens"],
+              case .string(let accountID)? = tokens["account_id"],
+              case .string(let accessToken)? = tokens["access_token"] else {
+            throw AppError.invalidData("Missing test auth payload")
+        }
+
+        return ExtractedAuth(
+            accountID: accountID,
+            accessToken: accessToken,
+            email: nil,
+            planType: nil,
+            teamName: nil
+        )
     }
 }
 

@@ -40,6 +40,33 @@ final class RemoteProxydBinaryBuilderTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: binaryPath.path))
     }
 
+    func testPrebuiltBinaryPrefersRepoRootArtifactForTarget() throws {
+        let fileManager = FileManager.default
+        let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: tempDir) }
+
+        let target = "x86_64-unknown-linux-musl"
+        let binaryPath = RepositoryLocator.proxydPrebuiltBinaryURL(in: tempDir, target: target)
+        try fileManager.createDirectory(at: binaryPath.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try writeExecutableStub(to: binaryPath)
+
+        let builder = RemoteProxydBinaryBuilder(
+            repoRoot: tempDir,
+            fileManager: fileManager,
+            commandRunner: RemoteShellCommandRunner(fileManager: fileManager)
+        )
+
+        let resolved = builder.prebuiltBinary(
+            for: RemoteLinuxPlatform(
+                primaryTarget: target,
+                fallbackTarget: "x86_64-unknown-linux-gnu"
+            )
+        )
+
+        XCTAssertEqual(resolved?.path, binaryPath.path)
+    }
+
     private func writeExecutableStub(to url: URL) throws {
         try Data("#!/bin/sh\nexit 0\n".utf8).write(to: url)
         try FileManager.default.setAttributes(
