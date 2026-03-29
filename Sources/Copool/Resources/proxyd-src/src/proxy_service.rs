@@ -71,29 +71,45 @@ const UNSUPPORTED_RESPONSES_FORWARDING_KEYS: &[&str] = &[
 const SSE_DONE: &str = "data: [DONE]\n\n";
 const MODELS: &[&str] = &[
     "GPT-5",
+    "GPT-5-Low",
     "GPT-5-Medium",
     "GPT-5-High",
+    "GPT-5-xHigh",
     "GPT-5.4",
+    "GPT-5.4-Low",
     "GPT-5.4-Medium",
     "GPT-5.4-High",
+    "GPT-5.4-xHigh",
     "GPT-5.4-Mini",
+    "GPT-5.4-Mini-Low",
     "GPT-5.4-Mini-Medium",
     "GPT-5.4-Mini-High",
+    "GPT-5.4-Mini-xHigh",
     "GPT-5.2",
+    "GPT-5.2-Low",
     "GPT-5.2-Medium",
     "GPT-5.2-High",
+    "GPT-5.2-xHigh",
     "GPT-5.3-Codex",
+    "GPT-5.3-Codex-Low",
     "GPT-5.3-Codex-Medium",
     "GPT-5.3-Codex-High",
+    "GPT-5.3-Codex-xHigh",
     "GPT-5.2-Codex",
+    "GPT-5.2-Codex-Low",
     "GPT-5.2-Codex-Medium",
     "GPT-5.2-Codex-High",
+    "GPT-5.2-Codex-xHigh",
     "GPT-5.1-Codex-Mini",
+    "GPT-5.1-Codex-Mini-Low",
     "GPT-5.1-Codex-Mini-Medium",
     "GPT-5.1-Codex-Mini-High",
+    "GPT-5.1-Codex-Mini-xHigh",
     "GPT-5.1-Codex-Max",
+    "GPT-5.1-Codex-Max-Low",
     "GPT-5.1-Codex-Max-Medium",
     "GPT-5.1-Codex-Max-High",
+    "GPT-5.1-Codex-Max-xHigh",
 ];
 const REQUEST_MODEL_MAPPINGS: &[(&str, &str)] = &[
     ("gpt-5-4", "gpt-5.4"),
@@ -959,7 +975,7 @@ fn resolve_client_model(model: &str) -> Result<ClientModelResolution, String> {
 }
 
 fn resolve_reasoning_alias(model: &str) -> Result<Option<ClientModelResolution>, String> {
-    for effort in ["medium", "high"] {
+    for effort in ["low", "medium", "high", "xhigh"] {
         let suffix = format!("-{effort}");
         if let Some(base) = model.strip_suffix(&suffix) {
             if base.is_empty() {
@@ -1106,6 +1122,9 @@ fn client_display_model_name(model: &str) -> String {
 }
 
 fn display_segment(segment: &str) -> String {
+    if segment == "xhigh" {
+        return "xHigh".to_string();
+    }
     let mut chars = segment.chars();
     match chars.next() {
         Some(first) => format!("{}{}", first.to_ascii_uppercase(), chars.as_str().to_ascii_lowercase()),
@@ -3115,11 +3134,19 @@ mod tests {
     #[test]
     fn maps_display_model_alias_names_to_upstream() {
         assert_eq!(
+            map_client_model_to_upstream("GPT-5.4-Low").expect("alias model should map"),
+            "gpt-5.4"
+        );
+        assert_eq!(
             map_client_model_to_upstream("GPT-5.4-High").expect("alias model should map"),
             "gpt-5.4"
         );
         assert_eq!(
             map_client_model_to_upstream("GPT-5.4-Mini-High").expect("alias model should map"),
+            "gpt-5.4-mini"
+        );
+        assert_eq!(
+            map_client_model_to_upstream("GPT-5.4-Mini-xHigh").expect("alias model should map"),
             "gpt-5.4-mini"
         );
         assert_eq!(
@@ -3131,8 +3158,11 @@ mod tests {
 
     #[test]
     fn client_visible_models_include_reasoning_alias_names() {
+        assert!(MODELS.contains(&"GPT-5.4-Low"));
         assert!(MODELS.contains(&"GPT-5.4-High"));
         assert!(MODELS.contains(&"GPT-5.4-Mini-High"));
+        assert!(MODELS.contains(&"GPT-5.4-Mini-xHigh"));
+        assert!(MODELS.contains(&"GPT-5.3-Codex-xHigh"));
         assert!(MODELS.contains(&"GPT-5.3-Codex-Medium"));
     }
 
@@ -3142,6 +3172,7 @@ mod tests {
         assert_eq!(normalize_model_for_client("gpt-5.3-codex"), "GPT-5.3-Codex");
         assert_eq!(normalize_model_for_client("gpt-5-4"), "GPT-5.4");
         assert_eq!(normalize_model_for_client("gpt-5-4-mini"), "GPT-5.4-Mini");
+        assert_eq!(normalize_model_for_client("gpt-5-4-xhigh"), "GPT-5.4-xHigh");
         assert_eq!(
             normalize_model_for_client("gpt5.4-2026-03-09"),
             "GPT-5.4-2026-03-09"

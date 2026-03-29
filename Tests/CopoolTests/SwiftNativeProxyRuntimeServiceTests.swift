@@ -278,15 +278,19 @@ final class SwiftNativeProxyRuntimeServiceTests: XCTestCase {
 
         let mapped = try await runtime.withIsolation { runtime in
             (
+                try runtime.mapClientModelToUpstream("GPT-5.4-Low"),
                 try runtime.mapClientModelToUpstream("GPT-5.4-High"),
                 try runtime.mapClientModelToUpstream("GPT-5.4-Mini-High"),
+                try runtime.mapClientModelToUpstream("GPT-5.4-Mini-xHigh"),
                 try runtime.mapClientModelToUpstream("GPT-5.3-Codex-Medium")
             )
         }
 
         XCTAssertEqual(mapped.0, "gpt-5.4")
-        XCTAssertEqual(mapped.1, "gpt-5.4-mini")
-        XCTAssertEqual(mapped.2, "gpt-5.3-codex")
+        XCTAssertEqual(mapped.1, "gpt-5.4")
+        XCTAssertEqual(mapped.2, "gpt-5.4-mini")
+        XCTAssertEqual(mapped.3, "gpt-5.4-mini")
+        XCTAssertEqual(mapped.4, "gpt-5.3-codex")
     }
 
     func testNormalizesUpstreamModelsForClientDisplay() async {
@@ -312,6 +316,7 @@ final class SwiftNativeProxyRuntimeServiceTests: XCTestCase {
                 runtime.normalizeModelForClient("gpt-5.3-codex"),
                 runtime.normalizeModelForClient("gpt-5-4"),
                 runtime.normalizeModelForClient("gpt-5-4-mini"),
+                runtime.normalizeModelForClient("gpt-5-4-xhigh"),
                 runtime.normalizeModelForClient("gpt5.4-2026-03-09")
             )
         }
@@ -320,12 +325,16 @@ final class SwiftNativeProxyRuntimeServiceTests: XCTestCase {
         XCTAssertEqual(normalized.1, "GPT-5.3-Codex")
         XCTAssertEqual(normalized.2, "GPT-5.4")
         XCTAssertEqual(normalized.3, "GPT-5.4-Mini")
-        XCTAssertEqual(normalized.4, "GPT-5.4-2026-03-09")
+        XCTAssertEqual(normalized.4, "GPT-5.4-xHigh")
+        XCTAssertEqual(normalized.5, "GPT-5.4-2026-03-09")
     }
 
     func testClientVisibleModelsIncludeReasoningAliasNames() {
+        XCTAssertTrue(SwiftNativeProxyRuntimeService.clientVisibleModels.contains("GPT-5.4-Low"))
         XCTAssertTrue(SwiftNativeProxyRuntimeService.clientVisibleModels.contains("GPT-5.4-High"))
         XCTAssertTrue(SwiftNativeProxyRuntimeService.clientVisibleModels.contains("GPT-5.4-Mini-High"))
+        XCTAssertTrue(SwiftNativeProxyRuntimeService.clientVisibleModels.contains("GPT-5.4-Mini-xHigh"))
+        XCTAssertTrue(SwiftNativeProxyRuntimeService.clientVisibleModels.contains("GPT-5.3-Codex-xHigh"))
         XCTAssertTrue(SwiftNativeProxyRuntimeService.clientVisibleModels.contains("GPT-5.3-Codex-Medium"))
     }
 

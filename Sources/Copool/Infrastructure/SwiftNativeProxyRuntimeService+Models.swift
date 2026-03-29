@@ -17,8 +17,9 @@ extension SwiftNativeProxyRuntimeService {
             "GPT-5.1-Codex-Mini",
             "GPT-5.1-Codex-Max"
         ]
+        let reasoningEfforts = ["Low", "Medium", "High", "xHigh"]
         let reasoningAliases = baseModels.flatMap { model in
-            ["Medium", "High"].map { "\(model)-\($0)" }
+            reasoningEfforts.map { "\(model)-\($0)" }
         }
         return baseModels + reasoningAliases
     }
@@ -126,12 +127,15 @@ extension SwiftNativeProxyRuntimeService {
     }
 
     private static func displaySegment(_ value: String) -> String {
+        if value == "xhigh" {
+            return "xHigh"
+        }
         guard let first = value.first else { return value }
         return String(first).uppercased() + value.dropFirst().lowercased()
     }
 
     private func resolveReasoningAlias(for normalizedModel: String) -> ClientModelResolution? {
-        for effort in ["medium", "high"] {
+        for effort in ["low", "medium", "high", "xhigh"] {
             let suffix = "-\(effort)"
             guard normalizedModel.hasSuffix(suffix) else { continue }
 
