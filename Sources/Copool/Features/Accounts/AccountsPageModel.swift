@@ -125,10 +125,12 @@ final class AccountsPageModel: ObservableObject {
     }
 
     var leadingToolbarButtons: [AccountsActionButtonDescriptor<AccountsPageActionIntent>] {
-        AccountsActionPresentation.leadingToolbarButtons(
+        let buttons = AccountsActionPresentation.leadingToolbarButtons(
             isImporting: isImporting,
             isAdding: isAdding
         )
+        guard runtimePlatform == .iOS else { return buttons }
+        return buttons.filter { $0.intent != .importCurrentAuth }
     }
 
     var trailingToolbarButtons: [AccountsActionButtonDescriptor<AccountsPageActionIntent>] {
