@@ -41,6 +41,7 @@ enum LayoutRules {
     static let iOSToolbarButtonSize = CGFloat(44)
     static let toolbarIconPointSize = CGFloat(18)
     static let toolbarRefreshIconOpticalScale = CGFloat(0.82)
+    static let compactActionControlHeight = CGFloat(30)
     static let proxyDetailCardSpacing = CGFloat(12)
     static let proxyHeroPortFieldWidth = CGFloat(108)
     static let proxyRemoteFieldMinWidth = CGFloat(160)

@@ -185,7 +185,7 @@ struct FrostedCapsuleButtonStyle: ButtonStyle {
     }
 
     private var minimumHeight: CGFloat {
-        density == .compact ? 30 : 34
+        density == .compact ? LayoutRules.compactActionControlHeight : 34
     }
 
     private var separatorColor: Color {

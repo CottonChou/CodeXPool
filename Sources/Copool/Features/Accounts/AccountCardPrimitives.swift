@@ -2,6 +2,7 @@ import SwiftUI
 
 private enum AccountCardOverlayLayout {
     static let actionReservationWidth: CGFloat = 144
+    static let compactActionControlHeight = LayoutRules.compactActionControlHeight
 }
 
 enum AccountCardMorphRules {
@@ -28,7 +29,7 @@ struct AccountCardPalette {
 
     init(accent: AccountCardAccent, isCurrent: Bool) {
         toneColor = Self.color(for: accent)
-        selectionBorderAccent = isCurrent ? .teal : nil
+        selectionBorderAccent = isCurrent ? accent : nil
         surfaceTint = selectionBorderAccent.map { Self.color(for: $0).opacity(0.14) }
     }
 
@@ -360,6 +361,7 @@ private struct AccountTrailingActionCluster: View {
                     backgroundColor: palette.toneColor.opacity(0.24),
                     foregroundColor: palette.toneColor
                 )
+                .frame(height: AccountCardOverlayLayout.compactActionControlHeight, alignment: .bottom)
             } else {
                 AccountSwitchButton(
                     switching: switching,

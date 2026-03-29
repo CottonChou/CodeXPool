@@ -71,13 +71,29 @@ const UNSUPPORTED_RESPONSES_FORWARDING_KEYS: &[&str] = &[
 const SSE_DONE: &str = "data: [DONE]\n\n";
 const MODELS: &[&str] = &[
     "GPT-5",
+    "GPT-5-Medium",
+    "GPT-5-High",
     "GPT-5.4",
+    "GPT-5.4-Medium",
+    "GPT-5.4-High",
     "GPT-5.4-Mini",
+    "GPT-5.4-Mini-Medium",
+    "GPT-5.4-Mini-High",
     "GPT-5.2",
+    "GPT-5.2-Medium",
+    "GPT-5.2-High",
     "GPT-5.3-Codex",
+    "GPT-5.3-Codex-Medium",
+    "GPT-5.3-Codex-High",
     "GPT-5.2-Codex",
+    "GPT-5.2-Codex-Medium",
+    "GPT-5.2-Codex-High",
     "GPT-5.1-Codex-Mini",
+    "GPT-5.1-Codex-Mini-Medium",
+    "GPT-5.1-Codex-Mini-High",
     "GPT-5.1-Codex-Max",
+    "GPT-5.1-Codex-Max-Medium",
+    "GPT-5.1-Codex-Max-High",
 ];
 const REQUEST_MODEL_MAPPINGS: &[(&str, &str)] = &[
     ("gpt-5-4", "gpt-5.4"),
@@ -154,6 +170,18 @@ struct ChatStreamState {
     function_call_index: i64,
     has_received_arguments_delta: bool,
     has_tool_call_announced: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ClientModelResolution {
+    upstream_model: String,
+    default_reasoning_effort: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum UpstreamRouteFamily {
+    Codex,
+    General,
 }
 
 impl Default for ChatStreamState {
@@ -620,7 +648,8 @@ fn convert_openai_chat_request_to_codex(request: &Value) -> Result<(Value, bool)
         return normalize_openai_responses_request(request.clone());
     }
 
-    let model = map_client_model_to_upstream(&required_string(request_object, "model")?)?;
+    let model_resolution = resolve_client_model(&required_string(request_object, "model")?)?;
+    let model = model_resolution.upstream_model.clone();
     let messages = request_object
         .get("messages")
         .and_then(Value::as_array)
@@ -653,18 +682,12 @@ fn convert_openai_chat_request_to_codex(request: &Value) -> Result<(Value, bool)
     );
     root.insert(
         "reasoning".to_string(),
-        json!({
-            "effort": request_object
-                .get("reasoning_effort")
-                .and_then(Value::as_str)
-                .or_else(|| request_object.get("reasoning").and_then(|value| value.get("effort")).and_then(Value::as_str))
-                .unwrap_or("medium"),
-            "summary": request_object
-                .get("reasoning")
-                .and_then(|value| value.get("summary"))
-                .and_then(Value::as_str)
-                .unwrap_or("auto"),
-        }),
+        merged_reasoning_for_upstream(
+            request_object.get("reasoning").and_then(Value::as_object),
+            request_object.get("reasoning_effort").and_then(Value::as_str),
+            model_resolution.default_reasoning_effort.as_deref(),
+            Some(model.as_str()),
+        ),
     );
 
     let mut input = Vec::new();
@@ -810,7 +833,8 @@ fn normalize_openai_responses_request(mut request: Value) -> Result<(Value, bool
         .as_object_mut()
         .ok_or_else(|| "responses 请求必须是 JSON 对象".to_string())?;
 
-    let model = map_client_model_to_upstream(&required_string(object, "model")?)?;
+    let model_resolution = resolve_client_model(&required_string(object, "model")?)?;
+    let model = model_resolution.upstream_model.clone();
     let downstream_stream = object
         .get("stream")
         .and_then(Value::as_bool)
@@ -839,8 +863,17 @@ fn normalize_openai_responses_request(mut request: Value) -> Result<(Value, bool
         *reasoning = Value::Object(Map::new());
     }
     if let Some(reasoning_object) = reasoning.as_object_mut() {
-        if !reasoning_object.contains_key("effort") {
-            reasoning_object.insert("effort".to_string(), Value::String("medium".to_string()));
+        let existing_effort = reasoning_object
+            .get("effort")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        if existing_effort.is_none() {
+            let default_effort = model_resolution
+                .default_reasoning_effort
+                .as_deref()
+                .unwrap_or("medium");
+            reasoning_object.insert("effort".to_string(), Value::String(default_effort.to_string()));
         }
         if !reasoning_object.contains_key("summary") {
             reasoning_object.insert("summary".to_string(), Value::String("auto".to_string()));
@@ -903,16 +936,114 @@ fn normalize_responses_input(input: Value) -> Value {
 }
 
 fn map_client_model_to_upstream(model: &str) -> Result<String, String> {
+    Ok(resolve_client_model(model)?.upstream_model)
+}
+
+fn resolve_client_model(model: &str) -> Result<ClientModelResolution, String> {
     let normalized = model.trim().to_lowercase();
-    if let Some(mapped) = remap_model_name(&normalized, REQUEST_MODEL_MAPPINGS) {
-        return Ok(mapped);
+    if let Some(alias_resolution) = resolve_reasoning_alias(&normalized)? {
+        return Ok(alias_resolution);
     }
 
-    Ok(normalize_numeric_model_revision_if_needed(&normalized))
+    if let Some(mapped) = remap_model_name(&normalized, REQUEST_MODEL_MAPPINGS) {
+        return Ok(ClientModelResolution {
+            upstream_model: mapped,
+            default_reasoning_effort: None,
+        });
+    }
+
+    Ok(ClientModelResolution {
+        upstream_model: normalize_numeric_model_revision_if_needed(&normalized),
+        default_reasoning_effort: None,
+    })
+}
+
+fn resolve_reasoning_alias(model: &str) -> Result<Option<ClientModelResolution>, String> {
+    for effort in ["medium", "high"] {
+        let suffix = format!("-{effort}");
+        if let Some(base) = model.strip_suffix(&suffix) {
+            if base.is_empty() {
+                continue;
+            }
+            let base_resolution = resolve_client_model(base)?;
+            return Ok(Some(ClientModelResolution {
+                upstream_model: base_resolution.upstream_model,
+                default_reasoning_effort: Some(effort.to_string()),
+            }));
+        }
+    }
+
+    Ok(None)
 }
 
 fn normalize_model_for_client(model: &str) -> String {
     client_display_model_name(model)
+}
+
+fn merged_reasoning_for_upstream(
+    existing: Option<&Map<String, Value>>,
+    explicit_effort: Option<&str>,
+    default_effort: Option<&str>,
+    upstream_model: Option<&str>,
+) -> Value {
+    let mut merged = existing.cloned().unwrap_or_default();
+    if let Some(explicit_effort) = explicit_effort {
+        merged.insert(
+            "effort".to_string(),
+            Value::String(explicit_effort.to_string()),
+        );
+    }
+
+    let existing_effort = merged
+        .get("effort")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    if existing_effort.is_none() {
+        merged.insert(
+            "effort".to_string(),
+            Value::String(
+                default_effort
+                    .unwrap_or_else(|| default_reasoning_effort_for_upstream(upstream_model))
+                    .to_string(),
+            ),
+        );
+    }
+
+    let existing_summary = merged
+        .get("summary")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    if existing_summary.is_none() {
+        merged.insert("summary".to_string(), Value::String("auto".to_string()));
+    }
+
+    Value::Object(merged)
+}
+
+fn default_reasoning_effort_for_upstream(upstream_model: Option<&str>) -> &'static str {
+    let route_family = upstream_model
+        .map(resolve_upstream_route_family)
+        .unwrap_or(UpstreamRouteFamily::General);
+    match route_family {
+        UpstreamRouteFamily::Codex => "medium",
+        UpstreamRouteFamily::General => "none",
+    }
+}
+
+fn resolve_upstream_route_family(model: &str) -> UpstreamRouteFamily {
+    let normalized = model.trim().to_lowercase();
+    if normalized.contains("codex")
+        || normalized.starts_with("gpt-5")
+        || normalized.starts_with("gpt-5.4")
+        || normalized.starts_with("gpt5.4")
+        || normalized.starts_with("gpt-5-4")
+    {
+        UpstreamRouteFamily::Codex
+    } else {
+        UpstreamRouteFamily::General
+    }
 }
 
 fn remap_model_name(model: &str, mappings: &[(&str, &str)]) -> Option<String> {
@@ -2982,6 +3113,30 @@ mod tests {
     }
 
     #[test]
+    fn maps_display_model_alias_names_to_upstream() {
+        assert_eq!(
+            map_client_model_to_upstream("GPT-5.4-High").expect("alias model should map"),
+            "gpt-5.4"
+        );
+        assert_eq!(
+            map_client_model_to_upstream("GPT-5.4-Mini-High").expect("alias model should map"),
+            "gpt-5.4-mini"
+        );
+        assert_eq!(
+            map_client_model_to_upstream("GPT-5.3-Codex-Medium")
+                .expect("alias model should map"),
+            "gpt-5.3-codex"
+        );
+    }
+
+    #[test]
+    fn client_visible_models_include_reasoning_alias_names() {
+        assert!(MODELS.contains(&"GPT-5.4-High"));
+        assert!(MODELS.contains(&"GPT-5.4-Mini-High"));
+        assert!(MODELS.contains(&"GPT-5.3-Codex-Medium"));
+    }
+
+    #[test]
     fn normalizes_upstream_models_for_client_display() {
         assert_eq!(normalize_model_for_client("gpt-5"), "GPT-5");
         assert_eq!(normalize_model_for_client("gpt-5.3-codex"), "GPT-5.3-Codex");
@@ -3043,6 +3198,75 @@ mod tests {
         assert!(payload.get("prompt_cache_retention").is_none());
         assert!(payload.get("safety_identifier").is_none());
         assert!(payload.get("service_tier").is_none());
+    }
+
+    #[test]
+    fn injects_reasoning_effort_from_model_alias_when_missing() {
+        let request = json!({
+            "model": "GPT-5.4-High",
+            "input": "hello"
+        });
+
+        let (payload, _) =
+            normalize_openai_responses_request(request).expect("request should normalize");
+
+        assert_eq!(
+            payload
+                .get("reasoning")
+                .and_then(|value| value.get("effort"))
+                .and_then(|value| value.as_str()),
+            Some("high")
+        );
+        assert_eq!(
+            payload
+                .get("reasoning")
+                .and_then(|value| value.get("summary"))
+                .and_then(|value| value.as_str()),
+            Some("auto")
+        );
+    }
+
+    #[test]
+    fn keeps_explicit_reasoning_effort_over_model_alias_default() {
+        let request = json!({
+            "model": "GPT-5.4-High",
+            "input": "hello",
+            "reasoning": {
+                "effort": "low"
+            }
+        });
+
+        let (payload, _) =
+            normalize_openai_responses_request(request).expect("request should normalize");
+
+        assert_eq!(
+            payload
+                .get("reasoning")
+                .and_then(|value| value.get("effort"))
+                .and_then(|value| value.as_str()),
+            Some("low")
+        );
+    }
+
+    #[test]
+    fn chat_conversion_injects_reasoning_effort_from_model_alias() {
+        let request = json!({
+            "model": "GPT-5.3-Codex-High",
+            "messages": [
+                { "role": "user", "content": "hello" }
+            ]
+        });
+
+        let (payload, _) =
+            convert_openai_chat_request_to_codex(&request).expect("request should convert");
+
+        assert_eq!(
+            payload
+                .get("reasoning")
+                .and_then(|value| value.get("effort"))
+                .and_then(|value| value.as_str()),
+            Some("high")
+        );
     }
 
     #[test]

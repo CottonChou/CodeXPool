@@ -2,10 +2,10 @@ import XCTest
 @testable import Copool
 
 final class AccountCardPresentationTests: XCTestCase {
-    func testCurrentAccountPaletteKeepsTealSelectionHighlight() {
+    func testCurrentAccountPaletteUsesOwnAccentForSelectionHighlight() {
         let palette = AccountCardPalette(accent: .orange, isCurrent: true)
 
-        XCTAssertEqual(palette.selectionBorderAccent, .teal)
+        XCTAssertEqual(palette.selectionBorderAccent, .orange)
         XCTAssertNotNil(palette.surfaceTint)
     }
 
@@ -72,7 +72,7 @@ final class AccountCardPresentationTests: XCTestCase {
         let presentation = AccountCardPresentation(
             account: account,
             isCollapsed: false,
-            locale: Locale(identifier: "en_US_POSIX"),
+            locale: Locale(identifier: "en_US"),
             usageProgressDisplayMode: .used
         )
 
@@ -137,13 +137,17 @@ final class AccountCardPresentationTests: XCTestCase {
         let presentation = AccountCardPresentation(
             account: account,
             isCollapsed: false,
-            locale: Locale(identifier: "en_US_POSIX"),
+            locale: Locale(identifier: "en_US"),
             usageProgressDisplayMode: .remaining
         )
 
         XCTAssertEqual(presentation.fiveHourWindow.progressPercent, 28)
         XCTAssertEqual(presentation.fiveHourWindow.primaryText, "Remaining 28%")
         XCTAssertEqual(presentation.fiveHourWindow.secondaryText, "Used 72%")
+        XCTAssertEqual(
+            presentation.fiveHourWindow.resetText,
+            L10n.tr("accounts.window.reset_at_format", "11/15/25, 22:13:20")
+        )
         XCTAssertEqual(presentation.compactUsage.fiveHourDisplayPercent, 28)
         XCTAssertEqual(presentation.compactUsage.oneWeekDisplayPercent, 70)
     }

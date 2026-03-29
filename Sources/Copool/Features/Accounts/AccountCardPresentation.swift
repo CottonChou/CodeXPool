@@ -146,10 +146,17 @@ struct AccountCardPresentation: Equatable {
 
     private static func formatResetAt(_ epoch: Int64?, locale: Locale) -> String {
         guard let epoch else { return "--" }
-        let formatter = DateFormatter()
-        formatter.locale = locale
-        formatter.dateStyle = .short
-        formatter.timeStyle = .medium
-        return formatter.string(from: Date(timeIntervalSince1970: TimeInterval(epoch)))
+        let date = Date(timeIntervalSince1970: TimeInterval(epoch))
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.locale = locale
+        dateFormatter.dateStyle = .short
+        dateFormatter.timeStyle = .none
+
+        let timeFormatter = DateFormatter()
+        timeFormatter.locale = locale
+        timeFormatter.setLocalizedDateFormatFromTemplate("HHmmss")
+
+        return "\(dateFormatter.string(from: date)), \(timeFormatter.string(from: date))"
     }
 }

@@ -12,7 +12,8 @@ extension SwiftNativeProxyRuntimeService {
         guard let rawModel = request["model"] as? String, !rawModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw AppError.invalidData(L10n.tr("error.proxy_runtime.missing_model"))
         }
-        let model = try mapClientModelToUpstream(rawModel)
+        let modelResolution = try resolveClientModel(rawModel)
+        let model = modelResolution.upstreamModel
 
         var payload = request
         let downstreamStream = (request["stream"] as? Bool) ?? false
@@ -34,7 +35,11 @@ extension SwiftNativeProxyRuntimeService {
         }
 
         let currentReasoning = payload["reasoning"] as? [String: Any] ?? [:]
-        payload["reasoning"] = Self.normalizedReasoningForUpstream(currentReasoning, upstreamModel: model)
+        payload["reasoning"] = Self.mergedReasoningForUpstream(
+            existing: currentReasoning,
+            defaultEffort: modelResolution.defaultReasoningEffort,
+            upstreamModel: model
+        )
 
         var include = payload["include"] as? [Any] ?? []
         if !include.contains(where: { ($0 as? String) == "reasoning.encrypted_content" }) {
@@ -77,7 +82,8 @@ extension SwiftNativeProxyRuntimeService {
         guard let rawModel = request["model"] as? String, !rawModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw AppError.invalidData(L10n.tr("error.proxy_runtime.missing_model"))
         }
-        let model = try mapClientModelToUpstream(rawModel)
+        let modelResolution = try resolveClientModel(rawModel)
+        let model = modelResolution.upstreamModel
 
         guard let messages = request["messages"] as? [Any] else {
             throw AppError.invalidData(L10n.tr("error.proxy_runtime.chat_missing_messages"))
@@ -141,13 +147,19 @@ extension SwiftNativeProxyRuntimeService {
             }
         }
 
-        let reasoningEffort = (request["reasoning_effort"] as? String)
-            ?? (((request["reasoning"] as? [String: Any])?["effort"] as? String) ?? "medium")
-        let reasoningSummary = ((request["reasoning"] as? [String: Any])?["summary"] as? String) ?? "auto"
-        let reasoning = Self.normalizedReasoningForUpstream([
-            "effort": reasoningEffort,
-            "summary": reasoningSummary
-        ], upstreamModel: model)
+        let currentReasoning = request["reasoning"] as? [String: Any] ?? [:]
+        var requestedReasoning = currentReasoning
+        if let reasoningEffort = request["reasoning_effort"] as? String {
+            requestedReasoning["effort"] = reasoningEffort
+        }
+        if requestedReasoning["summary"] == nil {
+            requestedReasoning["summary"] = "auto"
+        }
+        let reasoning = Self.mergedReasoningForUpstream(
+            existing: requestedReasoning,
+            defaultEffort: modelResolution.defaultReasoningEffort,
+            upstreamModel: model
+        )
 
         var payload: [String: Any] = [
             "model": model,

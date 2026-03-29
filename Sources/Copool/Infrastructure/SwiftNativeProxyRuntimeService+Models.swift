@@ -1,8 +1,13 @@
 import Foundation
 
 extension SwiftNativeProxyRuntimeService {
+    struct ClientModelResolution: Equatable {
+        let upstreamModel: String
+        let defaultReasoningEffort: String?
+    }
+
     static var clientVisibleModels: [String] {
-        [
+        let baseModels = [
             "GPT-5",
             "GPT-5.4",
             "GPT-5.4-Mini",
@@ -12,6 +17,10 @@ extension SwiftNativeProxyRuntimeService {
             "GPT-5.1-Codex-Mini",
             "GPT-5.1-Codex-Max"
         ]
+        let reasoningAliases = baseModels.flatMap { model in
+            ["Medium", "High"].map { "\(model)-\($0)" }
+        }
+        return baseModels + reasoningAliases
     }
 
     static func resolveUpstreamRouteFamily(forUpstreamModel model: String) -> UpstreamRouteFamily {
@@ -52,11 +61,22 @@ extension SwiftNativeProxyRuntimeService {
     }
 
     func mapClientModelToUpstream(_ model: String) throws -> String {
+        try resolveClientModel(model).upstreamModel
+    }
+
+    func resolveClientModel(_ model: String) throws -> ClientModelResolution {
         let normalized = normalizedClientModelToken(model)
-        if normalized == "gpt-5-4" || normalized == "gpt-5.4" || normalized == "gpt5.4" {
-            return "gpt-5.4"
+        if let aliasResolution = resolveReasoningAlias(for: normalized) {
+            return aliasResolution
         }
-        return normalizedNumericModelRevisionIfNeeded(normalized)
+
+        if normalized == "gpt-5-4" || normalized == "gpt-5.4" || normalized == "gpt5.4" {
+            return ClientModelResolution(upstreamModel: "gpt-5.4", defaultReasoningEffort: nil)
+        }
+        return ClientModelResolution(
+            upstreamModel: normalizedNumericModelRevisionIfNeeded(normalized),
+            defaultReasoningEffort: nil
+        )
     }
 
     func normalizeModelForClient(_ model: String) -> String {
@@ -108,5 +128,27 @@ extension SwiftNativeProxyRuntimeService {
     private static func displaySegment(_ value: String) -> String {
         guard let first = value.first else { return value }
         return String(first).uppercased() + value.dropFirst().lowercased()
+    }
+
+    private func resolveReasoningAlias(for normalizedModel: String) -> ClientModelResolution? {
+        for effort in ["medium", "high"] {
+            let suffix = "-\(effort)"
+            guard normalizedModel.hasSuffix(suffix) else { continue }
+
+            let base = String(normalizedModel.dropLast(suffix.count))
+            guard !base.isEmpty else { continue }
+
+            do {
+                let baseResolution = try resolveClientModel(base)
+                return ClientModelResolution(
+                    upstreamModel: baseResolution.upstreamModel,
+                    defaultReasoningEffort: effort
+                )
+            } catch {
+                continue
+            }
+        }
+
+        return nil
     }
 }

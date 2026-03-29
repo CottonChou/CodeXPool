@@ -259,6 +259,36 @@ final class SwiftNativeProxyRuntimeServiceTests: XCTestCase {
         XCTAssertEqual(mapped.2, "gpt-5.3-codex")
     }
 
+    func testMapsDisplayModelAliasNamesToUpstream() async throws {
+        let runtime = SwiftNativeProxyRuntimeService(
+            paths: FileSystemPaths(
+                applicationSupportDirectory: URL(fileURLWithPath: "/tmp"),
+                accountStorePath: URL(fileURLWithPath: "/tmp/accounts.json"),
+                settingsStorePath: URL(fileURLWithPath: "/tmp/settings.json"),
+                codexAuthPath: URL(fileURLWithPath: "/tmp/auth.json"),
+                codexConfigPath: URL(fileURLWithPath: "/tmp/config.toml"),
+                proxyDaemonDataDirectory: URL(fileURLWithPath: "/tmp/proxyd", isDirectory: true),
+                proxyDaemonKeyPath: URL(fileURLWithPath: "/tmp/proxyd/api-proxy.key"),
+                cloudflaredLogDirectory: URL(fileURLWithPath: "/tmp/cloudflared-logs", isDirectory: true)
+            ),
+            storeRepository: MockStoreRepository(),
+            settingsRepository: MockSettingsRepository(),
+            authRepository: MockAuthRepository()
+        )
+
+        let mapped = try await runtime.withIsolation { runtime in
+            (
+                try runtime.mapClientModelToUpstream("GPT-5.4-High"),
+                try runtime.mapClientModelToUpstream("GPT-5.4-Mini-High"),
+                try runtime.mapClientModelToUpstream("GPT-5.3-Codex-Medium")
+            )
+        }
+
+        XCTAssertEqual(mapped.0, "gpt-5.4")
+        XCTAssertEqual(mapped.1, "gpt-5.4-mini")
+        XCTAssertEqual(mapped.2, "gpt-5.3-codex")
+    }
+
     func testNormalizesUpstreamModelsForClientDisplay() async {
         let runtime = SwiftNativeProxyRuntimeService(
             paths: FileSystemPaths(
@@ -291,6 +321,12 @@ final class SwiftNativeProxyRuntimeServiceTests: XCTestCase {
         XCTAssertEqual(normalized.2, "GPT-5.4")
         XCTAssertEqual(normalized.3, "GPT-5.4-Mini")
         XCTAssertEqual(normalized.4, "GPT-5.4-2026-03-09")
+    }
+
+    func testClientVisibleModelsIncludeReasoningAliasNames() {
+        XCTAssertTrue(SwiftNativeProxyRuntimeService.clientVisibleModels.contains("GPT-5.4-High"))
+        XCTAssertTrue(SwiftNativeProxyRuntimeService.clientVisibleModels.contains("GPT-5.4-Mini-High"))
+        XCTAssertTrue(SwiftNativeProxyRuntimeService.clientVisibleModels.contains("GPT-5.3-Codex-Medium"))
     }
 
     func testResolvesUpstreamBaseURLForBothRouteFamilies() {
@@ -371,19 +407,7 @@ final class SwiftNativeProxyRuntimeServiceTests: XCTestCase {
         XCTAssertNotNil(modelItems)
         XCTAssertTrue((modelItems?.count ?? 0) > 0)
         let ids = (modelItems ?? []).compactMap { $0["id"] as? String }
-        XCTAssertEqual(
-            ids,
-            [
-                "GPT-5",
-                "GPT-5.4",
-                "GPT-5.4-Mini",
-                "GPT-5.2",
-                "GPT-5.3-Codex",
-                "GPT-5.2-Codex",
-                "GPT-5.1-Codex-Mini",
-                "GPT-5.1-Codex-Max"
-            ]
-        )
+        XCTAssertEqual(ids, SwiftNativeProxyRuntimeService.clientVisibleModels)
 
         var modelsByAPIKeyHeader = URLRequest(url: modelsURL)
         modelsByAPIKeyHeader.setValue(started.apiKey ?? "", forHTTPHeaderField: "x-api-key")
@@ -583,6 +607,107 @@ final class SwiftNativeProxyRuntimeServiceTests: XCTestCase {
         }
 
         XCTAssertEqual(retainedUnsupportedKeys, [])
+    }
+
+    func testResponsesNormalizationInjectsReasoningEffortFromModelAlias() async throws {
+        let runtime = SwiftNativeProxyRuntimeService(
+            paths: FileSystemPaths(
+                applicationSupportDirectory: URL(fileURLWithPath: "/tmp"),
+                accountStorePath: URL(fileURLWithPath: "/tmp/accounts.json"),
+                settingsStorePath: URL(fileURLWithPath: "/tmp/settings.json"),
+                codexAuthPath: URL(fileURLWithPath: "/tmp/auth.json"),
+                codexConfigPath: URL(fileURLWithPath: "/tmp/config.toml"),
+                proxyDaemonDataDirectory: URL(fileURLWithPath: "/tmp/proxyd", isDirectory: true),
+                proxyDaemonKeyPath: URL(fileURLWithPath: "/tmp/proxyd/api-proxy.key"),
+                cloudflaredLogDirectory: URL(fileURLWithPath: "/tmp/cloudflared-logs", isDirectory: true)
+            ),
+            storeRepository: MockStoreRepository(),
+            settingsRepository: MockSettingsRepository(),
+            authRepository: MockAuthRepository()
+        )
+
+        let normalizedReasoningEffort = try await runtime.withIsolation { runtime in
+            let normalized = try runtime.normalizeResponsesRequest([
+                "model": "GPT-5.4-High",
+                "input": "hello"
+            ])
+            return (normalized.payload["reasoning"] as? [String: Any])?["effort"] as? String
+        }
+
+        let normalizedReasoningSummary = try await runtime.withIsolation { runtime in
+            let normalized = try runtime.normalizeResponsesRequest([
+                "model": "GPT-5.4-High",
+                "input": "hello"
+            ])
+            return (normalized.payload["reasoning"] as? [String: Any])?["summary"] as? String
+        }
+
+        XCTAssertEqual(normalizedReasoningEffort, "high")
+        XCTAssertEqual(normalizedReasoningSummary, "auto")
+    }
+
+    func testResponsesNormalizationKeepsExplicitReasoningEffortOverAliasDefault() async throws {
+        let runtime = SwiftNativeProxyRuntimeService(
+            paths: FileSystemPaths(
+                applicationSupportDirectory: URL(fileURLWithPath: "/tmp"),
+                accountStorePath: URL(fileURLWithPath: "/tmp/accounts.json"),
+                settingsStorePath: URL(fileURLWithPath: "/tmp/settings.json"),
+                codexAuthPath: URL(fileURLWithPath: "/tmp/auth.json"),
+                codexConfigPath: URL(fileURLWithPath: "/tmp/config.toml"),
+                proxyDaemonDataDirectory: URL(fileURLWithPath: "/tmp/proxyd", isDirectory: true),
+                proxyDaemonKeyPath: URL(fileURLWithPath: "/tmp/proxyd/api-proxy.key"),
+                cloudflaredLogDirectory: URL(fileURLWithPath: "/tmp/cloudflared-logs", isDirectory: true)
+            ),
+            storeRepository: MockStoreRepository(),
+            settingsRepository: MockSettingsRepository(),
+            authRepository: MockAuthRepository()
+        )
+
+        let normalizedReasoningEffort = try await runtime.withIsolation { runtime in
+            let normalized = try runtime.normalizeResponsesRequest([
+                "model": "GPT-5.4-High",
+                "input": "hello",
+                "reasoning": [
+                    "effort": "low"
+                ]
+            ])
+            return (normalized.payload["reasoning"] as? [String: Any])?["effort"] as? String
+        }
+
+        XCTAssertEqual(normalizedReasoningEffort, "low")
+    }
+
+    func testChatConversionInjectsReasoningEffortFromModelAlias() async throws {
+        let runtime = SwiftNativeProxyRuntimeService(
+            paths: FileSystemPaths(
+                applicationSupportDirectory: URL(fileURLWithPath: "/tmp"),
+                accountStorePath: URL(fileURLWithPath: "/tmp/accounts.json"),
+                settingsStorePath: URL(fileURLWithPath: "/tmp/settings.json"),
+                codexAuthPath: URL(fileURLWithPath: "/tmp/auth.json"),
+                codexConfigPath: URL(fileURLWithPath: "/tmp/config.toml"),
+                proxyDaemonDataDirectory: URL(fileURLWithPath: "/tmp/proxyd", isDirectory: true),
+                proxyDaemonKeyPath: URL(fileURLWithPath: "/tmp/proxyd/api-proxy.key"),
+                cloudflaredLogDirectory: URL(fileURLWithPath: "/tmp/cloudflared-logs", isDirectory: true)
+            ),
+            storeRepository: MockStoreRepository(),
+            settingsRepository: MockSettingsRepository(),
+            authRepository: MockAuthRepository()
+        )
+
+        let normalizedReasoningEffort = try await runtime.withIsolation { runtime in
+            let normalized = try runtime.convertChatRequestToResponses([
+                "model": "GPT-5.3-Codex-High",
+                "messages": [
+                    [
+                        "role": "user",
+                        "content": "hello"
+                    ]
+                ]
+            ])
+            return (normalized.payload["reasoning"] as? [String: Any])?["effort"] as? String
+        }
+
+        XCTAssertEqual(normalizedReasoningEffort, "high")
     }
 
     func testPayloadOversizeDetectionFromContentLengthHeader() {

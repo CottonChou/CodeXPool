@@ -3,6 +3,10 @@ import SwiftUI
 @testable import Copool
 
 final class LayoutRulesTests: XCTestCase {
+    func testCompactActionControlHeightMatchesAccountCardBottomActionLayout() {
+        XCTAssertEqual(LayoutRules.compactActionControlHeight, 30)
+    }
+
     func testMacOSUsesFixedGridColumnCounts() {
         let expanded = LayoutRules.accountsGridColumnCount(
             context: .init(

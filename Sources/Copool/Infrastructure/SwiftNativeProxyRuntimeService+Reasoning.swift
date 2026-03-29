@@ -1,6 +1,20 @@
 import Foundation
 
 extension SwiftNativeProxyRuntimeService {
+    static func mergedReasoningForUpstream(
+        existing reasoning: [String: Any],
+        defaultEffort: String?,
+        upstreamModel: String?
+    ) -> [String: Any] {
+        var merged = reasoning
+        let currentEffort = (merged["effort"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if currentEffort?.isEmpty != false, let defaultEffort {
+            merged["effort"] = defaultEffort
+        }
+        return normalizedReasoningForUpstream(merged, upstreamModel: upstreamModel)
+    }
+
     static func normalizedReasoningSummaryForUpstream(_ summary: String?) -> String {
         let raw = summary?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let lowered = raw.lowercased()
@@ -52,4 +66,3 @@ extension SwiftNativeProxyRuntimeService {
         return routeFamily == .codex ? "medium" : "none"
     }
 }
-
