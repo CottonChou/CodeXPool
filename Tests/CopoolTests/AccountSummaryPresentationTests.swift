@@ -2,6 +2,31 @@ import XCTest
 @testable import Copool
 
 final class AccountSummaryPresentationTests: XCTestCase {
+    func testNormalizedPlanLabelPrefersLatestUsagePlanType() {
+        let account = AccountSummary(
+            id: "acct-1",
+            label: "Primary",
+            email: "dev@example.com",
+            accountID: "account-1",
+            planType: "free",
+            teamName: nil,
+            teamAlias: nil,
+            addedAt: 0,
+            updatedAt: 0,
+            usage: UsageSnapshot(
+                fetchedAt: 1,
+                planType: "plus",
+                fiveHour: nil,
+                oneWeek: nil,
+                credits: nil
+            ),
+            usageError: nil,
+            isCurrent: false
+        )
+
+        XCTAssertEqual(account.normalizedPlanLabel, "PLUS")
+    }
+
     func testWorkspaceTagIsShownForBusinessPlan() {
         let account = AccountSummary(
             id: "acct-1",

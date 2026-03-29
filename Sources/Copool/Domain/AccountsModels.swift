@@ -284,9 +284,24 @@ struct AccountSummary: Equatable, Identifiable {
         AccountIdentity.key(for: self)
     }
 
-    var normalizedPlanLabel: String {
-        let normalized = (planType ?? usage?.planType ?? "team")
+    private var effectivePlanType: String {
+        let usagePlanType = usage?.planType?
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let usagePlanType, !usagePlanType.isEmpty {
+            return usagePlanType
+        }
+
+        let storedPlanType = planType?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let storedPlanType, !storedPlanType.isEmpty {
+            return storedPlanType
+        }
+
+        return "team"
+    }
+
+    var normalizedPlanLabel: String {
+        let normalized = effectivePlanType
             .lowercased()
 
         switch normalized {
