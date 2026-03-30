@@ -330,7 +330,7 @@
 "error.remote.no_usable_accounts_for_deploy" = "找不到可用於遠端部署的帳號。請先匯入或授權至少一個帳號。";
 "error.remote.build_proxyd_failed" = "建置遠端 proxyd 失敗";
 "error.remote.proxyd_not_found_after_build" = "建置完成後找不到 proxyd 二進位檔";
-"error.remote.unavailable_missing_proxyd_source" = "此建置缺少 src-tauri/proxyd/Cargo.toml，因此無法使用遠端部署功能。";
+"error.remote.unavailable_missing_proxyd_source" = "此建置缺少遠端 proxyd 所需資源，因此無法使用遠端部署功能。";
 "error.remote.ssh_command_failed_format" = "SSH 指令失敗：%@";
 "error.remote.scp_failed_format" = "SCP 失敗：%@";
 "error.proxy_runtime.invalid_port_format" = "Invalid proxy port: %@";

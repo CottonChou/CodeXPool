@@ -2,15 +2,28 @@ import Foundation
 
 struct RemoteProxydBinaryBuilder {
     let repoRoot: URL?
+    let bundledResourceRoot: URL?
     let fileManager: FileManager
     let commandRunner: RemoteShellCommandRunner
+
+    init(
+        repoRoot: URL?,
+        bundledResourceRoot: URL? = Bundle.main.resourceURL,
+        fileManager: FileManager,
+        commandRunner: RemoteShellCommandRunner
+    ) {
+        self.repoRoot = repoRoot
+        self.bundledResourceRoot = bundledResourceRoot
+        self.fileManager = fileManager
+        self.commandRunner = commandRunner
+    }
 
     func buildBinary(for server: RemoteServerConfig, forceRebuild: Bool = false) throws -> URL {
         let platform = try detectRemoteLinuxPlatform(for: server)
         if let prebuilt = prebuiltBinary(for: platform), !forceRebuild {
             return prebuilt
         }
-        guard let manifestPath = proxydManifestPath() else {
+        guard let manifestPath = try proxydManifestPath() else {
             throw AppError.io(L10n.tr("error.remote.unavailable_missing_proxyd_source"))
         }
         guard CommandRunner.resolveExecutable("cargo") != nil else {
@@ -92,7 +105,21 @@ struct RemoteProxydBinaryBuilder {
         return nil
     }
 
-    private func proxydManifestPath() -> URL? {
+    func bundledManifestPath() throws -> URL? {
+        guard let bundledResourceRoot else {
+            return nil
+        }
+
+        let structured = bundledResourceRoot
+            .appendingPathComponent(RepositoryLocator.proxydBundledManifestRelativePath, isDirectory: false)
+        if fileManager.fileExists(atPath: structured.path) {
+            return structured
+        }
+
+        return try restoreFlattenedBundledSourceTreeIfNeeded(from: bundledResourceRoot)
+    }
+
+    private func proxydManifestPath() throws -> URL? {
         if let repoRoot {
             if let manifest = RepositoryLocator.proxydManifestURL(in: repoRoot),
                fileManager.fileExists(atPath: manifest.path) {
@@ -100,13 +127,7 @@ struct RemoteProxydBinaryBuilder {
             }
         }
 
-        let bundled = Bundle.main.resourceURL?
-            .appendingPathComponent(RepositoryLocator.proxydBundledManifestRelativePath, isDirectory: false)
-        if let bundled, fileManager.fileExists(atPath: bundled.path) {
-            return bundled
-        }
-
-        return nil
+        return try bundledManifestPath()
     }
 
     private func proxydBuildTargetDirectory() throws -> URL {
@@ -258,6 +279,72 @@ struct RemoteProxydBinaryBuilder {
             let value = arch.isEmpty ? "unknown" : arch
             throw AppError.io("Unsupported remote Linux architecture: \(value)")
         }
+    }
+
+    private func restoreFlattenedBundledSourceTreeIfNeeded(from resourcesRoot: URL) throws -> URL? {
+        let manifest = resourcesRoot.appendingPathComponent("Cargo.toml", isDirectory: false)
+        let main = resourcesRoot.appendingPathComponent("main.rs", isDirectory: false)
+        guard fileManager.fileExists(atPath: manifest.path),
+              fileManager.fileExists(atPath: main.path) else {
+            return nil
+        }
+
+        let supportFiles = [
+            "auth.rs",
+            "models.rs",
+            "proxy_daemon.rs",
+            "proxy_service.rs",
+            "state.rs",
+            "store.rs",
+            "usage.rs",
+            "utils.rs",
+        ]
+        guard supportFiles.allSatisfy({
+            fileManager.fileExists(
+                atPath: resourcesRoot.appendingPathComponent($0, isDirectory: false).path
+            )
+        }) else {
+            return nil
+        }
+
+        let restoredRoot = try proxydBuildTargetDirectory()
+            .appendingPathComponent("bundled-proxyd-src", isDirectory: true)
+        if fileManager.fileExists(atPath: restoredRoot.path) {
+            try fileManager.removeItem(at: restoredRoot)
+        }
+
+        let restoredManifestDir = restoredRoot.appendingPathComponent("proxyd", isDirectory: true)
+        let restoredMainDir = restoredManifestDir.appendingPathComponent("src", isDirectory: true)
+        let restoredSupportDir = restoredRoot.appendingPathComponent("src", isDirectory: true)
+        try fileManager.createDirectory(at: restoredMainDir, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: restoredSupportDir, withIntermediateDirectories: true)
+
+        try fileManager.copyItem(
+            at: manifest,
+            to: restoredManifestDir.appendingPathComponent("Cargo.toml", isDirectory: false)
+        )
+
+        let lockfile = resourcesRoot.appendingPathComponent("Cargo.lock", isDirectory: false)
+        if fileManager.fileExists(atPath: lockfile.path) {
+            try fileManager.copyItem(
+                at: lockfile,
+                to: restoredManifestDir.appendingPathComponent("Cargo.lock", isDirectory: false)
+            )
+        }
+
+        try fileManager.copyItem(
+            at: main,
+            to: restoredMainDir.appendingPathComponent("main.rs", isDirectory: false)
+        )
+
+        for file in supportFiles {
+            try fileManager.copyItem(
+                at: resourcesRoot.appendingPathComponent(file, isDirectory: false),
+                to: restoredSupportDir.appendingPathComponent(file, isDirectory: false)
+            )
+        }
+
+        return restoredManifestDir.appendingPathComponent("Cargo.toml", isDirectory: false)
     }
 }
 

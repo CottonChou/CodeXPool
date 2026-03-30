@@ -2,6 +2,48 @@ import XCTest
 @testable import Copool
 
 final class RemoteProxydBinaryBuilderTests: XCTestCase {
+    func testBundledManifestPathRestoresFlattenedBundledSourceTree() throws {
+        let fileManager = FileManager.default
+        let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: tempDir) }
+
+        let resourcesRoot = tempDir.appendingPathComponent("Resources", isDirectory: true)
+        try fileManager.createDirectory(at: resourcesRoot, withIntermediateDirectories: true)
+
+        try Data("[package]\nname = \"codex-tools-proxyd\"\nversion = \"0.0.0\"\nedition = \"2021\"\n".utf8)
+            .write(to: resourcesRoot.appendingPathComponent("Cargo.toml"))
+        try Data("".utf8).write(to: resourcesRoot.appendingPathComponent("Cargo.lock"))
+        try Data("#[path = \"../../src/auth.rs\"]\nmod auth;\nfn main() {}\n".utf8)
+            .write(to: resourcesRoot.appendingPathComponent("main.rs"))
+        try Data("pub fn noop() {}\n".utf8)
+            .write(to: resourcesRoot.appendingPathComponent("auth.rs"))
+        try Data("".utf8).write(to: resourcesRoot.appendingPathComponent("models.rs"))
+        try Data("".utf8).write(to: resourcesRoot.appendingPathComponent("proxy_daemon.rs"))
+        try Data("".utf8).write(to: resourcesRoot.appendingPathComponent("proxy_service.rs"))
+        try Data("".utf8).write(to: resourcesRoot.appendingPathComponent("state.rs"))
+        try Data("".utf8).write(to: resourcesRoot.appendingPathComponent("store.rs"))
+        try Data("".utf8).write(to: resourcesRoot.appendingPathComponent("usage.rs"))
+        try Data("".utf8).write(to: resourcesRoot.appendingPathComponent("utils.rs"))
+
+        let builder = RemoteProxydBinaryBuilder(
+            repoRoot: nil,
+            bundledResourceRoot: resourcesRoot,
+            fileManager: fileManager,
+            commandRunner: RemoteShellCommandRunner(fileManager: fileManager)
+        )
+
+        let manifestPath = try XCTUnwrap(builder.bundledManifestPath())
+        let crateRoot = manifestPath.deletingLastPathComponent()
+        let restoredSupportSource = crateRoot
+            .deletingLastPathComponent()
+            .appendingPathComponent("src/auth.rs", isDirectory: false)
+
+        XCTAssertEqual(manifestPath.lastPathComponent, "Cargo.toml")
+        XCTAssertTrue(fileManager.fileExists(atPath: crateRoot.appendingPathComponent("src/main.rs").path))
+        XCTAssertTrue(fileManager.fileExists(atPath: restoredSupportSource.path))
+    }
+
     func testPrepareBinaryPathForBuildRemovesExistingCachedBinaryWhenForceRebuildEnabled() throws {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
