@@ -109,6 +109,33 @@ final class RemoteProxydBinaryBuilderTests: XCTestCase {
         XCTAssertEqual(resolved?.path, binaryPath.path)
     }
 
+    func testPrebuiltBinaryUsesBundledResourceRootArtifactForTarget() throws {
+        let fileManager = FileManager.default
+        let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: tempDir) }
+
+        let resourcesRoot = tempDir.appendingPathComponent("Resources", isDirectory: true)
+        let target = "aarch64-unknown-linux-musl"
+        let binaryPath = resourcesRoot
+            .appendingPathComponent("proxyd-prebuilt", isDirectory: true)
+            .appendingPathComponent(target, isDirectory: true)
+            .appendingPathComponent("codex-tools-proxyd", isDirectory: false)
+        try fileManager.createDirectory(at: binaryPath.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try writeExecutableStub(to: binaryPath)
+
+        let builder = RemoteProxydBinaryBuilder(
+            repoRoot: nil,
+            bundledResourceRoot: resourcesRoot,
+            fileManager: fileManager,
+            commandRunner: RemoteShellCommandRunner(fileManager: fileManager)
+        )
+
+        let resolved = builder.prebuiltBinary(forTarget: target)
+
+        XCTAssertEqual(resolved?.path, binaryPath.path)
+    }
+
     private func writeExecutableStub(to url: URL) throws {
         try Data("#!/bin/sh\nexit 0\n".utf8).write(to: url)
         try FileManager.default.setAttributes(

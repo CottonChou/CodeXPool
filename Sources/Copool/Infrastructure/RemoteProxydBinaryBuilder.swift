@@ -94,7 +94,7 @@ struct RemoteProxydBinaryBuilder {
             }
         }
 
-        let bundledBinary = Bundle.main.resourceURL?
+        let bundledBinary = bundledResourceRoot?
             .appendingPathComponent(RepositoryLocator.proxydBundledPrebuiltBinaryRelativeDirectory, isDirectory: true)
             .appendingPathComponent(target, isDirectory: true)
             .appendingPathComponent(RepositoryLocator.proxydBinaryName, isDirectory: false)
