@@ -141,6 +141,31 @@ final class ProxyControlBridgeTests: XCTestCase {
         XCTAssertEqual(metrics.pushLocalSnapshotCallCount, 1)
     }
 
+    func testPerformLocalCommandSucceedsWhenCloudSnapshotPushFails() async throws {
+        let cloudSyncService = FailingPushProxyControlCloudSyncService()
+        let bridge = makeBridge(
+            cloudSyncService: cloudSyncService,
+            runtimePlatform: .macOS
+        )
+
+        let command = ProxyControlCommand(
+            id: UUID().uuidString,
+            createdAt: 1_763_216_000_000,
+            sourceDeviceID: "macos-proxy-control",
+            kind: .refreshStatus,
+            preferredProxyPort: nil,
+            autoStartProxy: nil,
+            cloudflaredInput: nil,
+            remoteServer: nil,
+            remoteServerID: nil,
+            logLines: nil
+        )
+
+        let snapshot = try await bridge.performLocalCommand(command)
+
+        XCTAssertEqual(snapshot.sourceDeviceID, "macos-proxy-bridge")
+    }
+
     func testPerformLocalCommandBroadcastsLocalSnapshotUpdate() async throws {
         let cloudSyncService = SpyProxyControlCloudSyncService()
         let bridge = makeBridge(
@@ -397,6 +422,27 @@ private actor SpyProxyControlCloudSyncService: ProxyControlCloudSyncServiceProto
             lastSnapshotRemoteStatusCount: lastSnapshotRemoteStatusCount
         )
     }
+}
+
+private actor FailingPushProxyControlCloudSyncService: ProxyControlCloudSyncServiceProtocol {
+    func pushLocalSnapshot(_ snapshot: ProxyControlSnapshot) async throws {
+        _ = snapshot
+        throw AppError.io("Trying to initialize a container without an application ID")
+    }
+
+    func pullRemoteSnapshot() async throws -> ProxyControlSnapshot? {
+        nil
+    }
+
+    func enqueueCommand(_ command: ProxyControlCommand) async throws {
+        _ = command
+    }
+
+    func pullPendingCommand() async throws -> ProxyControlCommand? {
+        nil
+    }
+
+    func ensurePushSubscriptionIfNeeded() async throws {}
 }
 
 private struct StubLaunchAtStartupService: LaunchAtStartupServiceProtocol {

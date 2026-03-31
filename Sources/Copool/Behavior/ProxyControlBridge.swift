@@ -149,7 +149,17 @@ actor ProxyControlBridge: ProxyLocalCommandServiceProtocol {
         broadcastLocally: Bool
     ) async throws -> ProxyControlSnapshot {
         let snapshot = try await buildSnapshot(forceRemoteStatusRefresh: forceRemoteStatusRefresh)
-        try await cloudSyncService?.pushLocalSnapshot(snapshot)
+        do {
+            try await cloudSyncService?.pushLocalSnapshot(snapshot)
+        } catch {
+            guard !broadcastLocally else {
+                if broadcastLocally {
+                    broadcastLocalSnapshot(snapshot)
+                }
+                return snapshot
+            }
+            throw error
+        }
         if broadcastLocally {
             broadcastLocalSnapshot(snapshot)
         }
