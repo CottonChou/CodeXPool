@@ -89,10 +89,11 @@ extension AccountsPageModel {
             }
             return lhs.workspaceName.localizedCaseInsensitiveCompare(rhs.workspaceName) == .orderedAscending
         }
+        let pendingError = pendingCards.isEmpty ? nil : pendingWorkspaceAuthorizationError
         return AccountsPageContentPresentation(
             state: contentState,
             pendingWorkspaceCards: pendingCards,
-            pendingWorkspaceError: pendingWorkspaceAuthorizationError,
+            pendingWorkspaceError: pendingError,
             isOverviewMode: areAllAccountsCollapsed
         )
     }

@@ -1,7 +1,8 @@
 import SwiftUI
 
 struct AccountsPageShell: View {
-    @ObservedObject var store: AccountsPageViewStore
+    @ObservedObject var contentStore: AccountsPageViewStore
+    @ObservedObject var chromeStore: AccountsPageChromeStore
     let currentLocale: AppLocale
     let onSelectLocale: (AppLocale) -> Void
     let areCardsPresented: Bool
@@ -16,7 +17,8 @@ struct AccountsPageShell: View {
     var body: some View {
         #if os(iOS)
         AccountsIOSPageShell(
-            store: store,
+            contentStore: contentStore,
+            chromeStore: chromeStore,
             currentLocale: currentLocale,
             onSelectLocale: onSelectLocale,
             areCardsPresented: areCardsPresented,
@@ -30,7 +32,8 @@ struct AccountsPageShell: View {
         )
         #else
         AccountsMacPageShell(
-            store: store,
+            contentStore: contentStore,
+            chromeStore: chromeStore,
             areCardsPresented: areCardsPresented,
             onTriggerAction: onTriggerAction,
             onToggleCollapse: onToggleCollapse,
@@ -46,7 +49,8 @@ struct AccountsPageShell: View {
 
 #if os(iOS)
 private struct AccountsIOSPageShell: View {
-    @ObservedObject var store: AccountsPageViewStore
+    @ObservedObject var contentStore: AccountsPageViewStore
+    @ObservedObject var chromeStore: AccountsPageChromeStore
     let currentLocale: AppLocale
     let onSelectLocale: (AppLocale) -> Void
     let areCardsPresented: Bool
@@ -63,8 +67,8 @@ private struct AccountsIOSPageShell: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     AccountsPageContentSection(
-                        presentation: store.contentPresentation,
-                        cardStoreProvider: store.cardStore(for:),
+                        presentation: contentStore.contentPresentation,
+                        cardStoreProvider: contentStore.cardStore(for:),
                         availableViewportSize: proxy.size,
                         areCardsPresented: areCardsPresented,
                         onSwitchAccount: onSwitchAccount,
@@ -85,8 +89,8 @@ private struct AccountsIOSPageShell: View {
             }
             .toolbar {
                 AccountsToolbarContent(
-                    leadingButtons: store.leadingToolbarButtons,
-                    trailingButtons: store.trailingToolbarButtons,
+                    leadingButtons: chromeStore.leadingToolbarButtons,
+                    trailingButtons: chromeStore.trailingToolbarButtons,
                     currentLocale: currentLocale,
                     onSelectLocale: onSelectLocale,
                     onTriggerAction: onTriggerAction,
@@ -99,7 +103,8 @@ private struct AccountsIOSPageShell: View {
 #endif
 
 private struct AccountsMacPageShell: View {
-    @ObservedObject var store: AccountsPageViewStore
+    @ObservedObject var contentStore: AccountsPageViewStore
+    @ObservedObject var chromeStore: AccountsPageChromeStore
     let areCardsPresented: Bool
     let onTriggerAction: (AccountsPageActionIntent) -> Void
     let onToggleCollapse: () -> Void
@@ -116,7 +121,7 @@ private struct AccountsMacPageShell: View {
     var body: some View {
         VStack(alignment: .leading, spacing: LayoutRules.sectionSpacing) {
             AccountsActionBarContainer(
-                presentation: store.macActionBarPresentation,
+                presentation: chromeStore.macActionBarPresentation,
                 onTriggerAction: onTriggerAction,
                 onToggleCollapse: onToggleCollapse
             )
@@ -126,8 +131,8 @@ private struct AccountsMacPageShell: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     AccountsPageContentSection(
-                        presentation: store.contentPresentation,
-                        cardStoreProvider: store.cardStore(for:),
+                        presentation: contentStore.contentPresentation,
+                        cardStoreProvider: contentStore.cardStore(for:),
                         availableViewportSize: CGSize(
                             width: pageContentWidth,
                             height: LayoutRules.defaultPanelHeight

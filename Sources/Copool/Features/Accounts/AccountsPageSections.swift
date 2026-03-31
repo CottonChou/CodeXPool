@@ -1,7 +1,4 @@
 import SwiftUI
-#if os(macOS)
-import AppKit
-#endif
 
 struct AccountsPageContentSection: View {
     let presentation: AccountsPageContentPresentation
@@ -102,33 +99,22 @@ private struct AccountsGridSection: View {
     }
 
     var body: some View {
-        Group {
-            #if os(macOS)
-            MacOSAccountsGridContainer(
-                entries: entries,
-                columnCount: LayoutRules.accountsGridColumnCount(context: gridContext),
-                columnSpacing: LayoutRules.accountsRowSpacing,
-                rowSpacing: LayoutRules.accountsRowSpacing
-            )
-            #else
-            LazyVGrid(
-                columns: columns,
-                alignment: .leading,
-                spacing: LayoutRules.accountsRowSpacing
-            ) {
-                ForEach(entries) { entry in
-                    AccountCardGridItem(
-                        store: entry.store,
-                        areCardsPresented: entry.areCardsPresented,
-                        frameWidth: entry.frameWidth,
-                        index: entry.index,
-                        onSwitch: entry.onSwitch,
-                        onRefresh: entry.onRefresh,
-                        onDelete: entry.onDelete
-                    )
-                }
+        LazyVGrid(
+            columns: columns,
+            alignment: .leading,
+            spacing: LayoutRules.accountsRowSpacing
+        ) {
+            ForEach(entries) { entry in
+                AccountCardGridItem(
+                    store: entry.store,
+                    areCardsPresented: entry.areCardsPresented,
+                    frameWidth: entry.frameWidth,
+                    index: entry.index,
+                    onSwitch: entry.onSwitch,
+                    onRefresh: entry.onRefresh,
+                    onDelete: entry.onDelete
+                )
             }
-            #endif
         }
         .padding(.horizontal, LayoutRules.pagePadding)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -184,7 +170,6 @@ private struct CardEntranceModifier: ViewModifier {
         content
             .opacity(isPresented ? 1 : 0)
             .offset(y: isPresented ? 0 : 22)
-            .scaleEffect(isPresented ? 1 : 0.985)
             .animation(
                 AccountsAnimationRules.cardEntrance(index: index),
                 value: isPresented
@@ -203,197 +188,6 @@ private struct AccountCardFrameModifier: ViewModifier {
         content.frame(maxWidth: .infinity, alignment: .topLeading)
     }
 }
-
-#if os(macOS)
-private struct MacOSAccountsGridContainer: NSViewRepresentable {
-    let entries: [AccountCardGridEntry]
-    let columnCount: Int
-    let columnSpacing: CGFloat
-    let rowSpacing: CGFloat
-
-    func makeNSView(context: Context) -> MacOSAccountsGridHostView {
-        let view = MacOSAccountsGridHostView()
-        view.update(
-            entries: entries,
-            columnCount: columnCount,
-            columnSpacing: columnSpacing,
-            rowSpacing: rowSpacing
-        )
-        return view
-    }
-
-    func updateNSView(_ nsView: MacOSAccountsGridHostView, context: Context) {
-        nsView.update(
-            entries: entries,
-            columnCount: columnCount,
-            columnSpacing: columnSpacing,
-            rowSpacing: rowSpacing
-        )
-    }
-}
-
-private final class MacOSAccountsGridHostView: NSView {
-    private let stack = NSStackView()
-    private var rowStacks: [NSStackView] = []
-    private var hosts: [String: NSHostingView<AccountCardGridItem>] = [:]
-    private var widthConstraints: [String: NSLayoutConstraint] = [:]
-
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        translatesAutoresizingMaskIntoConstraints = false
-        configureStack()
-    }
-
-    override var isFlipped: Bool {
-        true
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    func update(
-        entries: [AccountCardGridEntry],
-        columnCount: Int,
-        columnSpacing: CGFloat,
-        rowSpacing: CGFloat
-    ) {
-        stack.spacing = rowSpacing
-        let clampedColumnCount = max(1, columnCount)
-        let incomingIDs = Set(entries.map(\.id))
-
-        for (id, host) in hosts where !incomingIDs.contains(id) {
-            widthConstraints[id]?.isActive = false
-            widthConstraints[id] = nil
-            host.removeFromSuperview()
-            hosts[id] = nil
-        }
-
-        for entry in entries {
-            let host = hostView(for: entry)
-            host.rootView = makeCardItem(entry: entry)
-            applyWidth(entry.frameWidth, to: host, id: entry.id)
-        }
-
-        updateRows(
-            entries: entries,
-            columnCount: clampedColumnCount,
-            columnSpacing: columnSpacing
-        )
-    }
-
-    private func configureStack() {
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.distribution = .fill
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(stack)
-
-        NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: topAnchor),
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
-            stack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor),
-            stack.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor)
-        ])
-    }
-
-    private func hostView(for entry: AccountCardGridEntry) -> NSHostingView<AccountCardGridItem> {
-        if let existing = hosts[entry.id] {
-            return existing
-        }
-        let host = NSHostingView(rootView: makeCardItem(entry: entry))
-        host.translatesAutoresizingMaskIntoConstraints = false
-        hosts[entry.id] = host
-        return host
-    }
-
-    private func makeCardItem(entry: AccountCardGridEntry) -> AccountCardGridItem {
-        AccountCardGridItem(
-            store: entry.store,
-            areCardsPresented: entry.areCardsPresented,
-            frameWidth: entry.frameWidth,
-            index: entry.index,
-            onSwitch: entry.onSwitch,
-            onRefresh: entry.onRefresh,
-            onDelete: entry.onDelete
-        )
-    }
-
-    private func applyWidth(_ width: CGFloat?, to host: NSHostingView<AccountCardGridItem>, id: String) {
-        if let existing = widthConstraints[id] {
-            existing.isActive = false
-            widthConstraints[id] = nil
-        }
-        guard let width else { return }
-        let constraint = host.widthAnchor.constraint(equalToConstant: width)
-        constraint.priority = .required
-        constraint.isActive = true
-        widthConstraints[id] = constraint
-    }
-
-    private func updateRows(entries: [AccountCardGridEntry], columnCount: Int, columnSpacing: CGFloat) {
-        let rowCount = entries.isEmpty ? 0 : Int(ceil(Double(entries.count) / Double(columnCount)))
-
-        while rowStacks.count < rowCount {
-            let row = NSStackView()
-            row.orientation = .horizontal
-            row.alignment = .top
-            row.distribution = .fill
-            row.translatesAutoresizingMaskIntoConstraints = false
-            rowStacks.append(row)
-            stack.addArrangedSubview(row)
-        }
-
-        while rowStacks.count > rowCount {
-            let row = rowStacks.removeLast()
-            stack.removeArrangedSubview(row)
-            row.removeFromSuperview()
-        }
-
-        for rowIndex in 0..<rowCount {
-            let row = rowStacks[rowIndex]
-            row.spacing = columnSpacing
-            let start = rowIndex * columnCount
-            let end = min(start + columnCount, entries.count)
-            let targetHosts = entries[start..<end].compactMap { hosts[$0.id] }
-            syncRow(row, with: targetHosts)
-        }
-    }
-
-    private func syncRow(_ row: NSStackView, with targetHosts: [NSView]) {
-        let existing = row.arrangedSubviews
-        for view in existing where !targetHosts.contains(where: { $0 === view }) {
-            row.removeArrangedSubview(view)
-            view.removeFromSuperview()
-        }
-
-        for (index, target) in targetHosts.enumerated() {
-            if target.superview !== row {
-                target.removeFromSuperview()
-            }
-
-            if index < row.arrangedSubviews.count {
-                if row.arrangedSubviews[index] !== target {
-                    if row.arrangedSubviews.contains(where: { $0 === target }) {
-                        row.removeArrangedSubview(target)
-                        target.removeFromSuperview()
-                    }
-                    row.insertArrangedSubview(target, at: index)
-                }
-            } else {
-                row.addArrangedSubview(target)
-            }
-        }
-
-        while row.arrangedSubviews.count > targetHosts.count {
-            guard let last = row.arrangedSubviews.last else { break }
-            row.removeArrangedSubview(last)
-            last.removeFromSuperview()
-        }
-    }
-}
-#endif
 
 private struct PendingWorkspaceAuthorizationSection: View {
     let cards: [PendingWorkspaceAuthorizationCardViewState]

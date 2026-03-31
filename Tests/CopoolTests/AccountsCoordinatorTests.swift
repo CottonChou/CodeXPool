@@ -1162,17 +1162,43 @@ final class AccountsCoordinatorTests: XCTestCase {
                 )
             ]
         )
-        let store = AccountsPageViewStore(model: model)
-        let initialContent = store.contentPresentation
+        let contentStore = AccountsPageViewStore(model: model)
+        let chromeStore = AccountsPageChromeStore(model: model)
+        let initialContent = contentStore.contentPresentation
 
         model.isAdding = true
         await Task.yield()
 
-        XCTAssertEqual(store.contentPresentation, initialContent)
-        let addButton = store.macActionBarPresentation.descriptors.first {
-            $0.intent == AccountsPageActionIntent.addAccount
-        }
-        XCTAssertEqual(addButton?.isEnabled, false)
+        XCTAssertEqual(contentStore.contentPresentation, initialContent)
+        XCTAssertEqual(
+            chromeStore.macActionBarPresentation.descriptors.map(\.intent),
+            [.importCurrentAuth, .cancelAddAccount, .smartSwitch, .refreshUsage]
+        )
+    }
+
+    @MainActor
+    func testAccountsPageChromeStorePublishesActionBarChanges() async {
+        let model = makeAccountsPageModelForViewStoreTests(
+            initialAccounts: [
+                makeAccountSummary(
+                    id: "acct-1",
+                    accountID: "account-1",
+                    isCurrent: true,
+                    usage: nil
+                )
+            ]
+        )
+        let store = AccountsPageChromeStore(model: model)
+        let initialPresentation = store.macActionBarPresentation
+
+        model.isAdding = true
+        await Task.yield()
+
+        XCTAssertNotEqual(store.macActionBarPresentation, initialPresentation)
+        XCTAssertEqual(
+            store.macActionBarPresentation.descriptors.map(\.intent),
+            [.importCurrentAuth, .cancelAddAccount, .smartSwitch, .refreshUsage]
+        )
     }
 
     @MainActor
@@ -3834,7 +3860,7 @@ final class AccountsCoordinatorTests: XCTestCase {
     }
 
     @MainActor
-    func testContentPresentationShowsPendingSectionForErrorWithoutCards() {
+    func testContentPresentationHidesPendingSectionForErrorWithoutCards() {
         let account = makeAccountSummary(
             id: "acct-1",
             accountID: "account-1",
@@ -3860,8 +3886,8 @@ final class AccountsCoordinatorTests: XCTestCase {
         let contentPresentation = model.makeContentPresentation()
 
         XCTAssertTrue(contentPresentation.pendingWorkspaceCards.isEmpty)
-        XCTAssertEqual(contentPresentation.pendingWorkspaceError, L10n.tr("error.workspace.discovery_forbidden"))
-        XCTAssertTrue(contentPresentation.shouldShowPendingWorkspaceSection)
+        XCTAssertNil(contentPresentation.pendingWorkspaceError)
+        XCTAssertFalse(contentPresentation.shouldShowPendingWorkspaceSection)
     }
 
     @MainActor
