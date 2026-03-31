@@ -39,25 +39,59 @@ final class SimpleHTTPServer: @unchecked Sendable {
     private let listener: NWListener
     private let queue: DispatchQueue
     private let handler: RequestHandler
+    private let stateLock = NSLock()
+    private var isStarted = false
 
     init(port: UInt16, handler: @escaping RequestHandler) throws {
         guard let nwPort = NWEndpoint.Port(rawValue: port) else {
             throw AppError.invalidData(L10n.tr("error.http_server.invalid_port_format", String(port)))
         }
-        self.listener = try NWListener(using: .tcp, on: nwPort)
+        let parameters = NWParameters.tcp
+        parameters.allowLocalEndpointReuse = true
+        self.listener = try NWListener(using: parameters, on: nwPort)
         self.queue = DispatchQueue(label: "codex.tools.swift.proxy.listener", qos: .userInitiated)
         self.handler = handler
     }
 
-    func start() {
+    func start() async throws {
         listener.newConnectionHandler = { [weak self] connection in
             self?.handle(connection: connection)
         }
-        listener.start(queue: queue)
+
+        let shouldStart: Bool = stateLock.withLock {
+            if isStarted {
+                return false
+            }
+            isStarted = true
+            return true
+        }
+
+        guard shouldStart else { return }
+
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            let resumeState = ResumeState()
+
+            listener.stateUpdateHandler = { state in
+                let action = resumeState.consume(state: state)
+                switch action {
+                case .resume:
+                    continuation.resume()
+                case .throwError(let error):
+                    continuation.resume(throwing: error)
+                case .none:
+                    break
+                }
+            }
+
+            listener.start(queue: queue)
+        }
     }
 
     func stop() {
         listener.cancel()
+        stateLock.withLock {
+            isStarted = false
+        }
     }
 
     private func handle(connection: NWConnection) {
@@ -233,6 +267,45 @@ final class SimpleHTTPServer: @unchecked Sendable {
         case 500: return "Internal Server Error"
         case 502: return "Bad Gateway"
         default: return "HTTP"
+        }
+    }
+}
+
+private extension NSLock {
+    func withLock<T>(_ body: () -> T) -> T {
+        lock()
+        defer { unlock() }
+        return body()
+    }
+}
+
+private final class ResumeState: @unchecked Sendable {
+    enum Action {
+        case none
+        case resume
+        case throwError(Error)
+    }
+
+    private let lock = NSLock()
+    private var hasResumed = false
+
+    func consume(state: NWListener.State) -> Action {
+        lock.withLock {
+            guard !hasResumed else { return .none }
+
+            switch state {
+            case .ready:
+                hasResumed = true
+                return .resume
+            case .failed(let error):
+                hasResumed = true
+                return .throwError(error)
+            case .cancelled:
+                hasResumed = true
+                return .throwError(AppError.io("HTTP server listener was cancelled"))
+            default:
+                return .none
+            }
         }
     }
 }

@@ -3319,6 +3319,95 @@ final class AccountsCoordinatorTests: XCTestCase {
         )
     }
 
+    func testSyncWorkspaceDirectoryMergesWorkspaceMetadataAcrossAllEligibleAccounts() async throws {
+        let now: Int64 = 1_763_216_000
+        let storeRepository = InMemoryAccountsStoreRepository(
+            store: AccountsStore(
+                accounts: [
+                    StoredAccount(
+                        id: "acct-1",
+                        label: "Primary",
+                        email: "primary@example.com",
+                        accountID: "account-1",
+                        planType: "team",
+                        teamName: "primary-space",
+                        teamAlias: nil,
+                        authJSON: .object([
+                            "account_id": .string("account-1")
+                        ]),
+                        addedAt: now,
+                        updatedAt: now,
+                        usage: nil,
+                        usageError: nil
+                    ),
+                    StoredAccount(
+                        id: "acct-2",
+                        label: "Secondary",
+                        email: "secondary@example.com",
+                        accountID: "account-2",
+                        planType: "enterprise",
+                        teamName: "secondary-space",
+                        teamAlias: nil,
+                        authJSON: .object([
+                            "account_id": .string("account-2")
+                        ]),
+                        addedAt: now,
+                        updatedAt: now,
+                        usage: nil,
+                        usageError: nil
+                    )
+                ]
+            )
+        )
+        let metadataService = RecordingAccessTokenMappedWorkspaceMetadataService(
+            metadataByAccessToken: [
+                "token-account-1": [
+                    WorkspaceMetadata(accountID: "account-1", workspaceName: "primary-space", structure: "workspace"),
+                    WorkspaceMetadata(accountID: "account-3", workspaceName: "ops-space", structure: "workspace")
+                ],
+                "token-account-2": [
+                    WorkspaceMetadata(accountID: "account-2", workspaceName: "secondary-space", structure: "workspace"),
+                    WorkspaceMetadata(accountID: "account-4", workspaceName: "research-space", structure: "workspace")
+                ]
+            ]
+        )
+        let coordinator = AccountsCoordinator(
+            storeRepository: storeRepository,
+            settingsRepository: TestSettingsRepository(),
+            authRepository: MultiAccountAuthRepository(
+                extractedByAccountID: [
+                    "account-1": makeExtractedAuth(
+                        accountID: "account-1",
+                        planType: "team",
+                        teamName: "primary-space"
+                    ),
+                    "account-2": makeExtractedAuth(
+                        accountID: "account-2",
+                        planType: "enterprise",
+                        teamName: "secondary-space"
+                    )
+                ]
+            ),
+            usageService: CountingUsageService(result: makeUsageSnapshot(fetchedAt: now)),
+            workspaceMetadataService: metadataService,
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+
+        let entries = try await coordinator.syncWorkspaceDirectory()
+        let requestedTokens = await metadataService.readRequestedAccessTokens()
+
+        XCTAssertEqual(Set(requestedTokens), Set(["token-account-1", "token-account-2"]))
+        XCTAssertEqual(Set(entries.map(\.workspaceID)), Set(["account-3", "account-4"]))
+        XCTAssertEqual(
+            Set(entries.map(\.workspaceName)),
+            Set(["ops-space", "research-space"])
+        )
+    }
+
     func testSyncWorkspaceDirectoryRestoresVisibilityWhenWorkspaceBecomesActive() async throws {
         let now: Int64 = 1_763_216_000
         let existingEntry = WorkspaceDirectoryEntry(
@@ -3745,7 +3834,7 @@ final class AccountsCoordinatorTests: XCTestCase {
     }
 
     @MainActor
-    func testContentPresentationHidesPendingSectionForErrorWithoutCards() {
+    func testContentPresentationShowsPendingSectionForErrorWithoutCards() {
         let account = makeAccountSummary(
             id: "acct-1",
             accountID: "account-1",
@@ -3772,7 +3861,7 @@ final class AccountsCoordinatorTests: XCTestCase {
 
         XCTAssertTrue(contentPresentation.pendingWorkspaceCards.isEmpty)
         XCTAssertEqual(contentPresentation.pendingWorkspaceError, L10n.tr("error.workspace.discovery_forbidden"))
-        XCTAssertFalse(contentPresentation.shouldShowPendingWorkspaceSection)
+        XCTAssertTrue(contentPresentation.shouldShowPendingWorkspaceSection)
     }
 
     @MainActor

@@ -43,9 +43,9 @@ final class DefaultUsageService: UsageService, @unchecked Sendable {
     func fetchUsage(accessToken: String, accountID: String) async throws -> UsageSnapshot {
         let candidateURLs = resolveUsageURLs()
         let startedAt = Date()
-        Self.logger.debug(
-            "Usage request started for account \(accountID, privacy: .public). Candidates: \(candidateURLs.joined(separator: " | "), privacy: .public)"
-        )
+        // Self.logger.debug(
+        //     "Usage request started for account \(accountID, privacy: .public). Candidates: \(candidateURLs.joined(separator: " | "), privacy: .public)"
+        // )
         do {
             let resolved: ResolvedUsagePayload = try await endpointCoordinator.fetchFirstSuccessful(
                 scope: RequestPolicy.scope,
@@ -58,23 +58,22 @@ final class DefaultUsageService: UsageService, @unchecked Sendable {
                 request.setValue(accountID, forHTTPHeaderField: "ChatGPT-Account-Id")
                 request.setValue("application/json", forHTTPHeaderField: "Accept")
                 request.setValue("codex-tools-swift/0.1", forHTTPHeaderField: "User-Agent")
-                Self.logger.debug(
-                    "Usage request: \(Self.requestLogSummary(for: request), privacy: .public)"
-                )
+                // Self.logger.debug(
+                //     "Usage request: \(Self.requestLogSummary(for: request), privacy: .public)"
+                // )
                 return request
             } validate: { result in
-                Self.logger.debug(
-                    "Usage raw response from \(result.endpoint, privacy: .public) [status \(result.response.statusCode)] for account \(accountID, privacy: .public): \(Self.responseLogBody(for: result.data), privacy: .public)"
-                )
+                // Self.logger.debug(
+                //     "Usage raw response from \(result.endpoint, privacy: .public) [status \(result.response.statusCode)] for account \(accountID, privacy: .public): \(Self.responseLogBody(for: result.data), privacy: .public)"
+                // )
                 return ResolvedUsagePayload(
                     endpoint: result.endpoint,
                     payload: try JSONDecoder().decode(UsageAPIResponse.self, from: result.data)
                 )
             }
-            let elapsedMilliseconds = Int(Date().timeIntervalSince(startedAt) * 1_000)
-            Self.logger.debug(
-                "Usage request succeeded via \(resolved.endpoint, privacy: .public) in \(elapsedMilliseconds) ms for account \(accountID, privacy: .public)"
-            )
+            // Self.logger.debug(
+            //     "Usage request succeeded via \(resolved.endpoint, privacy: .public) in \(elapsedMilliseconds) ms for account \(accountID, privacy: .public)"
+            // )
             return mapPayload(resolved.payload)
         } catch EndpointRequestError.allRequestsFailed(let errors) {
             let elapsedMilliseconds = Int(Date().timeIntervalSince(startedAt) * 1_000)

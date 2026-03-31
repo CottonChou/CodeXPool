@@ -63,7 +63,7 @@ final class OpenAIChatGPTOAuthLoginService: ChatGPTOAuthLoginServiceProtocol, @u
             forcedWorkspaceID: effectiveForcedWorkspaceID
         )
 
-        server.start()
+        try await server.start()
         defer { server.stop() }
 
         try await beginAuthorizationSession(

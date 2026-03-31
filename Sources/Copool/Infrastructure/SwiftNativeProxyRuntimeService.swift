@@ -78,7 +78,7 @@ actor SwiftNativeProxyRuntimeService: ProxyRuntimeService {
                 }
                 return await self.handle(request: request)
             }
-            boundServer.start()
+            try await boundServer.start()
         } catch {
             lastError = L10n.tr("error.proxy_runtime.start_swift_proxy_failed_format", error.localizedDescription)
             throw AppError.io(lastError ?? L10n.tr("error.proxy_runtime.start_failed"))

@@ -29,18 +29,11 @@ final class DefaultWorkspaceMetadataService: WorkspaceMetadataService, @unchecke
     func fetchWorkspaceMetadata(accessToken: String) async throws -> [WorkspaceMetadata] {
         let candidateURLs = resolveAccountURLs()
         let startedAt = Date()
-        Self.logger.debug(
-            "Workspace discovery started. Candidates: \(candidateURLs.joined(separator: " | "), privacy: .public)"
-        )
 
         do {
             let resolved = try await fetchWorkspaceMetadataOnce(
                 accessToken: accessToken,
                 candidateURLs: candidateURLs
-            )
-            let elapsedMilliseconds = Int(Date().timeIntervalSince(startedAt) * 1_000)
-            Self.logger.debug(
-                "Workspace discovery succeeded via \(resolved.endpoint, privacy: .public) in \(elapsedMilliseconds) ms with \(resolved.metadata.count) entries"
             )
             return resolved.metadata
         } catch EndpointRequestError.allRequestsFailed(let errors) {
@@ -50,10 +43,6 @@ final class DefaultWorkspaceMetadataService: WorkspaceMetadataService, @unchecke
                     let resolved = try await fetchWorkspaceMetadataOnce(
                         accessToken: accessToken,
                         candidateURLs: candidateURLs
-                    )
-                    let elapsedMilliseconds = Int(Date().timeIntervalSince(startedAt) * 1_000)
-                    Self.logger.debug(
-                        "Workspace discovery retry succeeded via \(resolved.endpoint, privacy: .public) in \(elapsedMilliseconds) ms with \(resolved.metadata.count) entries"
                     )
                     return resolved.metadata
                 } catch EndpointRequestError.allRequestsFailed(let retryErrors) {
@@ -100,14 +89,8 @@ final class DefaultWorkspaceMetadataService: WorkspaceMetadataService, @unchecke
             request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
             request.setValue("application/json", forHTTPHeaderField: "Accept")
             request.setValue("codex-tools-swift/0.1", forHTTPHeaderField: "User-Agent")
-            Self.logger.debug(
-                "Workspace discovery request: \(Self.requestLogSummary(for: request), privacy: .public)"
-            )
             return request
         } validate: { result in
-            Self.logger.debug(
-                "Workspace discovery raw response from \(result.endpoint, privacy: .public) [status \(result.response.statusCode)]: \(Self.responseLogBody(for: result.data), privacy: .public)"
-            )
             let payload = try JSONDecoder().decode(WorkspaceAccountsResponse.self, from: result.data)
             let metadata = payload.items.map {
                 WorkspaceMetadata(

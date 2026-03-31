@@ -43,7 +43,7 @@ enum RemoteProxyDeploymentPlan {
         INSTALLED=0; SERVICE_INSTALLED=0; RUNNING=0; ENABLED=0; PID=""; API_KEY=""; \
         if [ -x "$BIN" ]; then INSTALLED=1; fi; \
         if command -v systemctl >/dev/null 2>&1; then \
-          if [ -f "/etc/systemd/system/$UNIT" ] || [ -f "/lib/systemd/system/$UNIT" ]; then SERVICE_INSTALLED=1; fi; \
+          if [ -f "/etc/systemd/system/$UNIT" ] || [ -f "/lib/systemd/system/$UNIT" ] || [ -f "/usr/lib/systemd/system/$UNIT" ]; then SERVICE_INSTALLED=1; fi; \
           ENABLED_STATE=$(systemctl is-enabled "$UNIT" 2>/dev/null || true); \
           if [ "$ENABLED_STATE" = "enabled" ]; then ENABLED=1; fi; \
           ACTIVE_STATE=$(systemctl is-active "$UNIT" 2>/dev/null || true); \
@@ -89,7 +89,7 @@ enum RemoteProxyDeploymentPlan {
         shellQuote: (String) -> String
     ) -> String {
         let restartCommand = shouldRestartService
-            ? "if [ -f \"/etc/systemd/system/$UNIT\" ] || [ -f \"/lib/systemd/system/$UNIT\" ]; then systemctl restart \"$UNIT\"; fi;"
+            ? "if [ -f \"/etc/systemd/system/$UNIT\" ] || [ -f \"/lib/systemd/system/$UNIT\" ] || [ -f \"/usr/lib/systemd/system/$UNIT\" ]; then systemctl restart \"$UNIT\"; fi;"
             : "true"
 
         return """
@@ -104,7 +104,7 @@ enum RemoteProxyDeploymentPlan {
         let marker = discoveryRecordMarker
         return """
         MARKER=\(shellQuote(marker)); SEEN_UNITS=""; \
-        for UNIT_PATH in /etc/systemd/system/codex-tools-proxyd-*.service /lib/systemd/system/codex-tools-proxyd-*.service; do \
+        for UNIT_PATH in /etc/systemd/system/codex-tools-proxyd-*.service /lib/systemd/system/codex-tools-proxyd-*.service /usr/lib/systemd/system/codex-tools-proxyd-*.service; do \
           [ -f "$UNIT_PATH" ] || continue; \
           UNIT_NAME=$(basename "$UNIT_PATH"); \
           case " $SEEN_UNITS " in *" $UNIT_NAME "*) continue ;; esac; \
@@ -145,7 +145,7 @@ enum RemoteProxyDeploymentPlan {
         UNIT=\(shellQuote(serviceName)); \
         systemctl stop "$UNIT" >/dev/null 2>&1 || true; \
         systemctl disable "$UNIT" >/dev/null 2>&1 || true; \
-        rm -f "/etc/systemd/system/$UNIT" "/lib/systemd/system/$UNIT"; \
+        rm -f "/etc/systemd/system/$UNIT" "/lib/systemd/system/$UNIT" "/usr/lib/systemd/system/$UNIT"; \
         systemctl daemon-reload; \
         \(removeDirCommand)
         """
@@ -158,7 +158,7 @@ enum RemoteProxyDeploymentPlan {
     ) -> String {
         """
         TARGET_DIR=\(shellQuote(server.remoteDir)); TARGET_PORT=\(shellQuote(String(server.listenPort))); TARGET_UNIT=\(shellQuote(preservingServiceName)); \
-        for UNIT_PATH in /etc/systemd/system/codex-tools-proxyd-*.service /lib/systemd/system/codex-tools-proxyd-*.service; do \
+        for UNIT_PATH in /etc/systemd/system/codex-tools-proxyd-*.service /lib/systemd/system/codex-tools-proxyd-*.service /usr/lib/systemd/system/codex-tools-proxyd-*.service; do \
           [ -f "$UNIT_PATH" ] || continue; \
           UNIT_NAME=$(basename "$UNIT_PATH"); \
           [ "$UNIT_NAME" = "$TARGET_UNIT" ] && continue; \
@@ -167,7 +167,7 @@ enum RemoteProxyDeploymentPlan {
           if [ "$WORK_DIR" = "$TARGET_DIR" ] || [ "$PORT" = "$TARGET_PORT" ]; then \
             systemctl stop "$UNIT_NAME" >/dev/null 2>&1 || true; \
             systemctl disable "$UNIT_NAME" >/dev/null 2>&1 || true; \
-            rm -f "/etc/systemd/system/$UNIT_NAME" "/lib/systemd/system/$UNIT_NAME"; \
+            rm -f "/etc/systemd/system/$UNIT_NAME" "/lib/systemd/system/$UNIT_NAME" "/usr/lib/systemd/system/$UNIT_NAME"; \
           fi; \
         done;
         """

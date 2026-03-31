@@ -7,7 +7,7 @@ struct AccountsPageContentPresentation: Equatable {
     let isOverviewMode: Bool
 
     var shouldShowPendingWorkspaceSection: Bool {
-        !pendingWorkspaceCards.isEmpty
+        !pendingWorkspaceCards.isEmpty || pendingWorkspaceError != nil
     }
 }
 

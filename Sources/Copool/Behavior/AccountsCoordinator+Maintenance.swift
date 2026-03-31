@@ -66,18 +66,19 @@ extension AccountsCoordinator {
 
     func syncWorkspaceDirectory() async throws -> [WorkspaceDirectoryEntry] {
         var store = try storeRepository.loadStore()
-        guard let workspaceMetadataService,
-              let sourceAccount = preferredWorkspaceDirectorySourceAccount(in: store) else {
-            return store.workspaceDirectory
-        }
-        let extracted = try authRepository.extractAuth(from: sourceAccount.authJSON)
-        guard shouldLookupRemoteWorkspaceMetadata(extracted: extracted) else {
+        guard let workspaceMetadataService else {
             return store.workspaceDirectory
         }
 
-        let metadata = try await workspaceMetadataService.fetchWorkspaceMetadata(
-            accessToken: extracted.accessToken
-        )
+        let eligibleAccounts = try store.accounts.compactMap { account -> (StoredAccount, ExtractedAuth)? in
+            let extracted = try authRepository.extractAuth(from: account.authJSON)
+            guard shouldLookupRemoteWorkspaceMetadata(extracted: extracted) else { return nil }
+            return (account, extracted)
+        }
+        guard !eligibleAccounts.isEmpty else {
+            return store.workspaceDirectory
+        }
+
         let now = dateProvider.unixSecondsNow()
         let authorizedWorkspaceIDs = Set(
             store.accounts.map { AccountIdentity.normalizedAccountID($0.accountID) }
@@ -90,15 +91,27 @@ extension AccountsCoordinator {
             }
         )
 
-        let discoveredWorkspaceIDs = Set(metadata.compactMap { entry -> String? in
-            let normalizedWorkspaceID = AccountIdentity.normalizedAccountID(entry.accountID)
-            guard !normalizedWorkspaceID.isEmpty else { return nil }
-            return normalizedWorkspaceID
-        })
+        var discoveredWorkspaceIDs: Set<String> = []
+        var discoveredWorkspacesByID: [String: (metadata: WorkspaceMetadata, sourceAccount: StoredAccount)] = [:]
 
-        for workspace in metadata {
-            let normalizedWorkspaceID = AccountIdentity.normalizedAccountID(workspace.accountID)
-            guard !normalizedWorkspaceID.isEmpty else { continue }
+        for (sourceAccount, extracted) in eligibleAccounts {
+            let metadata = try await workspaceMetadataService.fetchWorkspaceMetadata(
+                accessToken: extracted.accessToken
+            )
+
+            for workspace in metadata {
+                let normalizedWorkspaceID = AccountIdentity.normalizedAccountID(workspace.accountID)
+                guard !normalizedWorkspaceID.isEmpty else { continue }
+                discoveredWorkspaceIDs.insert(normalizedWorkspaceID)
+                if discoveredWorkspacesByID[normalizedWorkspaceID] == nil {
+                    discoveredWorkspacesByID[normalizedWorkspaceID] = (workspace, sourceAccount)
+                }
+            }
+        }
+
+        for (normalizedWorkspaceID, discoveredWorkspace) in discoveredWorkspacesByID {
+            let workspace = discoveredWorkspace.metadata
+            let sourceAccount = discoveredWorkspace.sourceAccount
             guard !authorizedWorkspaceIDs.contains(normalizedWorkspaceID) else {
                 nextEntriesByID.removeValue(forKey: normalizedWorkspaceID)
                 continue
@@ -489,14 +502,6 @@ extension AccountsCoordinator {
     private func shouldLookupRemoteWorkspaceMetadata(extracted: ExtractedAuth) -> Bool {
         let normalizedPlan = (extracted.planType ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return normalizedPlan == "team" || normalizedPlan == "business" || normalizedPlan == "enterprise"
-    }
-
-    private func preferredWorkspaceDirectorySourceAccount(in store: AccountsStore) -> StoredAccount? {
-        if let currentAccountKey = authRepository.currentAuthAccountKey(),
-           let current = store.accounts.first(where: { $0.accountKey == currentAccountKey }) {
-            return current
-        }
-        return store.accounts.first
     }
 
     private static func refreshAccount(

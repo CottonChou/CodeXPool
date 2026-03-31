@@ -192,6 +192,7 @@ final class RemoteServerConfigurationTests: XCTestCase {
         )
 
         XCTAssertTrue(command.contains("MARKER='__COPool_DISCOVERY__'"))
+        XCTAssertTrue(command.contains("/usr/lib/systemd/system/codex-tools-proxyd-*.service"))
         XCTAssertTrue(command.contains("WORK_DIR=$(sed -n 's/^WorkingDirectory=//p' \"$UNIT_PATH\" | head -n 1)"))
         XCTAssertTrue(command.contains("SERVER_ID=$(sed -n"))
         XCTAssertTrue(command.contains("COPOOL_SERVER_ID"))
@@ -235,6 +236,17 @@ final class RemoteServerConfigurationTests: XCTestCase {
         XCTAssertTrue(command.contains("systemctl stop \"$UNIT\""))
         XCTAssertTrue(command.contains("systemctl disable \"$UNIT\""))
         XCTAssertTrue(command.contains("systemctl daemon-reload"))
+        XCTAssertTrue(command.contains("\"/usr/lib/systemd/system/$UNIT\""))
         XCTAssertTrue(command.contains("rm -f '/srv/codex/codex-tools-proxyd' '/srv/codex/accounts.json'"))
+    }
+
+    func testDeploymentPlanStatusCommandChecksUsrLibSystemdDirectory() {
+        let command = RemoteProxyDeploymentPlan.renderStatusCommand(
+            serviceName: "codex-tools-proxyd-server-1.service",
+            remoteDir: "/srv/codex",
+            shellQuote: { value in "'\(value)'" }
+        )
+
+        XCTAssertTrue(command.contains("[ -f \"/usr/lib/systemd/system/$UNIT\" ]"))
     }
 }
