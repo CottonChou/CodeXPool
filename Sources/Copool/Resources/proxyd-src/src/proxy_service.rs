@@ -677,7 +677,7 @@ fn convert_openai_chat_request_to_codex(request: &Value) -> Result<(Value, bool)
         .unwrap_or(false);
 
     let mut root = Map::new();
-    root.insert("model".to_string(), Value::String(model));
+    root.insert("model".to_string(), Value::String(model.clone()));
     root.insert("stream".to_string(), Value::Bool(true));
     root.insert("store".to_string(), Value::Bool(false));
     root.insert("instructions".to_string(), Value::String(String::new()));

@@ -397,6 +397,35 @@
 		};
 /* End PBXCopyFilesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		A9C0DE9A1B2C3D4E5F607182 /* Build proxyd prebuilt */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 0;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/scripts/build_proxyd_prebuilt.sh",
+				"$(SRCROOT)/Sources/Copool/Resources/proxyd-src/src",
+				"$(SRCROOT)/Sources/Copool/Resources/proxyd-src/proxyd/src",
+				"$(SRCROOT)/Sources/Copool/Resources/proxyd-src/proxyd/Cargo.toml",
+				"$(SRCROOT)/Sources/Copool/Resources/proxyd-src/proxyd/Cargo.lock",
+			);
+			name = "Build proxyd prebuilt";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Sources/Copool/Resources/proxyd-prebuilt/x86_64-unknown-linux-musl/.build-stamp",
+				"$(SRCROOT)/Sources/Copool/Resources/proxyd-prebuilt/aarch64-unknown-linux-musl/.build-stamp",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/sh \"${SRCROOT}/scripts/build_proxyd_prebuilt.sh\"";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXFileReference section */
 		00E0EE08E1645AD783C2DED1 /* ShellCommandRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellCommandRunner.swift; sourceTree = "<group>"; };
 		01A60F9FBC201EBACCB9D21A /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "zh-Hant.lproj/Localizable.strings"; sourceTree = "<group>"; };
@@ -1078,6 +1107,7 @@
 			buildConfigurationList = 4866ECE00666C9CD90B9649C /* Build configuration list for PBXNativeTarget "Copool" */;
 			buildPhases = (
 				B5878CD9780E2ADEA4EC9D37 /* Sources */,
+				A9C0DE9A1B2C3D4E5F607182 /* Build proxyd prebuilt */,
 				D78B47AB5F9A1A8C8ACC3B11 /* Resources */,
 				C5AB32357C913EDBE3D61083 /* Embed Foundation Extensions */,
 			);
@@ -1635,6 +1665,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 					CURRENT_PROJECT_VERSION = 20;
 				DEAD_CODE_STRIPPING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
 				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
@@ -1717,6 +1748,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 					CURRENT_PROJECT_VERSION = 20;
 				DEAD_CODE_STRIPPING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
 				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;

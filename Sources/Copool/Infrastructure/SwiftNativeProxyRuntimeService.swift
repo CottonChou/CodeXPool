@@ -173,18 +173,21 @@ actor SwiftNativeProxyRuntimeService: ProxyRuntimeService {
         }
 
         let upstream: UpstreamResponse
+        if downstreamStream {
+            do {
+                return try await makeResponsesStreamingHTTPResponse(
+                    payload: payload,
+                    downstreamHeaders: downstreamHeaders
+                )
+            } catch {
+                return jsonError(statusCode: 502, message: error.localizedDescription)
+            }
+        }
+
         do {
             upstream = try await sendOverCandidates(payload: payload, downstreamHeaders: downstreamHeaders)
         } catch {
             return jsonError(statusCode: 502, message: error.localizedDescription)
-        }
-
-        if downstreamStream {
-            return HTTPResponse(
-                statusCode: 200,
-                headers: ["Content-Type": "text/event-stream; charset=utf-8"],
-                body: upstream.body
-            )
         }
 
         do {
@@ -218,23 +221,22 @@ actor SwiftNativeProxyRuntimeService: ProxyRuntimeService {
         }
 
         let upstream: UpstreamResponse
-        do {
-            upstream = try await sendOverCandidates(payload: payload, downstreamHeaders: downstreamHeaders)
-        } catch {
-            return jsonError(statusCode: 502, message: error.localizedDescription)
-        }
-
         if downstreamStream {
             do {
-                let sse = try convertResponsesSSEToChatCompletionsSSE(upstream.body, fallbackModel: requestedModel)
-                return HTTPResponse(
-                    statusCode: 200,
-                    headers: ["Content-Type": "text/event-stream; charset=utf-8"],
-                    body: sse
+                return try await makeChatCompletionsStreamingHTTPResponse(
+                    payload: payload,
+                    downstreamHeaders: downstreamHeaders,
+                    requestedModel: requestedModel
                 )
             } catch {
                 return jsonError(statusCode: 502, message: error.localizedDescription)
             }
+        }
+
+        do {
+            upstream = try await sendOverCandidates(payload: payload, downstreamHeaders: downstreamHeaders)
+        } catch {
+            return jsonError(statusCode: 502, message: error.localizedDescription)
         }
 
         do {
@@ -259,6 +261,9 @@ actor SwiftNativeProxyRuntimeService: ProxyRuntimeService {
                 let response = try await sendUpstream(payload: payload, candidate: candidate, downstreamHeaders: downstreamHeaders)
                 if response.statusCode >= 200 && response.statusCode < 300 {
                     try? recordSuccessfulCandidate(candidate)
+                    if shouldSyncCurrentAuthOnSuccessfulProxyResponse() {
+                        try? authRepository.writeCurrentAuth(candidate.authJSON)
+                    }
                     return response
                 }
 
@@ -297,6 +302,198 @@ actor SwiftNativeProxyRuntimeService: ProxyRuntimeService {
         throw AppError.network(message)
     }
 
+    private func sendStreamingOverCandidates(
+        payload: [String: Any],
+        downstreamHeaders: [String: String]
+    ) async throws -> UpstreamStreamingResponse {
+        let candidates = try currentCandidates()
+        guard !candidates.isEmpty else {
+            throw AppError.invalidData(L10n.tr("error.proxy_runtime.no_accounts_available"))
+        }
+
+        var failureDetails: [String] = []
+        var retryFailures: [RetryFailureInfo] = []
+        for candidate in candidates {
+            do {
+                let response = try await openStreamingUpstreamRequest(
+                    payload: payload,
+                    candidate: candidate,
+                    downstreamHeaders: downstreamHeaders
+                )
+
+                if response.statusCode >= 200 && response.statusCode < 300 {
+                    try? recordSuccessfulCandidate(candidate)
+                    return response
+                }
+
+                var buffered = Data()
+                for try await byte in response.bytes {
+                    buffered.append(byte)
+                    if buffered.count > ProxyRuntimeLimits.maxUpstreamResponseBytes {
+                        break
+                    }
+                }
+                let bodyText = String(data: buffered, encoding: .utf8) ?? ""
+                let detail = "\(candidate.label): \(response.statusCode) \(truncateForError(bodyText, maxLength: 120))"
+                failureDetails.append(detail)
+
+                if let retryFailure = classifyRetryFailure(statusCode: response.statusCode, bodyText: bodyText) {
+                    markCooldown(for: candidate.accountID, category: retryFailure.category)
+                    retryFailures.append(retryFailure)
+                    continue
+                } else {
+                    lastError = detail
+                    break
+                }
+            } catch {
+                let detail = "\(candidate.label): \(error.localizedDescription)"
+                failureDetails.append(detail)
+            }
+        }
+
+        if !retryFailures.isEmpty && retryFailures.count == candidates.count {
+            let summary = buildRetriableFailureSummary(retryFailures)
+            let message = summary.isEmpty
+                ? L10n.tr("error.proxy_runtime.all_accounts_unavailable")
+                : L10n.tr("error.proxy_runtime.all_accounts_unavailable_with_summary_format", summary)
+            lastError = message
+            throw AppError.network(message)
+        }
+
+        let preview = failureDetails.prefix(2).joined(separator: " | ")
+        let message = failureDetails.count > 2
+            ? L10n.tr("error.proxy_runtime.upstream_failed_with_more_format", preview, String(failureDetails.count - 2))
+            : L10n.tr("error.proxy_runtime.upstream_failed_format", preview)
+        lastError = message
+        throw AppError.network(message)
+    }
+
+    private func makeResponsesStreamingHTTPResponse(
+        payload: [String: Any],
+        downstreamHeaders: [String: String]
+    ) async throws -> HTTPResponse {
+        let upstream = try await sendStreamingOverCandidates(
+            payload: payload,
+            downstreamHeaders: downstreamHeaders
+        )
+        let decoder = makeResponsesPassthroughSSEStreamDecoder()
+
+        let stream = AsyncThrowingStream<Data, Error> { continuation in
+            Task {
+                do {
+                    var iterator = upstream.bytes.makeAsyncIterator()
+                    var buffer = Data()
+                    var totalBytes = 0
+
+                    while let byte = try await iterator.next() {
+                        buffer.append(byte)
+                        totalBytes += 1
+                        if totalBytes > ProxyRuntimeLimits.maxUpstreamResponseBytes {
+                            throw AppError.network(
+                                L10n.tr(
+                                    "error.proxy_runtime.upstream_response_too_large_format",
+                                    ProxyRuntimeLimits.limitDescription(for: ProxyRuntimeLimits.maxUpstreamResponseBytes)
+                                )
+                            )
+                        }
+
+                        if byte == 0x0A {
+                            for eventData in consumeResponsesPassthroughSSEChunk(decoder, data: buffer, isFinal: false) {
+                                continuation.yield(eventData)
+                            }
+                            buffer.removeAll(keepingCapacity: true)
+                        }
+                    }
+
+                    for eventData in consumeResponsesPassthroughSSEChunk(decoder, data: buffer, isFinal: true) {
+                        continuation.yield(eventData)
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+
+        return HTTPResponse(
+            statusCode: 200,
+            headers: [
+                "Content-Type": "text/event-stream; charset=utf-8",
+                "Cache-Control": "no-cache"
+            ],
+            body: stream
+        )
+    }
+
+    private func makeChatCompletionsStreamingHTTPResponse(
+        payload: [String: Any],
+        downstreamHeaders: [String: String],
+        requestedModel: String
+    ) async throws -> HTTPResponse {
+        let upstream = try await sendStreamingOverCandidates(
+            payload: payload,
+            downstreamHeaders: downstreamHeaders
+        )
+        let decoder = makeChatCompletionsSSEStreamDecoder(fallbackModel: requestedModel)
+
+        let stream = AsyncThrowingStream<Data, Error> { continuation in
+            Task {
+                do {
+                    var iterator = upstream.bytes.makeAsyncIterator()
+                    var buffer = Data()
+                    var totalBytes = 0
+
+                    while let byte = try await iterator.next() {
+                        buffer.append(byte)
+                        totalBytes += 1
+                        if totalBytes > ProxyRuntimeLimits.maxUpstreamResponseBytes {
+                            throw AppError.network(
+                                L10n.tr(
+                                    "error.proxy_runtime.upstream_response_too_large_format",
+                                    ProxyRuntimeLimits.limitDescription(for: ProxyRuntimeLimits.maxUpstreamResponseBytes)
+                                )
+                            )
+                        }
+
+                        if byte == 0x0A {
+                            let chunks = try consumeChatCompletionsSSEStreamChunk(
+                                decoder,
+                                data: buffer,
+                                isFinal: false
+                            )
+                            for chunk in chunks {
+                                continuation.yield(Data("data: \(jsonString(chunk))\n\n".utf8))
+                            }
+                            buffer.removeAll(keepingCapacity: true)
+                        }
+                    }
+
+                    let finalChunks = try consumeChatCompletionsSSEStreamChunk(
+                        decoder,
+                        data: buffer,
+                        isFinal: true
+                    )
+                    for chunk in finalChunks {
+                        continuation.yield(Data("data: \(jsonString(chunk))\n\n".utf8))
+                    }
+                    continuation.yield(Data("data: [DONE]\n\n".utf8))
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+
+        return HTTPResponse(
+            statusCode: 200,
+            headers: [
+                "Content-Type": "text/event-stream; charset=utf-8",
+                "Cache-Control": "no-cache"
+            ],
+            body: stream
+        )
+    }
+
     private func parseJSONObject(from data: Data) throws -> [String: Any] {
         let object = try JSONSerialization.jsonObject(with: data)
         guard let dict = object as? [String: Any] else {
@@ -305,7 +502,7 @@ actor SwiftNativeProxyRuntimeService: ProxyRuntimeService {
         return dict
     }
 
-    private func rewriteResponseModelFields(_ value: [String: Any]) -> [String: Any] {
+    func rewriteResponseModelFields(_ value: [String: Any]) -> [String: Any] {
         var output: Any = value
         recurseNormalizeModels(&output)
         return output as? [String: Any] ?? value

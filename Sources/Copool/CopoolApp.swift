@@ -29,6 +29,8 @@ struct CopoolApp: App {
             #if os(macOS)
             await container.proxyControlBridge.start()
             #endif
+            await container.settingsModel.loadIfNeeded()
+            await container.proxyModel.bootstrapOnAppLaunch(using: container.settingsModel.settings)
         }
     }
 

@@ -719,6 +719,54 @@ final class SwiftNativeProxyRuntimeServiceTests: XCTestCase {
         XCTAssertEqual(normalizedReasoningEffort, "high")
     }
 
+    func testStreamingChatTranslatorEmitsChunksIncrementally() async throws {
+        let runtime = makeRuntime(store: AccountsStore())
+        let decoder = await runtime.withIsolation { runtime in
+            runtime.makeChatCompletionsSSEStreamDecoder(fallbackModel: "gpt-5")
+        }
+
+        let firstChunkCount = try await runtime.withIsolation { runtime in
+            let chunks = try runtime.consumeChatCompletionsSSEStreamChunk(
+                decoder,
+                data: Data("""
+                event: response.created
+                data: {"type":"response.created","response":{"id":"resp_123","created_at":1,"model":"gpt-5"}}
+
+                event: response.output_text.delta
+                data: {"type":"response.output_text.delta","delta":"Hel
+                """.utf8),
+                isFinal: false
+            )
+            return chunks.count
+        }
+        XCTAssertEqual(firstChunkCount, 0)
+
+        let secondSnapshot = try await runtime.withIsolation { runtime in
+            let chunks = try runtime.consumeChatCompletionsSSEStreamChunk(
+                decoder,
+                data: Data("""
+                lo"}
+
+                event: response.completed
+                data: {"type":"response.completed","response":{"id":"resp_123","created_at":1,"model":"gpt-5","status":"completed"}}
+
+                """.utf8),
+                isFinal: true
+            )
+            let firstContent = ((chunks[0]["choices"] as? [[String: Any]])?.first?["delta"] as? [String: Any])?["content"] as? String
+            let finishReason = ((chunks[1]["choices"] as? [[String: Any]])?.first?["finish_reason"] as? String)
+            return StreamedChatChunkSnapshot(
+                chunkCount: chunks.count,
+                firstContent: firstContent,
+                finishReason: finishReason
+            )
+        }
+
+        XCTAssertEqual(secondSnapshot.chunkCount, 2)
+        XCTAssertEqual(secondSnapshot.firstContent, "Hello")
+        XCTAssertEqual(secondSnapshot.finishReason, "stop")
+    }
+
     func testPayloadOversizeDetectionFromContentLengthHeader() {
         let oversized = ProxyRuntimeLimits.maxInboundRequestBytes + 1
         let raw = """
@@ -959,6 +1007,12 @@ private struct NormalizedResponsesSnapshot: Sendable {
     let model: String?
     let stream: Bool?
     let input: [NormalizedInputMessage]
+}
+
+private struct StreamedChatChunkSnapshot: Sendable {
+    let chunkCount: Int
+    let firstContent: String?
+    let finishReason: String?
 }
 
 private struct NormalizedInputMessage: Sendable {

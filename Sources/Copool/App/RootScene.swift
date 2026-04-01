@@ -78,14 +78,6 @@ struct RootScene: View {
         .task {
             await settingsModel.loadIfNeeded()
         }
-        .task(id: settingsModel.hasLoaded) {
-            guard settingsModel.hasLoaded else { return }
-            #if os(macOS)
-            deferredProxyModel.loadIfNeeded(using: container)
-            #endif
-            guard let proxyModel = deferredProxyModel.model else { return }
-            await proxyModel.bootstrapOnAppLaunch(using: settingsModel.settings)
-        }
         .rootSceneNoticePresentation(currentNotice)
         #if os(macOS)
         .frame(

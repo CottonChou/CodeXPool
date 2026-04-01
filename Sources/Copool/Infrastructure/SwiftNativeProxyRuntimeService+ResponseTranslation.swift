@@ -97,26 +97,55 @@ extension SwiftNativeProxyRuntimeService {
     }
 
     func convertResponsesSSEToChatCompletionsSSE(_ sseData: Data, fallbackModel: String) throws -> Data {
-        let events = parseSSEEvents(from: sseData)
-        var state = ChatStreamState(
-            responseID: "chatcmpl_\(UUID().uuidString)",
-            createdAt: Int(dateProvider.unixSecondsNow()),
-            model: normalizeModelForClient(fallbackModel),
-            functionCallIndex: -1,
-            hasReceivedArgumentsDelta: false,
-            hasToolCallAnnounced: false
-        )
+        let decoder = makeChatCompletionsSSEStreamDecoder(fallbackModel: fallbackModel)
+        let chunks = try consumeChatCompletionsSSEStreamChunk(decoder, data: sseData, isFinal: true)
 
         var lines = ""
-        for event in events {
-            let chunks = translateSSEEventToChatChunks(event, state: &state)
-            for chunk in chunks {
-                lines += "data: \(jsonString(chunk))\n\n"
-            }
+        for chunk in chunks {
+            lines += "data: \(jsonString(chunk))\n\n"
         }
-
         lines += "data: [DONE]\n\n"
         return Data(lines.utf8)
+    }
+
+    func makeChatCompletionsSSEStreamDecoder(fallbackModel: String) -> ChatCompletionsSSEStreamDecoder {
+        ChatCompletionsSSEStreamDecoder(
+            decoder: SSEStreamDecoder(),
+            state: ChatStreamState(
+                responseID: "chatcmpl_\(UUID().uuidString)",
+                createdAt: Int(dateProvider.unixSecondsNow()),
+                model: normalizeModelForClient(fallbackModel),
+                functionCallIndex: -1,
+                hasReceivedArgumentsDelta: false,
+                hasToolCallAnnounced: false
+            )
+        )
+    }
+
+    func consumeChatCompletionsSSEStreamChunk(
+        _ decoder: ChatCompletionsSSEStreamDecoder,
+        data: Data,
+        isFinal: Bool
+    ) throws -> [[String: Any]] {
+        var chunks: [[String: Any]] = []
+        for event in decoder.decoder.push(data: data, isFinal: isFinal) {
+            chunks.append(contentsOf: translateSSEEventToChatChunks(event, state: &decoder.state))
+        }
+        return chunks
+    }
+
+    func makeResponsesPassthroughSSEStreamDecoder() -> SSEStreamDecoder {
+        SSEStreamDecoder()
+    }
+
+    func consumeResponsesPassthroughSSEChunk(
+        _ decoder: SSEStreamDecoder,
+        data: Data,
+        isFinal: Bool
+    ) -> [Data] {
+        decoder.push(data: data, isFinal: isFinal).map { event in
+            serializeSSEEvent(event: event.event, data: rewriteSSEEventDataModelsForClient(event.data))
+        }
     }
 
     func translateSSEEventToChatChunks(_ event: SSEEvent, state: inout ChatStreamState) -> [[String: Any]] {
@@ -400,29 +429,28 @@ extension SwiftNativeProxyRuntimeService {
     }
 
     func parseSSEEvents(from data: Data) -> [SSEEvent] {
-        guard let text = String(data: data, encoding: .utf8) else { return [] }
-        let normalized = text.replacingOccurrences(of: "\r\n", with: "\n")
+        SSEStreamDecoder().push(data: data, isFinal: true)
+    }
 
-        return normalized
-            .components(separatedBy: "\n\n")
-            .compactMap { block in
-                if block.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    return nil
-                }
+    func rewriteSSEEventDataModelsForClient(_ data: String) -> String {
+        guard data != "[DONE]",
+              let payloadData = data.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: payloadData) as? [String: Any] else {
+            return data
+        }
+        return jsonString(rewriteResponseModelFields(object))
+    }
 
-                var eventName: String?
-                var dataLines: [String] = []
-                for line in block.components(separatedBy: "\n") {
-                    if line.hasPrefix("event:") {
-                        eventName = line.replacingOccurrences(of: "event:", with: "").trimmingCharacters(in: .whitespaces)
-                    } else if line.hasPrefix("data:") {
-                        dataLines.append(line.replacingOccurrences(of: "data:", with: "").trimmingCharacters(in: .whitespaces))
-                    }
-                }
-
-                let joinedData = dataLines.joined(separator: "\n")
-                return joinedData.isEmpty ? nil : SSEEvent(event: eventName, data: joinedData)
-            }
+    func serializeSSEEvent(event: String?, data: String) -> Data {
+        var lines = ""
+        if let event, !event.isEmpty {
+            lines += "event: \(event)\n"
+        }
+        for line in data.split(separator: "\n", omittingEmptySubsequences: false) {
+            lines += "data: \(line)\n"
+        }
+        lines += "\n"
+        return Data(lines.utf8)
     }
 }
 
@@ -438,4 +466,85 @@ struct ChatStreamState {
     var functionCallIndex: Int
     var hasReceivedArgumentsDelta: Bool
     var hasToolCallAnnounced: Bool
+}
+
+final class ChatCompletionsSSEStreamDecoder: @unchecked Sendable {
+    let decoder: SSEStreamDecoder
+    var state: ChatStreamState
+
+    init(decoder: SSEStreamDecoder, state: ChatStreamState) {
+        self.decoder = decoder
+        self.state = state
+    }
+}
+
+final class SSEStreamDecoder: @unchecked Sendable {
+    private var buffer = Data()
+
+    func push(data: Data, isFinal: Bool) -> [SSEEvent] {
+        if !data.isEmpty {
+            buffer.append(data)
+        }
+
+        var events: [SSEEvent] = []
+        while let range = nextSeparatorRange(in: buffer) {
+            let chunk = buffer.subdata(in: 0..<range.lowerBound)
+            buffer.removeSubrange(0..<range.upperBound)
+            if let event = parseEventBlock(chunk) {
+                events.append(event)
+            }
+        }
+
+        if isFinal, !buffer.isEmpty {
+            if let event = parseEventBlock(buffer) {
+                events.append(event)
+            }
+            buffer.removeAll(keepingCapacity: false)
+        }
+
+        return events
+    }
+
+    private func nextSeparatorRange(in data: Data) -> Range<Int>? {
+        let bytes = Array(data)
+        guard bytes.count >= 2 else { return nil }
+
+        var index = 0
+        while index < bytes.count - 1 {
+            if bytes[index] == 0x0A && bytes[index + 1] == 0x0A {
+                return index..<(index + 2)
+            }
+            if index < bytes.count - 3 &&
+                bytes[index] == 0x0D &&
+                bytes[index + 1] == 0x0A &&
+                bytes[index + 2] == 0x0D &&
+                bytes[index + 3] == 0x0A {
+                return index..<(index + 4)
+            }
+            index += 1
+        }
+
+        return nil
+    }
+
+    private func parseEventBlock(_ data: Data) -> SSEEvent? {
+        guard let text = String(data: data, encoding: .utf8) else { return nil }
+        let normalized = text.replacingOccurrences(of: "\r\n", with: "\n")
+        if normalized.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return nil
+        }
+
+        var eventName: String?
+        var dataLines: [String] = []
+        for line in normalized.components(separatedBy: "\n") {
+            if line.hasPrefix("event:") {
+                eventName = String(line.dropFirst("event:".count)).trimmingCharacters(in: .whitespaces)
+            } else if line.hasPrefix("data:") {
+                dataLines.append(String(line.dropFirst("data:".count)).trimmingCharacters(in: .whitespaces))
+            }
+        }
+
+        let joinedData = dataLines.joined(separator: "\n")
+        return joinedData.isEmpty ? nil : SSEEvent(event: eventName, data: joinedData)
+    }
 }

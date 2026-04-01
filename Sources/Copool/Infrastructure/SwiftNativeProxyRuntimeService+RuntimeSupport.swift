@@ -1,6 +1,34 @@
 import Foundation
 
 extension SwiftNativeProxyRuntimeService {
+    func makeUpstreamRequest(
+        payload: [String: Any],
+        candidate: ProxyCandidate,
+        downstreamHeaders: [String: String]
+    ) throws -> URLRequest {
+        let body = try JSONSerialization.data(withJSONObject: payload)
+        let upstreamModel = (payload["model"] as? String) ?? "gpt-5.4"
+        let version = Self.normalizedForwardHeader(downstreamHeaders["version"]) ?? Self.defaultCodexClientVersion
+        let sessionID = Self.normalizedForwardHeader(downstreamHeaders["session_id"])
+            ?? Self.normalizedForwardHeader(downstreamHeaders["session-id"])
+            ?? UUID().uuidString
+        let userAgent = Self.normalizedForwardHeader(downstreamHeaders["user-agent"]) ?? Self.defaultCodexUserAgent
+        var request = URLRequest(url: responsesEndpoint(forUpstreamModel: upstreamModel))
+        request.httpMethod = "POST"
+        request.timeoutInterval = 180
+        request.httpBody = body
+        request.setValue("Bearer \(candidate.accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue(candidate.accountID, forHTTPHeaderField: "ChatGPT-Account-Id")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        request.setValue("codex_cli_rs", forHTTPHeaderField: "Originator")
+        request.setValue(version, forHTTPHeaderField: "Version")
+        request.setValue(sessionID, forHTTPHeaderField: "Session_id")
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        request.setValue("Keep-Alive", forHTTPHeaderField: "Connection")
+        return request
+    }
+
     func currentCandidates() throws -> [ProxyCandidate] {
         let modificationDate = accountsStoreModificationDate()
         if let cachedCandidates,
@@ -163,27 +191,11 @@ extension SwiftNativeProxyRuntimeService {
         candidate: ProxyCandidate,
         downstreamHeaders: [String: String]
     ) async throws -> UpstreamResponse {
-        let body = try JSONSerialization.data(withJSONObject: payload)
-        let upstreamModel = (payload["model"] as? String) ?? "gpt-5.4"
-        let version = Self.normalizedForwardHeader(downstreamHeaders["version"]) ?? Self.defaultCodexClientVersion
-        let sessionID = Self.normalizedForwardHeader(downstreamHeaders["session_id"])
-            ?? Self.normalizedForwardHeader(downstreamHeaders["session-id"])
-            ?? UUID().uuidString
-        let userAgent = Self.normalizedForwardHeader(downstreamHeaders["user-agent"]) ?? Self.defaultCodexUserAgent
-        var request = URLRequest(url: responsesEndpoint(forUpstreamModel: upstreamModel))
-        request.httpMethod = "POST"
-        request.timeoutInterval = 180
-        request.httpBody = body
-        request.setValue("Bearer \(candidate.accessToken)", forHTTPHeaderField: "Authorization")
-        request.setValue(candidate.accountID, forHTTPHeaderField: "ChatGPT-Account-Id")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-        request.setValue("codex_cli_rs", forHTTPHeaderField: "Originator")
-        request.setValue(version, forHTTPHeaderField: "Version")
-        request.setValue(sessionID, forHTTPHeaderField: "Session_id")
-        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
-        request.setValue("Keep-Alive", forHTTPHeaderField: "Connection")
-
+        let request = try makeUpstreamRequest(
+            payload: payload,
+            candidate: candidate,
+            downstreamHeaders: downstreamHeaders
+        )
         let (responseBytes, response) = try await URLSession.shared.bytes(for: request)
         let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 500
         var responseBody = Data()
@@ -205,6 +217,21 @@ extension SwiftNativeProxyRuntimeService {
             try? authRepository.writeCurrentAuth(candidate.authJSON)
         }
         return UpstreamResponse(statusCode: statusCode, body: responseBody)
+    }
+
+    func openStreamingUpstreamRequest(
+        payload: [String: Any],
+        candidate: ProxyCandidate,
+        downstreamHeaders: [String: String]
+    ) async throws -> UpstreamStreamingResponse {
+        let request = try makeUpstreamRequest(
+            payload: payload,
+            candidate: candidate,
+            downstreamHeaders: downstreamHeaders
+        )
+        let (bytes, response) = try await URLSession.shared.bytes(for: request)
+        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 500
+        return UpstreamStreamingResponse(statusCode: statusCode, bytes: bytes, candidate: candidate)
     }
 
     static func shouldSyncCurrentAuthOnSuccessfulProxyResponse(localProxyHostAPIOnly: Bool) -> Bool {
@@ -281,6 +308,12 @@ extension SwiftNativeProxyRuntimeService {
 struct UpstreamResponse {
     var statusCode: Int
     var body: Data
+}
+
+struct UpstreamStreamingResponse {
+    var statusCode: Int
+    var bytes: URLSession.AsyncBytes
+    var candidate: ProxyCandidate
 }
 
 struct ProxyCandidate {
