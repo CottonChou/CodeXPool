@@ -89,7 +89,7 @@ struct RemoteProxydBinaryBuilder {
     func prebuiltBinary(forTarget target: String) -> URL? {
         if let repoRoot {
             let repoBinary = RepositoryLocator.proxydPrebuiltBinaryURL(in: repoRoot, target: target)
-            if fileManager.isExecutableFile(atPath: repoBinary.path) {
+            if fileManager.fileExists(atPath: repoBinary.path) {
                 return repoBinary
             }
         }
@@ -98,7 +98,7 @@ struct RemoteProxydBinaryBuilder {
             .appendingPathComponent(RepositoryLocator.proxydBundledPrebuiltBinaryRelativeDirectory, isDirectory: true)
             .appendingPathComponent(target, isDirectory: true)
             .appendingPathComponent(RepositoryLocator.proxydBinaryName, isDirectory: false)
-        if let bundledBinary, fileManager.isExecutableFile(atPath: bundledBinary.path) {
+        if let bundledBinary, fileManager.fileExists(atPath: bundledBinary.path) {
             return bundledBinary
         }
 

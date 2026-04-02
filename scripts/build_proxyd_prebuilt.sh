@@ -129,7 +129,7 @@ build_target() {
   fi
 
   cp "$built_bin" "$output_bin"
-  chmod 755 "$output_bin"
+  chmod 644 "$output_bin"
   cp "$SOURCE_STAMP" "$stamp_file"
 }
 
