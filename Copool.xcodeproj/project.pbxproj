@@ -345,7 +345,6 @@
 		FCB8E6490AA6D2891320E6A2 /* AccountsPageControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = A103A103A103A103A103A103 /* AccountsPageControls.swift */; };
 		FE0F1E225FB072F2EFABD975 /* AccountsWidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E655B80A368B9D3F2B6371 /* AccountsWidgetSnapshot.swift */; };
 		FF792E37E347B5FD7011FE7D /* SystemDateProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 962E931E377964D0704D3809 /* SystemDateProvider.swift */; };
-		FFEEDDCCBBAA998877665544 /* proxyd-prebuilt in Resources */ = {isa = PBXBuildFile; fileRef = FFEEDDCCBBAA998877665545 /* proxyd-prebuilt */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1253,7 +1252,6 @@
 				E819DD760F7DDD030107C454 /* store.rs in Resources */,
 				16AF52DED4DD5AE588B64368 /* usage.rs in Resources */,
 				68A1228957522AF14BEF1006 /* utils.rs in Resources */,
-				FFEEDDCCBBAA998877665544 /* proxyd-prebuilt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
