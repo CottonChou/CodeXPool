@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct AccountsPageShell: View {
-    @ObservedObject var contentStore: AccountsPageViewStore
-    @ObservedObject var chromeStore: AccountsPageChromeStore
+    let contentStore: AccountsPageViewStore
+    let chromeStore: AccountsPageChromeStore
     let currentLocale: AppLocale
     let onSelectLocale: (AppLocale) -> Void
     let areCardsPresented: Bool
@@ -49,8 +49,8 @@ struct AccountsPageShell: View {
 
 #if os(iOS)
 private struct AccountsIOSPageShell: View {
-    @ObservedObject var contentStore: AccountsPageViewStore
-    @ObservedObject var chromeStore: AccountsPageChromeStore
+    let contentStore: AccountsPageViewStore
+    let chromeStore: AccountsPageChromeStore
     let currentLocale: AppLocale
     let onSelectLocale: (AppLocale) -> Void
     let areCardsPresented: Bool
@@ -64,33 +64,25 @@ private struct AccountsIOSPageShell: View {
 
     var body: some View {
         GeometryReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    AccountsPageContentSection(
-                        presentation: contentStore.contentPresentation,
-                        cardStoreProvider: contentStore.cardStore(for:),
-                        availableViewportSize: proxy.size,
-                        areCardsPresented: areCardsPresented,
-                        onSwitchAccount: onSwitchAccount,
-                        onRefreshAccountUsage: onRefreshAccountUsage,
-                        onAuthorizeWorkspace: onAuthorizeWorkspace,
-                        onDeletePendingWorkspace: onDeletePendingWorkspace,
-                        onDeleteAccount: onDeleteAccount
-                    )
-                }
-                .padding(.top, LayoutRules.iOSAccountsContentTopPadding(safeAreaTop: proxy.safeAreaInsets.top))
-                .padding(.bottom, LayoutRules.iOSAccountsContentBottomPadding(safeAreaBottom: proxy.safeAreaInsets.bottom))
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
+            AccountsIOSContentHost(
+                contentStore: contentStore,
+                safeAreaInsets: proxy.safeAreaInsets,
+                viewportSize: proxy.size,
+                areCardsPresented: areCardsPresented,
+                onSwitchAccount: onSwitchAccount,
+                onRefreshAccountUsage: onRefreshAccountUsage,
+                onAuthorizeWorkspace: onAuthorizeWorkspace,
+                onDeletePendingWorkspace: onDeletePendingWorkspace,
+                onDeleteAccount: onDeleteAccount
+            )
             .scrollIndicators(.hidden)
             .ignoresSafeArea(edges: [.top, .bottom])
             .refreshable {
                 onTriggerAction(.refreshUsage)
             }
             .toolbar {
-                AccountsToolbarContent(
-                    leadingButtons: chromeStore.leadingToolbarButtons,
-                    trailingButtons: chromeStore.trailingToolbarButtons,
+                AccountsToolbarHost(
+                    chromeStore: chromeStore,
                     currentLocale: currentLocale,
                     onSelectLocale: onSelectLocale,
                     onTriggerAction: onTriggerAction,
@@ -103,8 +95,8 @@ private struct AccountsIOSPageShell: View {
 #endif
 
 private struct AccountsMacPageShell: View {
-    @ObservedObject var contentStore: AccountsPageViewStore
-    @ObservedObject var chromeStore: AccountsPageChromeStore
+    let contentStore: AccountsPageViewStore
+    let chromeStore: AccountsPageChromeStore
     let areCardsPresented: Bool
     let onTriggerAction: (AccountsPageActionIntent) -> Void
     let onToggleCollapse: () -> Void
@@ -120,34 +112,24 @@ private struct AccountsMacPageShell: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: LayoutRules.sectionSpacing) {
-            AccountsActionBarContainer(
-                presentation: chromeStore.macActionBarPresentation,
+            AccountsMacActionBarHost(
+                chromeStore: chromeStore,
                 onTriggerAction: onTriggerAction,
                 onToggleCollapse: onToggleCollapse
             )
             .padding(.horizontal, LayoutRules.pagePadding)
             .frame(width: pageContentWidth, alignment: .leading)
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    AccountsPageContentSection(
-                        presentation: contentStore.contentPresentation,
-                        cardStoreProvider: contentStore.cardStore(for:),
-                        availableViewportSize: CGSize(
-                            width: pageContentWidth,
-                            height: LayoutRules.defaultPanelHeight
-                        ),
-                        areCardsPresented: areCardsPresented,
-                        onSwitchAccount: onSwitchAccount,
-                        onRefreshAccountUsage: onRefreshAccountUsage,
-                        onAuthorizeWorkspace: onAuthorizeWorkspace,
-                        onDeletePendingWorkspace: onDeletePendingWorkspace,
-                        onDeleteAccount: onDeleteAccount
-                    )
-                }
-                .padding(.bottom, 12)
-                .frame(width: pageContentWidth, alignment: .leading)
-            }
+            AccountsMacContentHost(
+                contentStore: contentStore,
+                pageContentWidth: pageContentWidth,
+                areCardsPresented: areCardsPresented,
+                onSwitchAccount: onSwitchAccount,
+                onRefreshAccountUsage: onRefreshAccountUsage,
+                onAuthorizeWorkspace: onAuthorizeWorkspace,
+                onDeletePendingWorkspace: onDeletePendingWorkspace,
+                onDeleteAccount: onDeleteAccount
+            )
             .scrollIndicators(.hidden)
         }
         .frame(width: pageContentWidth, alignment: .topLeading)
@@ -155,14 +137,14 @@ private struct AccountsMacPageShell: View {
     }
 }
 
-private struct AccountsActionBarContainer: View {
-    let presentation: AccountsActionBarPresentation
+private struct AccountsMacActionBarHost: View {
+    @ObservedObject var chromeStore: AccountsPageChromeStore
     let onTriggerAction: (AccountsPageActionIntent) -> Void
     let onToggleCollapse: () -> Void
 
     var body: some View {
         AccountsActionBarView(
-            presentation: presentation,
+            presentation: chromeStore.macActionBarPresentation,
             onTriggerAction: onTriggerAction,
             onToggleCollapse: onToggleCollapse
         )
@@ -170,9 +152,77 @@ private struct AccountsActionBarContainer: View {
 }
 
 #if os(iOS)
-private struct AccountsToolbarContent: ToolbarContent {
-    let leadingButtons: [AccountsActionButtonDescriptor<AccountsPageActionIntent>]
-    let trailingButtons: [AccountsActionButtonDescriptor<AccountsPageActionIntent>]
+private struct AccountsIOSContentHost: View {
+    @ObservedObject var contentStore: AccountsPageViewStore
+    let safeAreaInsets: EdgeInsets
+    let viewportSize: CGSize
+    let areCardsPresented: Bool
+    let onSwitchAccount: (String) -> Void
+    let onRefreshAccountUsage: (String) -> Void
+    let onAuthorizeWorkspace: (String) -> Void
+    let onDeletePendingWorkspace: (String) -> Void
+    let onDeleteAccount: (String) -> Void
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                AccountsPageContentSection(
+                    presentation: contentStore.contentPresentation,
+                    cardStoreProvider: contentStore.cardStore(for:),
+                    availableViewportSize: viewportSize,
+                    areCardsPresented: areCardsPresented,
+                    onSwitchAccount: onSwitchAccount,
+                    onRefreshAccountUsage: onRefreshAccountUsage,
+                    onAuthorizeWorkspace: onAuthorizeWorkspace,
+                    onDeletePendingWorkspace: onDeletePendingWorkspace,
+                    onDeleteAccount: onDeleteAccount
+                )
+            }
+            .padding(.top, LayoutRules.iOSAccountsContentTopPadding(safeAreaTop: safeAreaInsets.top))
+            .padding(.bottom, LayoutRules.iOSAccountsContentBottomPadding(safeAreaBottom: safeAreaInsets.bottom))
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+#endif
+
+private struct AccountsMacContentHost: View {
+    @ObservedObject var contentStore: AccountsPageViewStore
+    let pageContentWidth: CGFloat
+    let areCardsPresented: Bool
+    let onSwitchAccount: (String) -> Void
+    let onRefreshAccountUsage: (String) -> Void
+    let onAuthorizeWorkspace: (String) -> Void
+    let onDeletePendingWorkspace: (String) -> Void
+    let onDeleteAccount: (String) -> Void
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                AccountsPageContentSection(
+                    presentation: contentStore.contentPresentation,
+                    cardStoreProvider: contentStore.cardStore(for:),
+                    availableViewportSize: CGSize(
+                        width: pageContentWidth,
+                        height: LayoutRules.defaultPanelHeight
+                    ),
+                    areCardsPresented: areCardsPresented,
+                    onSwitchAccount: onSwitchAccount,
+                    onRefreshAccountUsage: onRefreshAccountUsage,
+                    onAuthorizeWorkspace: onAuthorizeWorkspace,
+                    onDeletePendingWorkspace: onDeletePendingWorkspace,
+                    onDeleteAccount: onDeleteAccount
+                )
+            }
+            .padding(.bottom, 12)
+            .frame(width: pageContentWidth, alignment: .leading)
+        }
+    }
+}
+
+#if os(iOS)
+private struct AccountsToolbarHost: ToolbarContent {
+    @ObservedObject var chromeStore: AccountsPageChromeStore
     let currentLocale: AppLocale
     let onSelectLocale: (AppLocale) -> Void
     let onTriggerAction: (AccountsPageActionIntent) -> Void
@@ -180,8 +230,8 @@ private struct AccountsToolbarContent: ToolbarContent {
 
     var body: some ToolbarContent {
         AccountsToolbarActions(
-            leadingButtons: leadingButtons,
-            trailingButtons: trailingButtons,
+            leadingButtons: chromeStore.leadingToolbarButtons,
+            trailingButtons: chromeStore.trailingToolbarButtons,
             currentLocale: currentLocale,
             onSelectLocale: onSelectLocale,
             onTriggerAction: onTriggerAction,

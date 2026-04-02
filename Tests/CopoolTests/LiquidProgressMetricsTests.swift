@@ -3,6 +3,17 @@ import SwiftUI
 @testable import Copool
 
 final class LiquidProgressMetricsTests: XCTestCase {
+    func testRenderModelClampsProgressIntoUnitRange() {
+        XCTAssertEqual(LiquidProgressRenderModel(progress: -0.4).fillScale, 0)
+        XCTAssertEqual(LiquidProgressRenderModel(progress: 0.45).fillScale, 0.45, accuracy: 0.001)
+        XCTAssertEqual(LiquidProgressRenderModel(progress: 1.8).fillScale, 1, accuracy: 0.001)
+    }
+
+    func testRenderModelOnlyShowsFillForPositiveProgress() {
+        XCTAssertFalse(LiquidProgressRenderModel(progress: 0).showsFill)
+        XCTAssertTrue(LiquidProgressRenderModel(progress: 0.01).showsFill)
+    }
+
     func testLowProgressUsesFullLeadingCapWidth() {
         let metrics = LiquidProgressMetrics(progress: 0.01, totalWidth: 250)
 

@@ -1120,11 +1120,11 @@ final class AccountsCoordinatorTests: XCTestCase {
         XCTAssertFalse(model.isRefreshSpinnerActive)
         XCTAssertTrue(model.canRefreshUsageAction)
 
-        model.syncRemoteUsageRefreshActivity(isRefreshing: true)
+        model.syncRemoteUsageRefreshActivity(refreshingAccountIDs: ["acct-1"])
         XCTAssertFalse(model.isRefreshSpinnerActive)
         XCTAssertTrue(model.canRefreshUsageAction)
 
-        model.syncRemoteUsageRefreshActivity(isRefreshing: false)
+        model.syncRemoteUsageRefreshActivity(refreshingAccountIDs: [])
         XCTAssertFalse(model.isRefreshSpinnerActive)
         XCTAssertTrue(model.canRefreshUsageAction)
     }
@@ -1405,7 +1405,7 @@ final class AccountsCoordinatorTests: XCTestCase {
                 onStart: {}
             )
         )
-        model.syncRemoteUsageRefreshActivity(isRefreshing: true)
+        model.syncRemoteUsageRefreshActivity(refreshingAccountIDs: ["acct-1"])
 
         await model.refreshUsage()
         let callCount = await callCounter.value
@@ -3343,6 +3343,78 @@ final class AccountsCoordinatorTests: XCTestCase {
             entries.first(where: { $0.workspaceID == "account-3" })?.status,
             .active
         )
+    }
+
+    func testSyncWorkspaceDirectoryPreservesConsentEntriesNotPresentInWorkspaceMetadata() async throws {
+        let now: Int64 = 1_763_216_000
+        let consentEntry = WorkspaceDirectoryEntry(
+            workspaceID: "account-2",
+            workspaceName: "ops-space",
+            email: "test@example.com",
+            planType: "team",
+            kind: .workspace,
+            source: .consent,
+            status: .active,
+            visibility: .visible,
+            lastSeenAt: now - 100,
+            lastStatusCheckedAt: nil
+        )
+        let storeRepository = InMemoryAccountsStoreRepository(
+            store: AccountsStore(
+                accounts: [
+                    StoredAccount(
+                        id: "acct-1",
+                        label: "Primary",
+                        email: "test@example.com",
+                        accountID: "account-1",
+                        planType: "team",
+                        teamName: "remote-space",
+                        teamAlias: nil,
+                        authJSON: .object([
+                            "account_id": .string("account-1"),
+                            "tokens": .object([
+                                "access_token": .string("token-1")
+                            ])
+                        ]),
+                        addedAt: now,
+                        updatedAt: now,
+                        usage: nil,
+                        usageError: nil
+                    )
+                ],
+                workspaceDirectory: [consentEntry]
+            )
+        )
+        let coordinator = AccountsCoordinator(
+            storeRepository: storeRepository,
+            settingsRepository: TestSettingsRepository(),
+            authRepository: MultiAccountAuthRepository(
+                extractedByAccountID: [
+                    "account-1": makeExtractedAuth(
+                        accountID: "account-1",
+                        planType: "team",
+                        teamName: "remote-space"
+                    )
+                ]
+            ),
+            usageService: CountingUsageService(result: makeUsageSnapshot(fetchedAt: now)),
+            workspaceMetadataService: StubWorkspaceMetadataService(
+                metadata: [
+                    WorkspaceMetadata(accountID: "account-1", workspaceName: "remote-space", structure: "workspace")
+                ]
+            ),
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+
+        let entries = try await coordinator.syncWorkspaceDirectory()
+        let savedStore = try storeRepository.loadStore()
+
+        XCTAssertEqual(entries, [consentEntry])
+        XCTAssertEqual(savedStore.workspaceDirectory, [consentEntry])
     }
 
     func testSyncWorkspaceDirectoryMergesWorkspaceMetadataAcrossAllEligibleAccounts() async throws {

@@ -1663,7 +1663,7 @@
 				CODE_SIGN_ENTITLEMENTS = Copool.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-					CURRENT_PROJECT_VERSION = 20;
+					CURRENT_PROJECT_VERSION = 21;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -1682,7 +1682,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-					MARKETING_VERSION = 1.0.21;
+					MARKETING_VERSION = 1.0.22;
 				PRODUCT_BUNDLE_IDENTIFIER = com.alick.copool;
 				PRODUCT_NAME = Copool;
 				REGISTER_APP_GROUPS = YES;
@@ -1704,7 +1704,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = CopoolWidgetsMac.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-					CURRENT_PROJECT_VERSION = 20;
+					CURRENT_PROJECT_VERSION = 21;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
@@ -1722,7 +1722,7 @@
 				INFOPLIST_FILE = Sources/CopoolWidgets/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited)";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-					MARKETING_VERSION = 1.0.21;
+					MARKETING_VERSION = 1.0.22;
 				PRODUCT_BUNDLE_IDENTIFIER = com.alick.copool.widgets;
 				PRODUCT_NAME = CopoolWidgetsMac;
 				REGISTER_APP_GROUPS = YES;
@@ -1746,7 +1746,7 @@
 				CODE_SIGN_ENTITLEMENTS = Copool.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-					CURRENT_PROJECT_VERSION = 20;
+					CURRENT_PROJECT_VERSION = 21;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -1765,7 +1765,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-					MARKETING_VERSION = 1.0.21;
+					MARKETING_VERSION = 1.0.22;
 				PRODUCT_BUNDLE_IDENTIFIER = com.alick.copool;
 				PRODUCT_NAME = Copool;
 				REGISTER_APP_GROUPS = YES;
@@ -1805,7 +1805,7 @@
 				CODE_SIGN_ENTITLEMENTS = CopooliOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-					CURRENT_PROJECT_VERSION = 20;
+					CURRENT_PROJECT_VERSION = 21;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Sources/Copool/Info-iOS.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
@@ -1814,7 +1814,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-					MARKETING_VERSION = 1.0.21;
+					MARKETING_VERSION = 1.0.22;
 				PRODUCT_BUNDLE_IDENTIFIER = com.copool.app.ios;
 				PRODUCT_NAME = Copool;
 				SDKROOT = iphoneos;
@@ -1830,7 +1830,7 @@
 				CODE_SIGN_ENTITLEMENTS = CopoolWidgets.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-					CURRENT_PROJECT_VERSION = 20;
+					CURRENT_PROJECT_VERSION = 21;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Sources/CopoolWidgets/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
@@ -1839,7 +1839,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-					MARKETING_VERSION = 1.0.21;
+					MARKETING_VERSION = 1.0.22;
 				PRODUCT_BUNDLE_IDENTIFIER = com.copool.app.ios.widgets;
 				PRODUCT_NAME = CopoolWidgets;
 				SDKROOT = iphoneos;
@@ -1858,7 +1858,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = CopoolWidgetsMac.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-					CURRENT_PROJECT_VERSION = 20;
+					CURRENT_PROJECT_VERSION = 21;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
@@ -1876,7 +1876,7 @@
 				INFOPLIST_FILE = Sources/CopoolWidgets/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited)";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-					MARKETING_VERSION = 1.0.21;
+					MARKETING_VERSION = 1.0.22;
 				PRODUCT_BUNDLE_IDENTIFIER = com.alick.copool.widgets;
 				PRODUCT_NAME = CopoolWidgetsMac;
 				REGISTER_APP_GROUPS = YES;
@@ -2029,7 +2029,7 @@
 				CODE_SIGN_ENTITLEMENTS = CopooliOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-					CURRENT_PROJECT_VERSION = 20;
+					CURRENT_PROJECT_VERSION = 21;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Sources/Copool/Info-iOS.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
@@ -2038,7 +2038,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-					MARKETING_VERSION = 1.0.21;
+					MARKETING_VERSION = 1.0.22;
 				PRODUCT_BUNDLE_IDENTIFIER = com.copool.app.ios;
 				PRODUCT_NAME = Copool;
 				SDKROOT = iphoneos;
@@ -2054,7 +2054,7 @@
 				CODE_SIGN_ENTITLEMENTS = CopoolWidgets.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-					CURRENT_PROJECT_VERSION = 20;
+					CURRENT_PROJECT_VERSION = 21;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Sources/CopoolWidgets/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
@@ -2063,7 +2063,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-					MARKETING_VERSION = 1.0.21;
+					MARKETING_VERSION = 1.0.22;
 				PRODUCT_BUNDLE_IDENTIFIER = com.copool.app.ios.widgets;
 				PRODUCT_NAME = CopoolWidgets;
 				SDKROOT = iphoneos;

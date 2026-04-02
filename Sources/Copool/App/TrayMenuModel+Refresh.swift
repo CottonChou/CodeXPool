@@ -223,13 +223,12 @@ extension TrayMenuModel {
     ) async throws -> [AccountSummary] {
         let latestAccounts = try await accountsCoordinator.listAccounts()
         if forceUsageRefresh {
-            beginRemoteUsageRefreshActivity()
-            defer { endRemoteUsageRefreshActivity() }
-
             let resolvedTargetAccountIDs = targetAccountIDs ?? latestAccounts.map(\.id)
             guard !resolvedTargetAccountIDs.isEmpty else {
                 return latestAccounts
             }
+            beginRemoteUsageRefreshActivity(for: resolvedTargetAccountIDs)
+            defer { endRemoteUsageRefreshActivity(for: resolvedTargetAccountIDs) }
 
             _ = try await accountsCoordinator.refreshUsage(
                 accountIDs: resolvedTargetAccountIDs,
@@ -253,9 +252,6 @@ extension TrayMenuModel {
     func refreshCurrentSelectionUsageNow() async {
         let latestAccounts = (try? await accountsCoordinator.listAccounts()) ?? accounts
         guard let currentAccount = latestAccounts.first(where: \.isCurrent) else { return }
-
-        beginRemoteUsageRefreshActivity()
-        defer { endRemoteUsageRefreshActivity() }
 
         do {
             let refreshedAccounts = try await refreshLocalAccounts(
@@ -341,15 +337,28 @@ extension TrayMenuModel {
         }
     }
 
-    func beginRemoteUsageRefreshActivity() {
+    func beginRemoteUsageRefreshActivity(for accountIDs: [String]) {
         remoteUsageRefreshActivityCount += 1
+        for accountID in accountIDs {
+            remoteUsageRefreshActivityCountsByID[accountID, default: 0] += 1
+        }
+        remoteUsageRefreshingAccountIDs = Set(remoteUsageRefreshActivityCountsByID.keys)
         if !isFetchingRemoteUsage {
             isFetchingRemoteUsage = true
         }
     }
 
-    func endRemoteUsageRefreshActivity() {
+    func endRemoteUsageRefreshActivity(for accountIDs: [String]) {
         remoteUsageRefreshActivityCount = max(0, remoteUsageRefreshActivityCount - 1)
+        for accountID in accountIDs {
+            let nextCount = max(0, remoteUsageRefreshActivityCountsByID[accountID, default: 0] - 1)
+            if nextCount == 0 {
+                remoteUsageRefreshActivityCountsByID.removeValue(forKey: accountID)
+            } else {
+                remoteUsageRefreshActivityCountsByID[accountID] = nextCount
+            }
+        }
+        remoteUsageRefreshingAccountIDs = Set(remoteUsageRefreshActivityCountsByID.keys)
         if remoteUsageRefreshActivityCount == 0, isFetchingRemoteUsage {
             isFetchingRemoteUsage = false
         }

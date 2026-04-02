@@ -5,6 +5,7 @@ private func makeDependencyPublisher<Value: Equatable>(
     _ publisher: Published<Value>.Publisher
 ) -> AnyPublisher<Void, Never> {
     publisher
+        .dropFirst()
         .removeDuplicates()
         .map { _ in () }
         .eraseToAnyPublisher()
@@ -85,8 +86,7 @@ final class AccountsPageViewStore: ObservableObject {
             makeDependencyPublisher(model.$collapsedAccountIDs),
             makeDependencyPublisher(model.$switchingAccountID),
             makeDependencyPublisher(model.$refreshingAccountIDs),
-            makeDependencyPublisher(model.$isManualRefreshing),
-            makeDependencyPublisher(model.$isRemoteUsageRefreshing),
+            makeDependencyPublisher(model.$remoteUsageRefreshingAccountIDs),
             makeDependencyPublisher(model.$usageProgressDisplayMode),
             makeDependencyPublisher(model.$pendingWorkspaceAuthorizations),
             makeDependencyPublisher(model.$pendingWorkspaceAuthorizationError),

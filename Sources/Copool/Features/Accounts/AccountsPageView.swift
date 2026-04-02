@@ -92,8 +92,6 @@ struct AccountsPageView: View {
     private func toggleCollapse() {
         withAnimation(AccountsAnimationRules.collapseToggle) {
             model.toggleAllAccountsCollapsed()
-            contentStore.syncFromModel()
-            chromeStore.syncFromModel()
         }
     }
 

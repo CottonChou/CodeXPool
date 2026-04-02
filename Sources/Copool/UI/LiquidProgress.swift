@@ -38,6 +38,18 @@ struct LiquidProgressBar: View {
     }
 }
 
+struct LiquidProgressRenderModel {
+    let fillScale: Double
+
+    init(progress: Double) {
+        fillScale = max(0, min(1, progress))
+    }
+
+    var showsFill: Bool {
+        fillScale > 0
+    }
+}
+
 struct LiquidProgressRing: View {
     let progress: Double
     let tint: Color

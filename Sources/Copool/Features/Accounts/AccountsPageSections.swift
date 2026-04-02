@@ -82,54 +82,29 @@ private struct AccountsGridSection: View {
         LayoutRules.accountsCardFrameWidth(context: gridContext)
     }
 
-    private var entries: [AccountCardGridEntry] {
-        Array(cardIDs.enumerated()).compactMap { index, cardID in
-            guard let cardStore = cardStoreProvider(cardID) else { return nil }
-            return AccountCardGridEntry(
-                id: cardID,
-                store: cardStore,
-                areCardsPresented: areCardsPresented,
-                frameWidth: cardFrameWidth,
-                index: index,
-                onSwitch: { onSwitchAccount(cardID) },
-                onRefresh: { onRefreshAccountUsage(cardID) },
-                onDelete: { onDeleteAccount(cardID) }
-            )
-        }
-    }
-
     var body: some View {
         LazyVGrid(
             columns: columns,
             alignment: .leading,
             spacing: LayoutRules.accountsRowSpacing
         ) {
-            ForEach(entries) { entry in
-                AccountCardGridItem(
-                    store: entry.store,
-                    areCardsPresented: entry.areCardsPresented,
-                    frameWidth: entry.frameWidth,
-                    index: entry.index,
-                    onSwitch: entry.onSwitch,
-                    onRefresh: entry.onRefresh,
-                    onDelete: entry.onDelete
-                )
+            ForEach(Array(cardIDs.enumerated()), id: \.element) { index, cardID in
+                if let store = cardStoreProvider(cardID) {
+                    AccountCardGridItem(
+                        store: store,
+                        areCardsPresented: areCardsPresented,
+                        frameWidth: cardFrameWidth,
+                        index: index,
+                        onSwitch: { onSwitchAccount(cardID) },
+                        onRefresh: { onRefreshAccountUsage(cardID) },
+                        onDelete: { onDeleteAccount(cardID) }
+                    )
+                }
             }
         }
         .padding(.horizontal, LayoutRules.pagePadding)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
-}
-
-private struct AccountCardGridEntry: Identifiable {
-    let id: String
-    let store: AccountCardStore
-    let areCardsPresented: Bool
-    let frameWidth: CGFloat?
-    let index: Int
-    let onSwitch: () -> Void
-    let onRefresh: () -> Void
-    let onDelete: () -> Void
 }
 
 private struct AccountCardGridItem: View {
@@ -142,16 +117,8 @@ private struct AccountCardGridItem: View {
     let onDelete: () -> Void
 
     var body: some View {
-        let card = store.presentation
         AccountCardView(
-            account: card.account,
-            isCollapsed: card.isCollapsed,
-            switching: card.switching,
-            refreshing: card.refreshing,
-            showsRefreshButton: card.showsRefreshButton,
-            isRefreshEnabled: card.isRefreshEnabled,
-            isUsageRefreshActive: card.isUsageRefreshActive,
-            usageProgressDisplayMode: card.usageProgressDisplayMode,
+            card: store.presentation,
             onSwitch: onSwitch,
             onRefresh: onRefresh,
             onDelete: onDelete

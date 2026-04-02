@@ -33,6 +33,7 @@ final class AccountsPageModel: ObservableObject {
     }
     @Published var isManualRefreshing = false
     @Published var isRemoteUsageRefreshing = false
+    @Published var remoteUsageRefreshingAccountIDs: Set<String> = []
     @Published var isImporting = false
     @Published var isAdding = false
     @Published var switchingAccountID: String?
@@ -156,12 +157,14 @@ final class AccountsPageModel: ObservableObject {
     }
 
     func canRefreshAccount(_ id: String) -> Bool {
-        _ = id
-        return runtimePlatform == .macOS && !isRefreshing
+        runtimePlatform == .macOS
+            && !refreshingAccountIDs.contains(id)
+            && (isManualRefreshing || !remoteUsageRefreshingAccountIDs.contains(id))
     }
 
     func isUsageRefreshActive(forAccountID id: String) -> Bool {
-        isManualRefreshing || isRemoteUsageRefreshing || refreshingAccountIDs.contains(id)
+        (!isManualRefreshing && remoteUsageRefreshingAccountIDs.contains(id))
+            || refreshingAccountIDs.contains(id)
     }
 
     func handlePageAction(_ intent: AccountsPageActionIntent) async {

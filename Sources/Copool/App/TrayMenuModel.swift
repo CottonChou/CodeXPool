@@ -91,11 +91,13 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
     var autoSmartSwitchEnabled = false
     var accountsRefreshActivityCount = 0
     var remoteUsageRefreshActivityCount = 0
+    var remoteUsageRefreshActivityCountsByID: [String: Int] = [:]
 
     @Published var accounts: [AccountSummary] = []
     @Published var notice: String?
     @Published var isRefreshingAccounts = false
     @Published var isFetchingRemoteUsage = false
+    @Published var remoteUsageRefreshingAccountIDs: Set<String> = []
 
     init(
         accountsCoordinator: AccountsCoordinator,

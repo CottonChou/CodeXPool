@@ -64,7 +64,7 @@ private final class PortOccupier {
     }
 
     func start() async throws {
-        try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             let resumeState = TestResumeState()
             listener.stateUpdateHandler = { state in
                 switch resumeState.consume(state: state) {
@@ -101,7 +101,7 @@ private func rawHTTPResponse(port: UInt16, request: String) async throws -> Data
 }
 
 private func waitForReady(_ connection: NWConnection) async throws {
-    try await withCheckedThrowingContinuation { continuation in
+    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
         let state = ConnectionResumeState()
         connection.stateUpdateHandler = { newState in
             switch state.consume(state: newState) {
@@ -117,7 +117,7 @@ private func waitForReady(_ connection: NWConnection) async throws {
 }
 
 private func sendRequest(_ connection: NWConnection, data: Data) async throws {
-    try await withCheckedThrowingContinuation { continuation in
+    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
         connection.send(content: data, completion: .contentProcessed { error in
             if let error {
                 continuation.resume(throwing: error)

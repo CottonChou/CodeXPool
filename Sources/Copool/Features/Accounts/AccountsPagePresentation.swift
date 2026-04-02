@@ -18,6 +18,7 @@ struct AccountsActionBarPresentation: Equatable {
 
 struct AccountCardViewState: Equatable, Identifiable {
     let account: AccountSummary
+    let presentation: AccountCardPresentation
     let isCollapsed: Bool
     let switching: Bool
     let refreshing: Bool
@@ -28,6 +29,27 @@ struct AccountCardViewState: Equatable, Identifiable {
 
     var id: String {
         account.id
+    }
+
+    static func == (lhs: AccountCardViewState, rhs: AccountCardViewState) -> Bool {
+        lhs.isCollapsed == rhs.isCollapsed
+            && lhs.switching == rhs.switching
+            && lhs.refreshing == rhs.refreshing
+            && lhs.showsRefreshButton == rhs.showsRefreshButton
+            && lhs.isRefreshEnabled == rhs.isRefreshEnabled
+            && lhs.isUsageRefreshActive == rhs.isUsageRefreshActive
+            && lhs.usageProgressDisplayMode == rhs.usageProgressDisplayMode
+            && lhs.account.id == rhs.account.id
+            && lhs.account.label == rhs.account.label
+            && lhs.account.email == rhs.account.email
+            && lhs.account.accountID == rhs.account.accountID
+            && lhs.account.planType == rhs.account.planType
+            && lhs.account.teamName == rhs.account.teamName
+            && lhs.account.teamAlias == rhs.account.teamAlias
+            && lhs.account.usage == rhs.account.usage
+            && lhs.account.usageError == rhs.account.usageError
+            && lhs.account.workspaceStatus == rhs.account.workspaceStatus
+            && lhs.account.isCurrent == rhs.account.isCurrent
     }
 }
 
@@ -48,12 +70,19 @@ struct PendingWorkspaceAuthorizationCardViewState: Equatable, Identifiable {
 }
 
 extension AccountsPageModel {
-    func makeAccountCardViewStates() -> [AccountCardViewState] {
+    func makeAccountCardViewStates(locale: Locale = .autoupdatingCurrent) -> [AccountCardViewState] {
         guard case .content(let accounts) = state else { return [] }
         return accounts.filter { !$0.isWorkspaceDeactivated }.map { account in
-            AccountCardViewState(
+            let isCollapsed = isAccountCollapsed(account.id)
+            return AccountCardViewState(
                 account: account,
-                isCollapsed: isAccountCollapsed(account.id),
+                presentation: AccountCardPresentation(
+                    account: account,
+                    isCollapsed: isCollapsed,
+                    locale: locale,
+                    usageProgressDisplayMode: usageProgressDisplayMode
+                ),
+                isCollapsed: isCollapsed,
                 switching: switchingAccountID == account.id,
                 refreshing: isAccountRefreshing(account.id),
                 showsRefreshButton: runtimePlatform == .macOS,

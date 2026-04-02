@@ -73,7 +73,12 @@ extension AccountsPageModel {
         schedulePendingWorkspaceRefresh(from: accounts)
     }
 
-    func syncRemoteUsageRefreshActivity(isRefreshing: Bool) {
+    func syncRemoteUsageRefreshActivity(refreshingAccountIDs: Set<String>) {
+        if remoteUsageRefreshingAccountIDs != refreshingAccountIDs {
+            remoteUsageRefreshingAccountIDs = refreshingAccountIDs
+        }
+
+        let isRefreshing = !refreshingAccountIDs.isEmpty
         guard isRemoteUsageRefreshing != isRefreshing else { return }
         isRemoteUsageRefreshing = isRefreshing
     }

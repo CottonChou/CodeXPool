@@ -9,36 +9,43 @@ import UIKit
 
 struct RootScene: View {
     @State private var selectedTab: AppTab = .accounts
-    @StateObject private var accountsModel: AccountsPageModel
-    @StateObject private var settingsModel: SettingsPageModel
+    @StateObject private var chromeStore: RootSceneChromeStore
     @StateObject private var deferredProxyModel = DeferredProxyModelStore()
-    @ObservedObject private var trayModel: TrayMenuModel
+    private let trayModel: TrayMenuModel
+    private let accountsModel: AccountsPageModel
+    private let settingsModel: SettingsPageModel
     private let container: AppContainer
 
     init(container: AppContainer, trayModel: TrayMenuModel) {
         self.container = container
-        _accountsModel = StateObject(wrappedValue: container.accountsModel)
-        _settingsModel = StateObject(wrappedValue: container.settingsModel)
+        self.accountsModel = container.accountsModel
+        self.settingsModel = container.settingsModel
+        _chromeStore = StateObject(
+            wrappedValue: RootSceneChromeStore(
+                accountsModel: container.accountsModel,
+                settingsModel: container.settingsModel
+            )
+        )
         self.trayModel = trayModel
     }
 
     private var runtimeLocale: Locale {
-        Locale(identifier: AppLocale.resolve(settingsModel.settings.locale).identifier)
+        Locale(identifier: AppLocale.resolve(chromeStore.localeIdentifier).identifier)
     }
 
     private var currentNotice: NoticeMessage? {
         switch selectedTab {
         case .accounts:
-            return accountsModel.notice
+            return chromeStore.accountsNotice
         case .proxy:
             return deferredProxyModel.model?.notice
         case .settings:
-            return settingsModel.notice
+            return chromeStore.settingsNotice
         }
     }
 
     private var currentAppLocale: AppLocale {
-        AppLocale.resolve(settingsModel.settings.locale)
+        AppLocale.resolve(chromeStore.localeIdentifier)
     }
 
     private var visibleTabs: [AppTab] {
@@ -53,16 +60,16 @@ struct RootScene: View {
         platformTabShell
         .environment(\.locale, runtimeLocale)
         .onAppear {
-            L10n.setLocale(identifier: settingsModel.settings.locale)
+            L10n.setLocale(identifier: chromeStore.localeIdentifier)
         }
-        .onChange(of: settingsModel.settings.locale) { _, value in
+        .onChange(of: chromeStore.localeIdentifier) { _, value in
             L10n.setLocale(identifier: value)
         }
         .onReceive(trayModel.$accounts.removeDuplicates()) { accounts in
             accountsModel.syncFromBackgroundRefresh(accounts)
         }
-        .onReceive(trayModel.$isFetchingRemoteUsage.removeDuplicates()) { isRefreshing in
-            accountsModel.syncRemoteUsageRefreshActivity(isRefreshing: isRefreshing)
+        .onReceive(trayModel.$remoteUsageRefreshingAccountIDs.removeDuplicates()) { accountIDs in
+            accountsModel.syncRemoteUsageRefreshActivity(refreshingAccountIDs: accountIDs)
         }
         .onChange(of: selectedTab) { _, value in
             guard value == .proxy else { return }
@@ -167,6 +174,43 @@ struct RootScene: View {
                     deferredProxyModel.loadIfNeeded(using: container)
                 }
         }
+    }
+}
+
+@MainActor
+private final class RootSceneChromeStore: ObservableObject {
+    @Published private(set) var localeIdentifier: String
+    @Published private(set) var accountsNotice: NoticeMessage?
+    @Published private(set) var settingsNotice: NoticeMessage?
+
+    private var cancellables: Set<AnyCancellable> = []
+
+    init(accountsModel: AccountsPageModel, settingsModel: SettingsPageModel) {
+        localeIdentifier = settingsModel.settings.locale
+        accountsNotice = accountsModel.notice
+        settingsNotice = settingsModel.notice
+
+        settingsModel.$settings
+            .map(\.locale)
+            .removeDuplicates()
+            .sink { [weak self] localeIdentifier in
+                self?.localeIdentifier = localeIdentifier
+            }
+            .store(in: &cancellables)
+
+        accountsModel.$notice
+            .removeDuplicates()
+            .sink { [weak self] notice in
+                self?.accountsNotice = notice
+            }
+            .store(in: &cancellables)
+
+        settingsModel.$notice
+            .removeDuplicates()
+            .sink { [weak self] notice in
+                self?.settingsNotice = notice
+            }
+            .store(in: &cancellables)
     }
 }
 

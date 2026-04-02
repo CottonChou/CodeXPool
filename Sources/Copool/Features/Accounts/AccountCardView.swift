@@ -1,70 +1,43 @@
 import SwiftUI
 
 struct AccountCardView: View {
-    let account: AccountSummary
-    let isCollapsed: Bool
-    let switching: Bool
-    let refreshing: Bool
-    let showsRefreshButton: Bool
-    let isRefreshEnabled: Bool
-    let isUsageRefreshActive: Bool
-    let usageProgressDisplayMode: UsageProgressDisplayMode
+    let card: AccountCardViewState
     let onSwitch: () -> Void
     let onRefresh: () -> Void
     let onDelete: () -> Void
 
-    @Environment(\.locale) private var locale
     @State private var isHoveringCollapsedSwitch = false
     @State private var isCollapsedSwitchOverlayPresented = false
 
     init(
-        account: AccountSummary,
-        isCollapsed: Bool,
-        switching: Bool,
-        refreshing: Bool,
-        showsRefreshButton: Bool,
-        isRefreshEnabled: Bool,
-        isUsageRefreshActive: Bool,
-        usageProgressDisplayMode: UsageProgressDisplayMode,
+        card: AccountCardViewState,
         onSwitch: @escaping () -> Void,
         onRefresh: @escaping () -> Void,
         onDelete: @escaping () -> Void
     ) {
-        self.account = account
-        self.isCollapsed = isCollapsed
-        self.switching = switching
-        self.refreshing = refreshing
-        self.showsRefreshButton = showsRefreshButton
-        self.isRefreshEnabled = isRefreshEnabled
-        self.isUsageRefreshActive = isUsageRefreshActive
-        self.usageProgressDisplayMode = usageProgressDisplayMode
+        self.card = card
         self.onSwitch = onSwitch
         self.onRefresh = onRefresh
         self.onDelete = onDelete
     }
 
-    private var presentation: AccountCardPresentation {
-        AccountCardPresentation(
-            account: account,
-            isCollapsed: isCollapsed,
-            locale: locale,
-            usageProgressDisplayMode: usageProgressDisplayMode
-        )
-    }
-
     private var palette: AccountCardPalette {
-        AccountCardPalette(accent: presentation.accent, isCurrent: account.isCurrent)
+        AccountCardPalette(accent: card.presentation.accent, isCurrent: card.account.isCurrent)
     }
 
     private var interactionPresentation: AccountCardInteractionPresentation {
         AccountCardInteractionPresentation(
-            isCollapsed: isCollapsed,
-            isCurrent: account.isCurrent,
-            switching: switching,
+            isCollapsed: card.isCollapsed,
+            isCurrent: card.account.isCurrent,
+            switching: card.switching,
             isHoveringCollapsedSwitch: isHoveringCollapsedSwitch,
             isCollapsedSwitchOverlayPresented: isCollapsedSwitchOverlayPresented,
             platform: accountCardInteractionPlatform
         )
+    }
+
+    private var presentation: AccountCardPresentation {
+        card.presentation
     }
 
     private var accountCardInteractionPlatform: AccountCardInteractionPlatform {
@@ -89,12 +62,12 @@ struct AccountCardView: View {
                 }
             }
             #endif
-            .onChange(of: isCollapsed) { _, collapsed in
+            .onChange(of: card.isCollapsed) { _, collapsed in
                 if !collapsed {
                     dismissCollapsedSwitchOverlay()
                 }
             }
-            .onChange(of: account.isCurrent) { _, isCurrent in
+            .onChange(of: card.account.isCurrent) { _, isCurrent in
                 if isCurrent {
                     dismissCollapsedSwitchOverlay()
                 }
@@ -104,7 +77,7 @@ struct AccountCardView: View {
     @ViewBuilder
     private var cardBody: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if isCollapsed {
+            if card.isCollapsed {
                 AccountCompactHeaderContent(
                     planLabel: presentation.planLabel,
                     workspaceLabel: presentation.teamNameTag,
@@ -112,29 +85,29 @@ struct AccountCardView: View {
                     accountName: presentation.displayAccountName,
                     accentColor: palette.toneColor,
                     titleFont: .headline,
-                    titleColor: account.isCurrent ? palette.toneColor : .primary,
+                    titleColor: card.account.isCurrent ? palette.toneColor : .primary,
                     spacing: 8
                 )
                 AccountCardCompactUsageSection(presentation: presentation)
             } else {
                 AccountCardHeaderSection(
                     presentation: presentation,
-                    isCollapsed: isCollapsed,
-                    isCurrent: account.isCurrent,
+                    isCollapsed: card.isCollapsed,
+                    isCurrent: card.account.isCurrent,
                     palette: palette,
                     onDelete: onDelete
                 )
 
                 Text(presentation.displayAccountName)
                     .font(.headline)
-                    .foregroundStyle(account.isCurrent ? palette.toneColor : .primary)
+                    .foregroundStyle(card.account.isCurrent ? palette.toneColor : .primary)
                     .lineLimit(1)
                     .truncationMode(.tail)
 
                 AccountCardExpandedUsageSection(presentation: presentation)
             }
         }
-        .padding(isCollapsed ? 8 : 10)
+        .padding(card.isCollapsed ? 8 : 10)
         .accountCardSurface(cornerRadius: 12, tint: palette.surfaceTint)
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -142,23 +115,23 @@ struct AccountCardView: View {
         )
         .overlay(alignment: .bottomTrailing) {
             AccountCardBottomOverlay(
-                isCollapsed: isCollapsed,
-                isCurrent: account.isCurrent,
-                switching: switching,
-                refreshing: refreshing,
-                showsRefreshButton: showsRefreshButton,
-                isRefreshEnabled: isRefreshEnabled,
-                usageError: isUsageRefreshActive ? nil : account.usageError,
+                isCollapsed: card.isCollapsed,
+                isCurrent: card.account.isCurrent,
+                switching: card.switching,
+                refreshing: card.refreshing,
+                showsRefreshButton: card.showsRefreshButton,
+                isRefreshEnabled: card.isRefreshEnabled,
+                usageError: card.isUsageRefreshActive ? nil : card.account.usageError,
                 palette: palette,
                 onSwitch: onSwitch,
                 onRefresh: onRefresh
             )
         }
-        .animation(AccountCardMorphRules.animation, value: account.isCurrent)
+        .animation(AccountCardMorphRules.animation, value: card.account.isCurrent)
         .overlay {
             AccountCollapsedSwitchOverlay(
                 isVisible: interactionPresentation.isCollapsedSwitchOverlayVisible,
-                switching: switching,
+                switching: card.switching,
                 onDismiss: dismissCollapsedSwitchOverlay,
                 onSwitch: onSwitch
             )

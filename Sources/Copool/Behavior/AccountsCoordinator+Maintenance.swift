@@ -145,6 +145,9 @@ extension AccountsCoordinator {
             if entry.visibility == .deleted {
                 return true
             }
+            if entry.source == .consent {
+                return true
+            }
             return discoveredWorkspaceIDs.contains(workspaceID)
         }
 
