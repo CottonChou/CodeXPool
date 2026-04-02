@@ -7,8 +7,10 @@ enum RepositoryLocator {
     ]
     static let proxydBundledManifestRelativePath = "proxyd-src/proxyd/Cargo.toml"
     static let proxydPrebuiltBinaryRelativeDirectory = "Sources/Copool/Resources/proxyd-prebuilt"
-    static let proxydBundledPrebuiltBinaryRelativeDirectory = "proxyd-prebuilt"
+    static let proxydBundledPrebuiltBinaryRelativeDirectory = "proxyd-prebuilt-archives"
+    static let proxydExtractedPrebuiltBinaryRelativeDirectory = "proxyd-prebuilt"
     static let proxydBinaryName = "codex-tools-proxyd"
+    static let proxydCompressedBinaryExtension = "zlib"
 
     static func proxydManifestURL(in root: URL) -> URL? {
         for relativePath in proxydManifestRelativePaths {
@@ -55,6 +57,23 @@ enum RepositoryLocator {
     static func proxydPrebuiltBinaryURL(in root: URL, target: String) -> URL {
         root
             .appendingPathComponent(proxydPrebuiltBinaryRelativeDirectory, isDirectory: true)
+            .appendingPathComponent(target, isDirectory: true)
+            .appendingPathComponent(proxydBinaryName, isDirectory: false)
+    }
+
+    static func proxydBundledCompressedBinaryURL(in root: URL, target: String) -> URL {
+        root
+            .appendingPathComponent(proxydBundledPrebuiltBinaryRelativeDirectory, isDirectory: true)
+            .appendingPathComponent(target, isDirectory: true)
+            .appendingPathComponent(
+                "\(proxydBinaryName).\(proxydCompressedBinaryExtension)",
+                isDirectory: false
+            )
+    }
+
+    static func proxydExtractedPrebuiltBinaryURL(in root: URL, target: String) -> URL {
+        root
+            .appendingPathComponent(proxydExtractedPrebuiltBinaryRelativeDirectory, isDirectory: true)
             .appendingPathComponent(target, isDirectory: true)
             .appendingPathComponent(proxydBinaryName, isDirectory: false)
     }

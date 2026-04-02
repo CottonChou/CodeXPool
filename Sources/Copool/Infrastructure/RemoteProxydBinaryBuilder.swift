@@ -1,26 +1,30 @@
 import Foundation
+import Compression
 
 struct RemoteProxydBinaryBuilder {
     let repoRoot: URL?
     let bundledResourceRoot: URL?
+    let prebuiltCacheRoot: URL?
     let fileManager: FileManager
     let commandRunner: RemoteShellCommandRunner
 
     init(
         repoRoot: URL?,
         bundledResourceRoot: URL? = Bundle.main.resourceURL,
+        prebuiltCacheRoot: URL? = nil,
         fileManager: FileManager,
         commandRunner: RemoteShellCommandRunner
     ) {
         self.repoRoot = repoRoot
         self.bundledResourceRoot = bundledResourceRoot
+        self.prebuiltCacheRoot = prebuiltCacheRoot
         self.fileManager = fileManager
         self.commandRunner = commandRunner
     }
 
     func buildBinary(for server: RemoteServerConfig, forceRebuild: Bool = false) throws -> URL {
         let platform = try detectRemoteLinuxPlatform(for: server)
-        if let prebuilt = prebuiltBinary(for: platform), !forceRebuild {
+        if let prebuilt = try prebuiltBinary(for: platform), !forceRebuild {
             return prebuilt
         }
         guard let manifestPath = try proxydManifestPath() else {
@@ -77,16 +81,16 @@ struct RemoteProxydBinaryBuilder {
         return false
     }
 
-    func prebuiltBinary(for platform: RemoteLinuxPlatform) -> URL? {
+    func prebuiltBinary(for platform: RemoteLinuxPlatform) throws -> URL? {
         for target in [platform.primaryTarget, platform.fallbackTarget] {
-            if let binary = prebuiltBinary(forTarget: target) {
+            if let binary = try prebuiltBinary(forTarget: target) {
                 return binary
             }
         }
         return nil
     }
 
-    func prebuiltBinary(forTarget target: String) -> URL? {
+    func prebuiltBinary(forTarget target: String) throws -> URL? {
         if let repoRoot {
             let repoBinary = RepositoryLocator.proxydPrebuiltBinaryURL(in: repoRoot, target: target)
             if fileManager.fileExists(atPath: repoBinary.path) {
@@ -94,12 +98,17 @@ struct RemoteProxydBinaryBuilder {
             }
         }
 
-        let bundledBinary = bundledResourceRoot?
-            .appendingPathComponent(RepositoryLocator.proxydBundledPrebuiltBinaryRelativeDirectory, isDirectory: true)
-            .appendingPathComponent(target, isDirectory: true)
-            .appendingPathComponent(RepositoryLocator.proxydBinaryName, isDirectory: false)
-        if let bundledBinary, fileManager.fileExists(atPath: bundledBinary.path) {
-            return bundledBinary
+        if let bundledResourceRoot {
+            let bundledCompressedBinary = RepositoryLocator.proxydBundledCompressedBinaryURL(
+                in: bundledResourceRoot,
+                target: target
+            )
+            if fileManager.fileExists(atPath: bundledCompressedBinary.path) {
+                return try extractBundledCompressedBinary(
+                    at: bundledCompressedBinary,
+                    target: target
+                )
+            }
         }
 
         return nil
@@ -142,6 +151,110 @@ struct RemoteProxydBinaryBuilder {
             .appendingPathComponent("proxyd-target", isDirectory: true)
         try fileManager.createDirectory(at: path, withIntermediateDirectories: true)
         return path
+    }
+
+    private func proxydPrebuiltCacheDirectory() throws -> URL {
+        if let prebuiltCacheRoot {
+            try fileManager.createDirectory(at: prebuiltCacheRoot, withIntermediateDirectories: true)
+            return prebuiltCacheRoot
+        }
+
+        let applicationSupport = try fileManager.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        let path = applicationSupport
+            .appendingPathComponent("CodexToolsSwift", isDirectory: true)
+            .appendingPathComponent("proxyd-runtime", isDirectory: true)
+        try fileManager.createDirectory(at: path, withIntermediateDirectories: true)
+        return path
+    }
+
+    private func extractBundledCompressedBinary(at source: URL, target: String) throws -> URL {
+        let cacheRoot = try proxydPrebuiltCacheDirectory()
+        let extractedBinary = RepositoryLocator.proxydExtractedPrebuiltBinaryURL(in: cacheRoot, target: target)
+        let stampPath = extractedBinary
+            .deletingLastPathComponent()
+            .appendingPathComponent(".archive-stamp", isDirectory: false)
+        try fileManager.createDirectory(at: extractedBinary.deletingLastPathComponent(), withIntermediateDirectories: true)
+
+        let sourceStamp = try archiveStamp(for: source)
+        if fileManager.isExecutableFile(atPath: extractedBinary.path),
+           let existingStamp = try? String(contentsOf: stampPath),
+           existingStamp == sourceStamp {
+            return extractedBinary
+        }
+
+        let compressed = try Data(contentsOf: source)
+        let extracted = try decompressZlibData(compressed)
+        try extracted.write(to: extractedBinary, options: .atomic)
+        try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: extractedBinary.path)
+        try sourceStamp.write(to: stampPath, atomically: true, encoding: .utf8)
+        return extractedBinary
+    }
+
+    private func archiveStamp(for archive: URL) throws -> String {
+        let attributes = try fileManager.attributesOfItem(atPath: archive.path)
+        let size = (attributes[.size] as? NSNumber)?.int64Value ?? 0
+        let modified = (attributes[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+        return "\(size):\(modified)"
+    }
+
+    private func decompressZlibData(_ data: Data) throws -> Data {
+        guard !data.isEmpty else {
+            return Data()
+        }
+
+        let destinationCapacity = max(64, data.count * 8)
+        return try data.withUnsafeBytes { sourceBuffer in
+            guard let sourceBaseAddress = sourceBuffer.bindMemory(to: UInt8.self).baseAddress else {
+                throw AppError.io("Compressed proxyd archive is empty")
+            }
+
+            var decoded = Data()
+            let stream = UnsafeMutablePointer<compression_stream>.allocate(capacity: 1)
+            defer { stream.deallocate() }
+            stream.pointee = compression_stream(
+                dst_ptr: UnsafeMutablePointer<UInt8>(bitPattern: 1)!,
+                dst_size: 0,
+                src_ptr: UnsafePointer<UInt8>(bitPattern: 1)!,
+                src_size: 0,
+                state: nil
+            )
+
+            let status = compression_stream_init(&stream.pointee, COMPRESSION_STREAM_DECODE, COMPRESSION_ZLIB)
+            guard status != COMPRESSION_STATUS_ERROR else {
+                throw AppError.io("Failed to initialize proxyd archive decompression")
+            }
+            defer { compression_stream_destroy(&stream.pointee) }
+
+            let destination = UnsafeMutablePointer<UInt8>.allocate(capacity: destinationCapacity)
+            defer { destination.deallocate() }
+
+            stream.pointee.src_ptr = sourceBaseAddress
+            stream.pointee.src_size = data.count
+
+            while true {
+                stream.pointee.dst_ptr = destination
+                stream.pointee.dst_size = destinationCapacity
+                let result = compression_stream_process(&stream.pointee, Int32(COMPRESSION_STREAM_FINALIZE.rawValue))
+                let produced = destinationCapacity - stream.pointee.dst_size
+                if produced > 0 {
+                    decoded.append(destination, count: produced)
+                }
+
+                switch result {
+                case COMPRESSION_STATUS_OK:
+                    continue
+                case COMPRESSION_STATUS_END:
+                    return decoded
+                default:
+                    throw AppError.io("Failed to decompress proxyd archive")
+                }
+            }
+        }
     }
 
     private func ensureRustTargetAddedIfPossible(_ target: String) throws {

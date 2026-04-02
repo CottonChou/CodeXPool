@@ -4,6 +4,7 @@ set -eu
 ROOT="${SRCROOT:-$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)}"
 MANIFEST="$ROOT/Sources/Copool/Resources/proxyd-src/proxyd/Cargo.toml"
 PREBUILT_DIR="$ROOT/Sources/Copool/Resources/proxyd-prebuilt"
+ARCHIVE_DIR="$ROOT/Sources/Copool/Resources/proxyd-prebuilt-archives"
 TARGET_DIR="${CODEX_TOOLS_PROXY_TARGET_DIR:-$HOME/Library/Caches/Copool/proxyd-target}"
 PATH="$HOME/.cargo/bin:$PATH"
 CARGO_BIN=""
@@ -71,7 +72,7 @@ if [ -n "$RUSTC_BIN" ]; then
   export PATH
 fi
 
-mkdir -p "$PREBUILT_DIR" "$TARGET_DIR"
+mkdir -p "$PREBUILT_DIR" "$ARCHIVE_DIR" "$TARGET_DIR"
 
 SOURCE_STAMP="$(mktemp)"
 find "$ROOT/Sources/Copool/Resources/proxyd-src" -type f \
@@ -82,12 +83,14 @@ build_target() {
   target="$1"
   output_dir="$PREBUILT_DIR/$target"
   output_bin="$output_dir/codex-tools-proxyd"
+  archive_dir="$ARCHIVE_DIR/$target"
+  archive_bin="$archive_dir/codex-tools-proxyd.zlib"
   stamp_file="$output_dir/.build-stamp"
   build_failed=0
 
-  mkdir -p "$output_dir"
+  mkdir -p "$output_dir" "$archive_dir"
 
-  if [ -f "$output_bin" ] && [ -f "$stamp_file" ] && cmp -s "$SOURCE_STAMP" "$stamp_file"; then
+  if [ -f "$output_bin" ] && [ -f "$archive_bin" ] && [ -f "$stamp_file" ] && cmp -s "$SOURCE_STAMP" "$stamp_file"; then
     echo "proxyd prebuilt up to date for $target"
     return 0
   fi
@@ -130,6 +133,14 @@ build_target() {
 
   cp "$built_bin" "$output_bin"
   chmod 644 "$output_bin"
+  python3 - "$output_bin" "$archive_bin" <<'PY'
+import pathlib
+import sys
+import zlib
+
+source = pathlib.Path(sys.argv[1]).read_bytes()
+pathlib.Path(sys.argv[2]).write_bytes(zlib.compress(source, level=9))
+PY
   cp "$SOURCE_STAMP" "$stamp_file"
 }
 

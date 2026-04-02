@@ -34,6 +34,7 @@ let package = Package(
                 .process("Resources/zh-Hans.lproj"),
                 .process("Resources/zh-Hant.lproj"),
                 .process("Resources/proxyd-src"),
+                .copy("Resources/proxyd-prebuilt-archives"),
                 .copy("Resources/proxyd-prebuilt")
             ]
         ),

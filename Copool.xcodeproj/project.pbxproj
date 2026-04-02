@@ -40,6 +40,7 @@
 		15C1AB961C5BB3B728A848E1 /* AccountsWidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E655B80A368B9D3F2B6371 /* AccountsWidgetSnapshot.swift */; };
 		15DB5CC3DD62EDCC284D506A /* SwiftNativeProxyRuntimeService+RequestTranslation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72F83775D81C98F1457C952A /* SwiftNativeProxyRuntimeService+RequestTranslation.swift */; };
 		16AF52DED4DD5AE588B64368 /* usage.rs in Resources */ = {isa = PBXBuildFile; fileRef = 2A597D670A72CDE27C08D586 /* usage.rs */; };
+		16AF52DED4DD5AE588B64369 /* proxyd-prebuilt-archives in Resources */ = {isa = PBXBuildFile; fileRef = FFEEDDCCBBAA998877665546 /* proxyd-prebuilt-archives */; };
 		17BFE68D5BA05B5054C01207 /* AccountsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F538DA3A540B8548A65F877E /* AccountsModels.swift */; };
 		17D19163BCCA0B5770E5BDE0 /* LayoutRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECE624821FB137E8DB3711AD /* LayoutRules.swift */; };
 		17EFD9B9B9CF5294FD765876 /* RemoteProxyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36D2D735CB5E1753FB0DE639 /* RemoteProxyService.swift */; };
@@ -628,6 +629,7 @@
 		FAECC20A0EA2A2E024BEFA9E /* models.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = models.rs; sourceTree = "<group>"; };
 		FEB8F849524A5B828F5C0F7F /* proxy_service.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = proxy_service.rs; sourceTree = "<group>"; };
 		FFEEDDCCBBAA998877665545 /* proxyd-prebuilt */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "proxyd-prebuilt"; sourceTree = "<group>"; };
+		FFEEDDCCBBAA998877665546 /* proxyd-prebuilt-archives */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "proxyd-prebuilt-archives"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -784,6 +786,7 @@
 				F1D95B8D644ECF9BF1D1A871 /* LaunchScreen.storyboard */,
 				B200F10CE9F433B769723734 /* Localizable.strings */,
 				FFEEDDCCBBAA998877665545 /* proxyd-prebuilt */,
+				FFEEDDCCBBAA998877665546 /* proxyd-prebuilt-archives */,
 				18F9F7EDE5720DCB562AE727 /* proxyd-src */,
 			);
 			path = Resources;
@@ -1252,6 +1255,7 @@
 				E819DD760F7DDD030107C454 /* store.rs in Resources */,
 				16AF52DED4DD5AE588B64368 /* usage.rs in Resources */,
 				68A1228957522AF14BEF1006 /* utils.rs in Resources */,
+				16AF52DED4DD5AE588B64369 /* proxyd-prebuilt-archives in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
