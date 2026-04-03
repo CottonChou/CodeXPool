@@ -1273,6 +1273,102 @@ final class AccountsCoordinatorTests: XCTestCase {
     }
 
     @MainActor
+    func testAccountsPageViewStoreRoutesRefreshingChangesToScopedCardRefresh() async throws {
+        let model = makeAccountsPageModelForViewStoreTests(
+            initialAccounts: [
+                makeAccountSummary(
+                    id: "acct-1",
+                    accountID: "account-1",
+                    isCurrent: true,
+                    usage: nil
+                ),
+                makeAccountSummary(
+                    id: "acct-2",
+                    accountID: "account-2",
+                    isCurrent: false,
+                    usage: nil
+                )
+            ]
+        )
+        let store = AccountsPageViewStore(model: model)
+        let initialEventCount = store.debugRefreshEvents.count
+
+        model.refreshingAccountIDs = ["acct-2"]
+        await Task.yield()
+
+        let events = Array(store.debugRefreshEvents.dropFirst(initialEventCount))
+        XCTAssertEqual(events.count, 1)
+        XCTAssertEqual(events.first?.kind, .scopedCards(1))
+        XCTAssertEqual(events.first?.trigger, "refreshingAccountIDs")
+        XCTAssertEqual(events.first?.updated, 1)
+        XCTAssertEqual(events.first?.inserted, 0)
+        XCTAssertEqual(events.first?.removed, 0)
+    }
+
+    @MainActor
+    func testAccountsPageViewStoreRoutesPendingWorkspaceChangesToContentRefreshOnly() async {
+        let model = makeAccountsPageModelForViewStoreTests(
+            initialAccounts: [
+                makeAccountSummary(
+                    id: "acct-1",
+                    accountID: "account-1",
+                    isCurrent: true,
+                    usage: nil
+                )
+            ]
+        )
+        let store = AccountsPageViewStore(model: model)
+        let initialEventCount = store.debugRefreshEvents.count
+
+        model.pendingWorkspaceAuthorizations = [
+            WorkspaceAuthorizationCandidate(
+                workspaceID: "workspace-1",
+                workspaceName: "Workspace 1",
+                email: "workspace@example.com",
+                planType: "team"
+            )
+        ]
+        await Task.yield()
+
+        let events = Array(store.debugRefreshEvents.dropFirst(initialEventCount))
+        XCTAssertEqual(events.count, 1)
+        XCTAssertEqual(events.first?.kind, .content)
+        XCTAssertEqual(events.first?.trigger, "pendingWorkspaceAuthorizations")
+        XCTAssertEqual(events.first?.contentChanged, true)
+    }
+
+    @MainActor
+    func testAccountsPageViewStoreRoutesUsageDisplayChangesToAllCardRefresh() async {
+        let model = makeAccountsPageModelForViewStoreTests(
+            initialAccounts: [
+                makeAccountSummary(
+                    id: "acct-1",
+                    accountID: "account-1",
+                    isCurrent: true,
+                    usage: makeUsageSnapshot(fetchedAt: 1)
+                ),
+                makeAccountSummary(
+                    id: "acct-2",
+                    accountID: "account-2",
+                    isCurrent: false,
+                    usage: makeUsageSnapshot(fetchedAt: 1)
+                )
+            ]
+        )
+        let store = AccountsPageViewStore(model: model)
+        let initialEventCount = store.debugRefreshEvents.count
+
+        model.usageProgressDisplayMode = .remaining
+        await Task.yield()
+
+        let events = Array(store.debugRefreshEvents.dropFirst(initialEventCount))
+        XCTAssertEqual(events.count, 1)
+        XCTAssertEqual(events.first?.kind, .allCards)
+        XCTAssertEqual(events.first?.trigger, "usageProgressDisplayMode")
+        XCTAssertEqual(events.first?.updated, 2)
+    }
+
+    @MainActor
     func testAccountsPageViewStoreRepublishesStructureWhenVisibleCardOrderChanges() async {
         let model = makeAccountsPageModelForViewStoreTests(
             initialAccounts: [

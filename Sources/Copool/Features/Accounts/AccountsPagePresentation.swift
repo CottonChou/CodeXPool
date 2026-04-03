@@ -70,27 +70,45 @@ struct PendingWorkspaceAuthorizationCardViewState: Equatable, Identifiable {
 }
 
 extension AccountsPageModel {
+    func makeAccountCardViewState(
+        for account: AccountSummary,
+        locale: Locale = .autoupdatingCurrent
+    ) -> AccountCardViewState {
+        let isCollapsed = isAccountCollapsed(account.id)
+        return AccountCardViewState(
+            account: account,
+            presentation: AccountCardPresentation(
+                account: account,
+                isCollapsed: isCollapsed,
+                locale: locale,
+                usageProgressDisplayMode: usageProgressDisplayMode
+            ),
+            isCollapsed: isCollapsed,
+            switching: switchingAccountID == account.id,
+            refreshing: isAccountRefreshing(account.id),
+            showsRefreshButton: runtimePlatform == .macOS,
+            isRefreshEnabled: canRefreshAccount(account.id),
+            isUsageRefreshActive: isUsageRefreshActive(forAccountID: account.id),
+            usageProgressDisplayMode: usageProgressDisplayMode
+        )
+    }
+
+    func makeAccountCardViewState(
+        forAccountID accountID: String,
+        locale: Locale = .autoupdatingCurrent
+    ) -> AccountCardViewState? {
+        guard case .content(let accounts) = state else { return nil }
+        guard let account = accounts.first(where: { $0.id == accountID && !$0.isWorkspaceDeactivated }) else {
+            return nil
+        }
+        return makeAccountCardViewState(for: account, locale: locale)
+    }
+
     func makeAccountCardViewStates(locale: Locale = .autoupdatingCurrent) -> [AccountCardViewState] {
         guard case .content(let accounts) = state else { return [] }
-        return accounts.filter { !$0.isWorkspaceDeactivated }.map { account in
-            let isCollapsed = isAccountCollapsed(account.id)
-            return AccountCardViewState(
-                account: account,
-                presentation: AccountCardPresentation(
-                    account: account,
-                    isCollapsed: isCollapsed,
-                    locale: locale,
-                    usageProgressDisplayMode: usageProgressDisplayMode
-                ),
-                isCollapsed: isCollapsed,
-                switching: switchingAccountID == account.id,
-                refreshing: isAccountRefreshing(account.id),
-                showsRefreshButton: runtimePlatform == .macOS,
-                isRefreshEnabled: canRefreshAccount(account.id),
-                isUsageRefreshActive: isUsageRefreshActive(forAccountID: account.id),
-                usageProgressDisplayMode: usageProgressDisplayMode
-            )
-        }
+        return accounts
+            .filter { !$0.isWorkspaceDeactivated }
+            .map { makeAccountCardViewState(for: $0, locale: locale) }
     }
 
     func makeContentPresentation() -> AccountsPageContentPresentation {
