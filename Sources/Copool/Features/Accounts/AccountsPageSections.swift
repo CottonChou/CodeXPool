@@ -8,6 +8,7 @@ struct AccountsPageContentSection: View {
     let onSwitchAccount: (String) -> Void
     let onRefreshAccountUsage: (String) -> Void
     let onAuthorizeWorkspace: (String) -> Void
+    let onCancelAuthorizeWorkspace: () -> Void
     let onDeletePendingWorkspace: (String) -> Void
     let onDeleteAccount: (String) -> Void
 
@@ -30,6 +31,7 @@ struct AccountsPageContentSection: View {
                         errorMessage: presentation.pendingWorkspaceError,
                         areCardsPresented: areCardsPresented,
                         onAuthorizeWorkspace: onAuthorizeWorkspace,
+                        onCancelAuthorizeWorkspace: onCancelAuthorizeWorkspace,
                         onDeletePendingWorkspace: onDeletePendingWorkspace
                     )
                 }
@@ -161,6 +163,7 @@ private struct PendingWorkspaceAuthorizationSection: View {
     let errorMessage: String?
     let areCardsPresented: Bool
     let onAuthorizeWorkspace: (String) -> Void
+    let onCancelAuthorizeWorkspace: () -> Void
     let onDeletePendingWorkspace: (String) -> Void
 
     var body: some View {
@@ -195,12 +198,17 @@ private struct PendingWorkspaceAuthorizationSection: View {
                         PendingWorkspaceAuthorizationCard(
                             card: card,
                             onAuthorize: { onAuthorizeWorkspace(card.id) },
+                            onCancelAuthorize: onCancelAuthorizeWorkspace,
                             onDelete: { onDeletePendingWorkspace(card.id) }
                         )
                         .copoolCardEntrance(index: index, isPresented: areCardsPresented)
                         .modifier(AccountCardFrameModifier())
                     }
                 }
+                .animation(
+                    AccountsAnimationRules.contentReorder,
+                    value: cards.map(\.id)
+                )
                 .padding(.horizontal, LayoutRules.pagePadding)
             }
         }
@@ -210,6 +218,7 @@ private struct PendingWorkspaceAuthorizationSection: View {
 private struct PendingWorkspaceAuthorizationCard: View {
     let card: PendingWorkspaceAuthorizationCardViewState
     let onAuthorize: () -> Void
+    let onCancelAuthorize: () -> Void
     let onDelete: () -> Void
 
     private var isDeactivated: Bool {
@@ -217,20 +226,7 @@ private struct PendingWorkspaceAuthorizationCard: View {
     }
 
     private var planLabel: String {
-        AccountSummary(
-            id: card.workspaceID,
-            label: card.workspaceName,
-            email: card.email,
-            accountID: card.workspaceID,
-            planType: card.planType,
-            teamName: card.workspaceName,
-            teamAlias: nil,
-            addedAt: 0,
-            updatedAt: 0,
-            usage: nil,
-            usageError: nil,
-            isCurrent: false
-        ).normalizedPlanLabel
+        AccountPlanLabel.normalized(from: card.planType)
     }
 
     var body: some View {
@@ -273,23 +269,20 @@ private struct PendingWorkspaceAuthorizationCard: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             HStack(alignment: .center, spacing: 10) {
-                if !isDeactivated && card.deletionMode == .dismissCandidate {
-                    Button(action: onAuthorize) {
-                        if card.authorizing {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else {
-                            Label(L10n.tr("accounts.pending.action.authorize"), systemImage: "checkmark.shield")
-                                .lineLimit(1)
-                        }
+                if !isDeactivated {
+                    Button(action: card.authorizing ? onCancelAuthorize : onAuthorize) {
+                        Label(
+                            card.authorizing ? L10n.tr("common.cancel") : L10n.tr("accounts.pending.action.authorize"),
+                            systemImage: card.authorizing ? "xmark.circle" : "checkmark.shield"
+                        )
+                        .lineLimit(1)
                     }
                     .copoolActionButtonStyle(
-                        prominent: true,
-                        tint: .indigo,
+                        prominent: !card.authorizing,
+                        tint: card.authorizing ? .secondary : .indigo,
                         density: .compact,
                         iOSStyle: .liquidGlass
                     )
-                    .disabled(card.authorizing)
                 }
 
                 Spacer(minLength: 0)

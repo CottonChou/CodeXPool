@@ -11,6 +11,7 @@ struct AccountsPageShell: View {
     let onSwitchAccount: (String) -> Void
     let onRefreshAccountUsage: (String) -> Void
     let onAuthorizeWorkspace: (String) -> Void
+    let onCancelAuthorizeWorkspace: () -> Void
     let onDeletePendingWorkspace: (String) -> Void
     let onDeleteAccount: (String) -> Void
 
@@ -27,6 +28,7 @@ struct AccountsPageShell: View {
             onSwitchAccount: onSwitchAccount,
             onRefreshAccountUsage: onRefreshAccountUsage,
             onAuthorizeWorkspace: onAuthorizeWorkspace,
+            onCancelAuthorizeWorkspace: onCancelAuthorizeWorkspace,
             onDeletePendingWorkspace: onDeletePendingWorkspace,
             onDeleteAccount: onDeleteAccount
         )
@@ -40,6 +42,7 @@ struct AccountsPageShell: View {
             onSwitchAccount: onSwitchAccount,
             onRefreshAccountUsage: onRefreshAccountUsage,
             onAuthorizeWorkspace: onAuthorizeWorkspace,
+            onCancelAuthorizeWorkspace: onCancelAuthorizeWorkspace,
             onDeletePendingWorkspace: onDeletePendingWorkspace,
             onDeleteAccount: onDeleteAccount
         )
@@ -59,6 +62,7 @@ private struct AccountsIOSPageShell: View {
     let onSwitchAccount: (String) -> Void
     let onRefreshAccountUsage: (String) -> Void
     let onAuthorizeWorkspace: (String) -> Void
+    let onCancelAuthorizeWorkspace: () -> Void
     let onDeletePendingWorkspace: (String) -> Void
     let onDeleteAccount: (String) -> Void
 
@@ -72,6 +76,7 @@ private struct AccountsIOSPageShell: View {
                 onSwitchAccount: onSwitchAccount,
                 onRefreshAccountUsage: onRefreshAccountUsage,
                 onAuthorizeWorkspace: onAuthorizeWorkspace,
+                onCancelAuthorizeWorkspace: onCancelAuthorizeWorkspace,
                 onDeletePendingWorkspace: onDeletePendingWorkspace,
                 onDeleteAccount: onDeleteAccount
             )
@@ -103,6 +108,7 @@ private struct AccountsMacPageShell: View {
     let onSwitchAccount: (String) -> Void
     let onRefreshAccountUsage: (String) -> Void
     let onAuthorizeWorkspace: (String) -> Void
+    let onCancelAuthorizeWorkspace: () -> Void
     let onDeletePendingWorkspace: (String) -> Void
     let onDeleteAccount: (String) -> Void
 
@@ -127,6 +133,7 @@ private struct AccountsMacPageShell: View {
                 onSwitchAccount: onSwitchAccount,
                 onRefreshAccountUsage: onRefreshAccountUsage,
                 onAuthorizeWorkspace: onAuthorizeWorkspace,
+                onCancelAuthorizeWorkspace: onCancelAuthorizeWorkspace,
                 onDeletePendingWorkspace: onDeletePendingWorkspace,
                 onDeleteAccount: onDeleteAccount
             )
@@ -160,6 +167,7 @@ private struct AccountsIOSContentHost: View {
     let onSwitchAccount: (String) -> Void
     let onRefreshAccountUsage: (String) -> Void
     let onAuthorizeWorkspace: (String) -> Void
+    let onCancelAuthorizeWorkspace: () -> Void
     let onDeletePendingWorkspace: (String) -> Void
     let onDeleteAccount: (String) -> Void
 
@@ -174,6 +182,7 @@ private struct AccountsIOSContentHost: View {
                     onSwitchAccount: onSwitchAccount,
                     onRefreshAccountUsage: onRefreshAccountUsage,
                     onAuthorizeWorkspace: onAuthorizeWorkspace,
+                    onCancelAuthorizeWorkspace: onCancelAuthorizeWorkspace,
                     onDeletePendingWorkspace: onDeletePendingWorkspace,
                     onDeleteAccount: onDeleteAccount
                 )
@@ -193,6 +202,7 @@ private struct AccountsMacContentHost: View {
     let onSwitchAccount: (String) -> Void
     let onRefreshAccountUsage: (String) -> Void
     let onAuthorizeWorkspace: (String) -> Void
+    let onCancelAuthorizeWorkspace: () -> Void
     let onDeletePendingWorkspace: (String) -> Void
     let onDeleteAccount: (String) -> Void
 
@@ -210,6 +220,7 @@ private struct AccountsMacContentHost: View {
                     onSwitchAccount: onSwitchAccount,
                     onRefreshAccountUsage: onRefreshAccountUsage,
                     onAuthorizeWorkspace: onAuthorizeWorkspace,
+                    onCancelAuthorizeWorkspace: onCancelAuthorizeWorkspace,
                     onDeletePendingWorkspace: onDeletePendingWorkspace,
                     onDeleteAccount: onDeleteAccount
                 )

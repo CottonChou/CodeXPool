@@ -1338,6 +1338,72 @@ final class AccountsCoordinatorTests: XCTestCase {
     }
 
     @MainActor
+    func testDeletePendingWorkspaceDoesNotReloadWorkspaceDirectoryAfterPersistingVisibility() async {
+        let entry = WorkspaceDirectoryEntry(
+            workspaceID: "workspace-1",
+            workspaceName: "Workspace 1",
+            email: "workspace@example.com",
+            planType: "team",
+            kind: .workspace,
+            source: .consent,
+            status: .active,
+            visibility: .visible,
+            lastSeenAt: 1,
+            lastStatusCheckedAt: nil
+        )
+        let repository = CountingAccountsStoreRepository(
+            store: AccountsStore(
+                workspaceDirectory: [entry]
+            )
+        )
+        let coordinator = AccountsCoordinator(
+            storeRepository: repository,
+            settingsRepository: TestSettingsRepository(),
+            authRepository: StubAuthRepository(),
+            usageService: CountingUsageService(
+                result: UsageSnapshot(
+                    fetchedAt: 1,
+                    planType: "pro",
+                    fiveHour: nil,
+                    oneWeek: nil,
+                    credits: nil
+                )
+            ),
+            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService()
+        )
+        let model = AccountsPageModel(
+            coordinator: coordinator,
+            onLocalAccountsChanged: nil,
+            initialAccounts: [
+                makeAccountSummary(
+                    id: "acct-1",
+                    accountID: "account-1",
+                    isCurrent: true,
+                    usage: nil
+                )
+            ]
+        )
+        model.workspaceDirectory = [entry]
+        model.pendingWorkspaceAuthorizations = [
+            WorkspaceAuthorizationCandidate(
+                workspaceID: "workspace-1",
+                workspaceName: "Workspace 1",
+                email: "workspace@example.com",
+                planType: "team"
+            )
+        ]
+
+        await model.deletePendingWorkspace(id: "workspace-1")
+
+        XCTAssertEqual(repository.loadCount, 1)
+        XCTAssertTrue(model.pendingWorkspaceAuthorizations.isEmpty)
+        XCTAssertEqual(model.workspaceDirectory.first?.visibility, .deleted)
+    }
+
+    @MainActor
     func testAccountsPageViewStoreRoutesUsageDisplayChangesToAllCardRefresh() async {
         let model = makeAccountsPageModelForViewStoreTests(
             initialAccounts: [
@@ -2099,6 +2165,86 @@ final class AccountsCoordinatorTests: XCTestCase {
     }
 
     @MainActor
+    func testAccountsPageModelCancelPendingWorkspaceAuthorizationStopsPendingLoginTask() async {
+        let now: Int64 = 1_763_216_000
+        let loginService = HangingChatGPTOAuthLoginService()
+        let coordinator = AccountsCoordinator(
+            storeRepository: InMemoryAccountsStoreRepository(
+                store: AccountsStore(
+                    accounts: [
+                        StoredAccount(
+                            id: "acct-1",
+                            label: "Current",
+                            email: "test@example.com",
+                            accountID: "account-1",
+                            planType: "team",
+                            teamName: "remote-space",
+                            teamAlias: nil,
+                            authJSON: .object([
+                                "tokens": .object([
+                                    "access_token": .string("token-1"),
+                                    "account_id": .string("account-1")
+                                ])
+                            ]),
+                            addedAt: now,
+                            updatedAt: now,
+                            usage: makeUsageSnapshot(fetchedAt: now, fiveHourResetAt: now + 300),
+                            usageError: nil
+                        )
+                    ],
+                    workspaceDirectory: [
+                        WorkspaceDirectoryEntry(
+                            workspaceID: "account-2",
+                            workspaceName: "ops-space",
+                            email: "test@example.com",
+                            planType: "team",
+                            kind: .workspace,
+                            source: .consent,
+                            status: .active,
+                            visibility: .visible,
+                            lastSeenAt: now,
+                            lastStatusCheckedAt: nil
+                        )
+                    ]
+                )
+            ),
+            settingsRepository: TestSettingsRepository(),
+            authRepository: TokenMappedAuthRepository(
+                extractedByAccessToken: [
+                    "token-1": makeExtractedAuth(accountID: "account-1", planType: "team", teamName: nil)
+                ]
+            ),
+            usageService: RecordingAccountUsageService(results: [:]),
+            workspaceMetadataService: StubWorkspaceMetadataService(
+                metadata: [
+                    WorkspaceMetadata(accountID: "account-1", workspaceName: "remote-space", structure: "workspace"),
+                    WorkspaceMetadata(accountID: "account-2", workspaceName: "ops-space", structure: "workspace")
+                ]
+            ),
+            chatGPTOAuthLoginService: loginService,
+            codexCLIService: StubCodexCLIService(),
+            editorAppService: StubEditorAppService(),
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            dateProvider: FixedDateProvider(now: now)
+        )
+        let model = AccountsPageModel(coordinator: coordinator)
+
+        await model.load()
+        XCTAssertEqual(model.pendingWorkspaceAuthorizations.map(\.workspaceID), ["account-2"])
+
+        let authorizationTask = Task { await model.authorizePendingWorkspace(id: "account-2") }
+        await loginService.waitUntilStarted()
+        XCTAssertEqual(model.authorizingWorkspaceID, "account-2")
+
+        model.cancelPendingWorkspaceAuthorization()
+        await authorizationTask.value
+
+        XCTAssertNil(model.authorizingWorkspaceID)
+        XCTAssertEqual(model.pendingWorkspaceAuthorizations.map(\.workspaceID), ["account-2"])
+        XCTAssertEqual(model.notice?.text, L10n.tr("error.oauth.request_cancelled"))
+    }
+
+    @MainActor
     func testAccountsPageModelPendingWorkspaceDiscoveryShowsErrorWhenMetadataLookupFails() async {
         let now: Int64 = 1_763_216_000
         let coordinator = AccountsCoordinator(
@@ -2461,6 +2607,44 @@ final class AccountsCoordinatorTests: XCTestCase {
         } else {
             XCTFail("Expected content state after moving deactivated account into pending section")
         }
+    }
+
+    @MainActor
+    func testPendingWorkspaceCardRulesSortDeactivatedBeforeNameOrder() {
+        let cards = [
+            PendingWorkspaceAuthorizationCardViewState(
+                id: "pending-z",
+                workspaceID: "workspace-z",
+                workspaceName: "Zulu",
+                email: nil,
+                planType: "team",
+                status: .pending,
+                authorizing: false
+            ),
+            PendingWorkspaceAuthorizationCardViewState(
+                id: "deactivated-b",
+                workspaceID: "workspace-b",
+                workspaceName: "Beta",
+                email: nil,
+                planType: "team",
+                status: .deactivated,
+                authorizing: false
+            ),
+            PendingWorkspaceAuthorizationCardViewState(
+                id: "pending-a",
+                workspaceID: "workspace-a",
+                workspaceName: "Alpha",
+                email: nil,
+                planType: "team",
+                status: .pending,
+                authorizing: false
+            )
+        ]
+
+        XCTAssertEqual(
+            PendingWorkspaceCardRules.sortedForDisplay(cards).map(\.id),
+            ["deactivated-b", "pending-a", "pending-z"]
+        )
     }
 
     @MainActor
@@ -4726,6 +4910,24 @@ private final class InMemoryAccountsStoreRepository: AccountsStoreRepository, @u
 
     func loadStore() throws -> AccountsStore {
         store
+    }
+
+    func saveStore(_ store: AccountsStore) throws {
+        self.store = store
+    }
+}
+
+private final class CountingAccountsStoreRepository: AccountsStoreRepository, @unchecked Sendable {
+    private var store: AccountsStore
+    private(set) var loadCount = 0
+
+    init(store: AccountsStore) {
+        self.store = store
+    }
+
+    func loadStore() throws -> AccountsStore {
+        loadCount += 1
+        return store
     }
 
     func saveStore(_ store: AccountsStore) throws {

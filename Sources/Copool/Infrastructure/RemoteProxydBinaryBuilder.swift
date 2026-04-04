@@ -182,7 +182,7 @@ struct RemoteProxydBinaryBuilder {
 
         let sourceStamp = try archiveStamp(for: source)
         if fileManager.isExecutableFile(atPath: extractedBinary.path),
-           let existingStamp = try? String(contentsOf: stampPath),
+           let existingStamp = try? String(contentsOf: stampPath, encoding: .utf8),
            existingStamp == sourceStamp {
             return extractedBinary
         }

@@ -39,6 +39,7 @@ struct AccountsPageView: View {
             onSwitchAccount: switchAccount,
             onRefreshAccountUsage: refreshUsage,
             onAuthorizeWorkspace: authorizeWorkspace,
+            onCancelAuthorizeWorkspace: cancelAuthorizeWorkspace,
             onDeletePendingWorkspace: deletePendingWorkspace,
             onDeleteAccount: deleteAccount
         )
@@ -109,6 +110,10 @@ struct AccountsPageView: View {
 
     private func authorizeWorkspace(id: String) {
         Task { await model.authorizePendingWorkspace(id: id) }
+    }
+
+    private func cancelAuthorizeWorkspace() {
+        model.cancelPendingWorkspaceAuthorization()
     }
 
     private func deletePendingWorkspace(id: String) {

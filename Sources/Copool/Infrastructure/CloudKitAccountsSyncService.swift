@@ -1,9 +1,6 @@
 import Foundation
 import CloudKit
 import CryptoKit
-#if os(macOS)
-import Security
-#endif
 
 actor CloudKitAccountsSyncService: AccountsCloudSyncServiceProtocol {
     private enum Constants {
@@ -208,38 +205,7 @@ actor CloudKitAccountsSyncService: AccountsCloudSyncServiceProtocol {
     }
 
     private static func makeDatabase() -> CKDatabase? {
-        guard hasCloudKitEntitlement() else {
-            return nil
-        }
-        let container = CKContainer(identifier: Constants.containerIdentifier)
-        return container.privateCloudDatabase
-    }
-
-    private static func hasCloudKitEntitlement() -> Bool {
-        #if os(macOS)
-        guard let task = SecTaskCreateFromSelf(nil),
-              let value = SecTaskCopyValueForEntitlement(
-                task,
-                "com.apple.developer.icloud-services" as CFString,
-                nil
-              ) else {
-            return false
-        }
-
-        if let services = value as? [String] {
-            return services.contains("CloudKit") || services.contains("CloudKit-Anonymous")
-        }
-        if let services = value as? NSArray {
-            return services.contains { element in
-                guard let service = element as? String else { return false }
-                return service == "CloudKit" || service == "CloudKit-Anonymous"
-            }
-        }
-
-        return false
-        #else
-        return true
-        #endif
+        CloudKitSupport.makePrivateDatabase(containerIdentifier: Constants.containerIdentifier)
     }
 }
 

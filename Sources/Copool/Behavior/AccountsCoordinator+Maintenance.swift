@@ -394,7 +394,7 @@ extension AccountsCoordinator {
             existing.label = account.label
             existing.email = account.email
             existing.planType = account.planType
-            if let teamName = Self.normalizedTeamName(account.teamName) {
+            if let teamName = WorkspaceDisplayName.normalized(from: account.teamName) {
                 existing.teamName = teamName
             }
             existing.authJSON = account.authJSON
@@ -451,7 +451,7 @@ extension AccountsCoordinator {
             let extracted = try authRepository.extractAuth(from: storedAccount.authJSON)
             guard shouldLookupRemoteWorkspaceMetadata(extracted: extracted) else { continue }
             if !forceRemoteCheck,
-               Self.normalizedTeamName(storedAccount.teamName) != nil {
+               WorkspaceDisplayName.normalized(from: storedAccount.teamName) != nil {
                 continue
             }
 
@@ -532,9 +532,9 @@ extension AccountsCoordinator {
             account.usageError = nil
             account.usageStateUpdatedAt = now
             account.planType = refreshed.extractedAuth.planType ?? account.planType
-            if let teamName = normalizedTeamName(refreshed.extractedAuth.teamName) {
-                account.teamName = teamName
-            }
+        if let teamName = WorkspaceDisplayName.normalized(from: refreshed.extractedAuth.teamName) {
+            account.teamName = teamName
+        }
             account.email = refreshed.extractedAuth.email ?? account.email
             account.workspaceStatus = .active
             account.principalID = refreshed.extractedAuth.principalID
@@ -597,7 +597,7 @@ extension AccountsCoordinator {
             let existingEntry = existingIndex.map { store.workspaceDirectory[$0] }
             let entry = WorkspaceDirectoryEntry(
                 workspaceID: account.accountID,
-                workspaceName: normalizedTeamName(account.teamName),
+                workspaceName: WorkspaceDisplayName.normalized(from: account.teamName),
                 email: account.email,
                 planType: account.planType,
                 kind: workspaceDirectoryKind(for: account),
@@ -722,8 +722,8 @@ extension AccountsCoordinator {
                 didChange = true
             }
 
-            let reconciledTeamName = normalizedTeamName(reconciled.teamName)
-            let storedTeamName = normalizedTeamName(store.accounts[index].teamName)
+            let reconciledTeamName = WorkspaceDisplayName.normalized(from: reconciled.teamName)
+            let storedTeamName = WorkspaceDisplayName.normalized(from: store.accounts[index].teamName)
             if let reconciledTeamName, storedTeamName != reconciledTeamName {
                 store.accounts[index].teamName = reconciledTeamName
                 didChange = true
@@ -731,12 +731,6 @@ extension AccountsCoordinator {
         }
 
         return didChange
-    }
-
-    private static func normalizedTeamName(_ value: String?) -> String? {
-        guard let value else { return nil }
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
     }
 
     private static func remoteWorkspaceName(
@@ -756,7 +750,7 @@ extension AccountsCoordinator {
             return nil
         }
 
-        let trimmedName = normalizedTeamName(match.workspaceName)
+        let trimmedName = WorkspaceDisplayName.normalized(from: match.workspaceName)
         if workspaceMetadataRepresentsInactiveWorkspace(match) {
             return (trimmedName, .deactivated)
         }
@@ -773,8 +767,7 @@ extension AccountsCoordinator {
             return nil
         }
 
-        guard let trimmedName = metadata.workspaceName?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !trimmedName.isEmpty else {
+        guard let trimmedName = WorkspaceDisplayName.normalized(from: metadata.workspaceName) else {
             return nil
         }
 
@@ -816,7 +809,7 @@ extension AccountsCoordinator {
     }
 
     private static func workspaceDirectoryKind(for account: StoredAccount) -> WorkspaceDirectoryKind {
-        normalizedTeamName(account.teamName) == nil ? .personal : .workspace
+        WorkspaceDisplayName.normalized(from: account.teamName) == nil ? .personal : .workspace
     }
 
     private func persistConsentWorkspaceDirectory(

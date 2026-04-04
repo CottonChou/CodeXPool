@@ -78,33 +78,37 @@ struct AccountCardView: View {
     private var cardBody: some View {
         VStack(alignment: .leading, spacing: 8) {
             if card.isCollapsed {
-                AccountCompactHeaderContent(
-                    planLabel: presentation.planLabel,
-                    workspaceLabel: presentation.teamNameTag,
-                    statusLabel: presentation.statusLabel,
-                    accountName: presentation.displayAccountName,
-                    accentColor: palette.toneColor,
-                    titleFont: .headline,
-                    titleColor: card.account.isCurrent ? palette.toneColor : .primary,
-                    spacing: 8
-                )
-                AccountCardCompactUsageSection(presentation: presentation)
+                VStack(alignment: .leading, spacing: 8) {
+                    AccountCompactHeaderContent(
+                        planLabel: presentation.planLabel,
+                        workspaceLabel: presentation.teamNameTag,
+                        statusLabel: presentation.statusLabel,
+                        accountName: presentation.displayAccountName,
+                        accentColor: palette.toneColor,
+                        titleFont: .headline,
+                        titleColor: card.account.isCurrent ? palette.toneColor : .primary,
+                        spacing: 8
+                    )
+                    AccountCardCompactUsageSection(presentation: presentation)
+                }
             } else {
-                AccountCardHeaderSection(
-                    presentation: presentation,
-                    isCollapsed: card.isCollapsed,
-                    isCurrent: card.account.isCurrent,
-                    palette: palette,
-                    onDelete: onDelete
-                )
+                VStack(alignment: .leading, spacing: 8) {
+                    AccountCardHeaderSection(
+                        presentation: presentation,
+                        isCollapsed: card.isCollapsed,
+                        isCurrent: card.account.isCurrent,
+                        palette: palette,
+                        onDelete: onDelete
+                    )
 
-                Text(presentation.displayAccountName)
-                    .font(.headline)
-                    .foregroundStyle(card.account.isCurrent ? palette.toneColor : .primary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                    Text(presentation.displayAccountName)
+                        .font(.headline)
+                        .foregroundStyle(card.account.isCurrent ? palette.toneColor : .primary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
 
-                AccountCardExpandedUsageSection(presentation: presentation)
+                    AccountCardExpandedUsageSection(presentation: presentation)
+                }
             }
         }
         .padding(card.isCollapsed ? 8 : 10)
@@ -127,6 +131,7 @@ struct AccountCardView: View {
                 onRefresh: onRefresh
             )
         }
+        .animation(AccountCardMorphRules.animation, value: card.isCollapsed)
         .animation(AccountCardMorphRules.animation, value: card.account.isCurrent)
         .overlay {
             AccountCollapsedSwitchOverlay(

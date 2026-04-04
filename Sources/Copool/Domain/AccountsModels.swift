@@ -27,6 +27,53 @@ enum WorkspaceDirectorySource: String, Codable, Equatable {
     case deactivated
 }
 
+enum AccountPlanLabel {
+    static func normalized(from planType: String?) -> String {
+        let normalized = planType?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+
+        switch normalized {
+        case "free":
+            return "FREE"
+        case "plus":
+            return "PLUS"
+        case "pro":
+            return "PRO"
+        case "enterprise":
+            return "ENTERPRISE"
+        case "business":
+            return "BUSINESS"
+        default:
+            return "TEAM"
+        }
+    }
+
+    static func normalized(usagePlanType: String?, storedPlanType: String?) -> String {
+        let usagePlanType = usagePlanType?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let usagePlanType, !usagePlanType.isEmpty {
+            return normalized(from: usagePlanType)
+        }
+
+        let storedPlanType = storedPlanType?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let storedPlanType, !storedPlanType.isEmpty {
+            return normalized(from: storedPlanType)
+        }
+
+        return normalized(from: nil as String?)
+    }
+}
+
+enum WorkspaceDisplayName {
+    static func normalized(from value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
 struct WorkspaceDirectoryEntry: Codable, Equatable, Identifiable {
     var workspaceID: String
     var workspaceName: String?
@@ -284,40 +331,11 @@ struct AccountSummary: Equatable, Identifiable {
         AccountIdentity.key(for: self)
     }
 
-    private var effectivePlanType: String {
-        let usagePlanType = usage?.planType?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        if let usagePlanType, !usagePlanType.isEmpty {
-            return usagePlanType
-        }
-
-        let storedPlanType = planType?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        if let storedPlanType, !storedPlanType.isEmpty {
-            return storedPlanType
-        }
-
-        return "team"
-    }
-
     var normalizedPlanLabel: String {
-        let normalized = effectivePlanType
-            .lowercased()
-
-        switch normalized {
-        case "free":
-            return "FREE"
-        case "plus":
-            return "PLUS"
-        case "pro":
-            return "PRO"
-        case "enterprise":
-            return "ENTERPRISE"
-        case "business":
-            return "BUSINESS"
-        default:
-            return "TEAM"
-        }
+        AccountPlanLabel.normalized(
+            usagePlanType: usage?.planType,
+            storedPlanType: planType
+        )
     }
 
     var displayTeamName: String? {

@@ -9,16 +9,24 @@ extension AccountsPageModel {
         guard !isRefreshing, !isAdding, !isImporting else { return }
         guard let candidate = pendingWorkspaceAuthorizations.first(where: { $0.id == id }) else { return }
         guard candidate.status == .pending else { return }
+        guard pendingWorkspaceAuthorizationTask == nil else { return }
 
         authorizingWorkspaceID = id
-        defer { authorizingWorkspaceID = nil }
-
-        do {
-            let imported = try await coordinator.authorizeWorkspaceViaLogin(
+        let task = Task { [coordinator] in
+            try await coordinator.authorizeWorkspaceViaLogin(
                 workspaceID: candidate.workspaceID,
                 workspaceName: candidate.workspaceName,
                 customLabel: nil
             )
+        }
+        pendingWorkspaceAuthorizationTask = task
+        defer {
+            pendingWorkspaceAuthorizationTask = nil
+            authorizingWorkspaceID = nil
+        }
+
+        do {
+            let imported = try await task.value
             removePendingWorkspaceAuthorization(id: id)
             let accounts = try await coordinator.listAccounts()
             applyAccounts(accounts)
@@ -28,6 +36,8 @@ extension AccountsPageModel {
                 style: .success,
                 text: L10n.tr("accounts.notice.workspace_authorized_format", candidate.workspaceName)
             )
+        } catch is CancellationError {
+            notice = NoticeMessage(style: .error, text: L10n.tr("error.oauth.request_cancelled"))
         } catch {
             if isDeactivatedPendingWorkspaceError(error) {
                 markPendingWorkspaceAuthorizationDeactivated(id: id)
@@ -45,6 +55,10 @@ extension AccountsPageModel {
         }
     }
 
+    func cancelPendingWorkspaceAuthorization() {
+        pendingWorkspaceAuthorizationTask?.cancel()
+    }
+
     func deletePendingWorkspace(id: String) async {
         guard runtimePlatform == .macOS else {
             notice = NoticeMessage(style: .error, text: PlatformCapabilities.unsupportedOperationMessage)
@@ -55,20 +69,25 @@ extension AccountsPageModel {
             return
         }
         guard authorizingWorkspaceID != id else { return }
-        guard pendingWorkspaceAuthorizations.contains(where: { $0.id == id }) else { return }
+        guard let candidate = pendingWorkspaceAuthorizations.first(where: { $0.id == id }) else { return }
+
+        let previousWorkspaceDirectory = workspaceDirectory
 
         removePendingWorkspaceAuthorization(id: id)
+        updateWorkspaceDirectoryVisibilityLocally(
+            workspaceID: id,
+            visibility: .deleted
+        )
 
         do {
             try await coordinator.updateWorkspaceDirectoryVisibility(
                 workspaceID: id,
                 visibility: .deleted
             )
-            applyWorkspaceDirectory(
-                try await coordinator.listWorkspaceDirectory()
-            )
             notice = NoticeMessage(style: .info, text: L10n.tr("accounts.pending.notice.dismissed"))
         } catch {
+            workspaceDirectory = previousWorkspaceDirectory
+            restorePendingWorkspaceAuthorization(candidate)
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
         }
     }
@@ -128,6 +147,28 @@ extension AccountsPageModel {
         pendingWorkspaceAuthorizationError = nil
     }
 
+    private func restorePendingWorkspaceAuthorization(_ candidate: WorkspaceAuthorizationCandidate) {
+        pendingWorkspaceAuthorizations = PendingWorkspaceCardRules.sortedCandidates(
+            pendingWorkspaceAuthorizations + [candidate]
+        )
+        pendingWorkspaceAuthorizationError = nil
+    }
+
+    private func updateWorkspaceDirectoryVisibilityLocally(
+        workspaceID: String,
+        visibility: WorkspaceDirectoryVisibility
+    ) {
+        let normalizedWorkspaceID = AccountIdentity.normalizedAccountID(workspaceID)
+        guard !normalizedWorkspaceID.isEmpty else { return }
+        guard let index = workspaceDirectory.firstIndex(where: {
+            AccountIdentity.normalizedAccountID($0.workspaceID) == normalizedWorkspaceID
+        }) else {
+            return
+        }
+        guard workspaceDirectory[index].visibility != visibility else { return }
+        workspaceDirectory[index].visibility = visibility
+    }
+
     private func isPendingWorkspaceRefreshCancellation(_ error: Error) -> Bool {
         if error is CancellationError {
             return true
@@ -153,13 +194,13 @@ extension AccountsPageModel {
             accounts.map { AccountIdentity.normalizedAccountID($0.accountID) }
         )
 
-        return entries.compactMap { entry in
+        let candidates: [WorkspaceAuthorizationCandidate] = entries.compactMap { entry in
             let workspaceID = AccountIdentity.normalizedAccountID(entry.workspaceID)
             guard !workspaceID.isEmpty else { return nil }
             guard entry.kind == .workspace else { return nil }
             guard entry.visibility == .visible else { return nil }
             guard !authorizedWorkspaceIDs.contains(workspaceID) else { return nil }
-            guard let workspaceName = normalizedPendingWorkspaceName(entry.workspaceName) else { return nil }
+            guard let workspaceName = WorkspaceDisplayName.normalized(from: entry.workspaceName) else { return nil }
 
             return WorkspaceAuthorizationCandidate(
                 workspaceID: entry.workspaceID,
@@ -169,15 +210,7 @@ extension AccountsPageModel {
                 status: entry.status == .deactivated ? .deactivated : .pending
             )
         }
-        .sorted { lhs, rhs in
-            lhs.workspaceName.localizedCaseInsensitiveCompare(rhs.workspaceName) == .orderedAscending
-        }
-    }
-
-    private func normalizedPendingWorkspaceName(_ value: String?) -> String? {
-        guard let value else { return nil }
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
+        return PendingWorkspaceCardRules.sortedCandidates(candidates)
     }
 
     private func deleteDeactivatedPendingAccount(id: String) async {

@@ -18,6 +18,7 @@ final class AccountsPageModel: ObservableObject {
     private let noticeScheduler = NoticeAutoDismissScheduler()
     var pendingWorkspaceRefreshTask: Task<Void, Never>?
     var addAccountTask: Task<AccountSummary, Error>?
+    var pendingWorkspaceAuthorizationTask: Task<AccountSummary, Error>?
 
     var hasLoaded = false
     var isCloudSyncAvailable = true
@@ -112,6 +113,7 @@ final class AccountsPageModel: ObservableObject {
 
     deinit {
         addAccountTask?.cancel()
+        pendingWorkspaceAuthorizationTask?.cancel()
         pendingWorkspaceRefreshTask?.cancel()
     }
 

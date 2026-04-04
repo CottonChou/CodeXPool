@@ -4,23 +4,16 @@ import CloudKit
 import Security
 #endif
 
-struct CloudSyncAvailabilityService {
-    private let containerIdentifier = "iCloud.com.alick.copool"
-
-    func isICloudAvailable() async -> Bool {
-        guard Self.hasCloudKitEntitlement() else {
-            return false
+enum CloudKitSupport {
+    static func makePrivateDatabase(containerIdentifier: String) -> CKDatabase? {
+        guard hasCloudKitEntitlement() else {
+            return nil
         }
-
         let container = CKContainer(identifier: containerIdentifier)
-        return await withCheckedContinuation { continuation in
-            container.accountStatus { status, _ in
-                continuation.resume(returning: status == .available)
-            }
-        }
+        return container.privateCloudDatabase
     }
 
-    private static func hasCloudKitEntitlement() -> Bool {
+    static func hasCloudKitEntitlement() -> Bool {
         #if os(macOS)
         guard let task = SecTaskCreateFromSelf(nil),
               let value = SecTaskCopyValueForEntitlement(
@@ -30,7 +23,13 @@ struct CloudSyncAvailabilityService {
               ) else {
             return false
         }
+        return containsCloudKitService(value)
+        #else
+        return true
+        #endif
+    }
 
+    static func containsCloudKitService(_ value: Any) -> Bool {
         if let services = value as? [String] {
             return services.contains("CloudKit") || services.contains("CloudKit-Anonymous")
         }
@@ -41,8 +40,22 @@ struct CloudSyncAvailabilityService {
             }
         }
         return false
-        #else
-        return true
-        #endif
+    }
+}
+
+struct CloudSyncAvailabilityService {
+    private let containerIdentifier = "iCloud.com.alick.copool"
+
+    func isICloudAvailable() async -> Bool {
+        guard CloudKitSupport.hasCloudKitEntitlement() else {
+            return false
+        }
+
+        let container = CKContainer(identifier: containerIdentifier)
+        return await withCheckedContinuation { continuation in
+            container.accountStatus { status, _ in
+                continuation.resume(returning: status == .available)
+            }
+        }
     }
 }

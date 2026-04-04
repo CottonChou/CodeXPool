@@ -7,7 +7,7 @@ struct AccountsPageContentPresentation: Equatable {
     let isOverviewMode: Bool
 
     var shouldShowPendingWorkspaceSection: Bool {
-        !pendingWorkspaceCards.isEmpty || pendingWorkspaceError != nil
+        !isOverviewMode && (!pendingWorkspaceCards.isEmpty || pendingWorkspaceError != nil)
     }
 }
 
@@ -54,11 +54,6 @@ struct AccountCardViewState: Equatable, Identifiable {
 }
 
 struct PendingWorkspaceAuthorizationCardViewState: Equatable, Identifiable {
-    enum DeletionMode: Equatable {
-        case dismissCandidate
-        case deleteAccount
-    }
-
     let id: String
     let workspaceID: String
     let workspaceName: String
@@ -66,7 +61,46 @@ struct PendingWorkspaceAuthorizationCardViewState: Equatable, Identifiable {
     let planType: String?
     let status: WorkspaceAuthorizationCandidateStatus
     let authorizing: Bool
-    let deletionMode: DeletionMode
+}
+
+enum PendingWorkspaceCardRules {
+    static func sortedForDisplay(
+        _ cards: [PendingWorkspaceAuthorizationCardViewState]
+    ) -> [PendingWorkspaceAuthorizationCardViewState] {
+        cards.sorted {
+            sortsBefore(
+                lhsStatus: $0.status,
+                lhsName: $0.workspaceName,
+                rhsStatus: $1.status,
+                rhsName: $1.workspaceName
+            )
+        }
+    }
+
+    static func sortedCandidates(
+        _ candidates: [WorkspaceAuthorizationCandidate]
+    ) -> [WorkspaceAuthorizationCandidate] {
+        candidates.sorted {
+            sortsBefore(
+                lhsStatus: $0.status,
+                lhsName: $0.workspaceName,
+                rhsStatus: $1.status,
+                rhsName: $1.workspaceName
+            )
+        }
+    }
+
+    static func sortsBefore(
+        lhsStatus: WorkspaceAuthorizationCandidateStatus,
+        lhsName: String,
+        rhsStatus: WorkspaceAuthorizationCandidateStatus,
+        rhsName: String
+    ) -> Bool {
+        if lhsStatus != rhsStatus {
+            return lhsStatus == .deactivated
+        }
+        return lhsName.localizedCaseInsensitiveCompare(rhsName) == .orderedAscending
+    }
 }
 
 extension AccountsPageModel {
@@ -126,16 +160,12 @@ extension AccountsPageModel {
                 email: candidate.email,
                 planType: candidate.planType,
                 status: candidate.status,
-                authorizing: authorizingWorkspaceID == candidate.id,
-                deletionMode: .dismissCandidate
+                authorizing: authorizingWorkspaceID == candidate.id
             )
         }
-        let pendingCards = (deactivatedAccountCards + pendingAuthorizationCards).sorted { lhs, rhs in
-            if lhs.status != rhs.status {
-                return lhs.status == .deactivated
-            }
-            return lhs.workspaceName.localizedCaseInsensitiveCompare(rhs.workspaceName) == .orderedAscending
-        }
+        let pendingCards = PendingWorkspaceCardRules.sortedForDisplay(
+            deactivatedAccountCards + pendingAuthorizationCards
+        )
         let pendingError = pendingCards.isEmpty ? nil : pendingWorkspaceAuthorizationError
         return AccountsPageContentPresentation(
             state: contentState,
@@ -163,8 +193,7 @@ extension AccountsPageModel {
                 email: account.email,
                 planType: account.planType ?? account.usage?.planType,
                 status: .deactivated,
-                authorizing: false,
-                deletionMode: .deleteAccount
+                authorizing: false
             )
         }
     }

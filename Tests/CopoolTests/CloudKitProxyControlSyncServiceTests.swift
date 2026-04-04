@@ -2,6 +2,12 @@ import XCTest
 @testable import Copool
 
 final class CloudKitProxyControlSyncServiceTests: XCTestCase {
+    func testCloudKitEntitlementSupportRecognizesArrayAndNSArrayValues() {
+        XCTAssertTrue(CloudKitSupport.containsCloudKitService(["CloudKit"]))
+        XCTAssertTrue(CloudKitSupport.containsCloudKitService(NSArray(array: ["CloudKit-Anonymous"])))
+        XCTAssertFalse(CloudKitSupport.containsCloudKitService(["PushNotifications"]))
+    }
+
     func testSemanticSnapshotDigestChangesWhenPreferredPortTextChanges() throws {
         var snapshot = makeSnapshot()
         let baselineDigest = try CloudKitProxyControlSyncService.semanticSnapshotDigest(for: snapshot)

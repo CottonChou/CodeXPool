@@ -230,10 +230,6 @@ final class AccountsPageViewStore: ObservableObject {
             .store(in: &cancellables)
     }
 
-    func syncFromModel() {
-        refreshAllPresentations(trigger: "manual")
-    }
-
     func cardStore(for id: String) -> AccountCardStore? {
         cardStoresByID[id]
     }
@@ -422,12 +418,6 @@ final class AccountsPageChromeStore: ObservableObject {
         leadingToolbarButtons = model.leadingToolbarButtons
         trailingToolbarButtons = model.trailingToolbarButtons
         bind()
-    }
-
-    func syncFromModel() {
-        refreshMacActionBarPresentation()
-        refreshLeadingToolbarButtons()
-        refreshTrailingToolbarButtons()
     }
 
     private func bind() {

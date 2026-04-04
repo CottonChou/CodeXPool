@@ -2,6 +2,16 @@ import XCTest
 @testable import Copool
 
 final class AccountSummaryPresentationTests: XCTestCase {
+    func testNormalizedPlanLabelFromRawPlanTypeFallsBackToTeam() {
+        XCTAssertEqual(AccountPlanLabel.normalized(from: " business "), "BUSINESS")
+        XCTAssertEqual(AccountPlanLabel.normalized(from: nil), "TEAM")
+    }
+
+    func testWorkspaceDisplayNameNormalizationTrimsWhitespaceAndDropsEmptyValues() {
+        XCTAssertEqual(WorkspaceDisplayName.normalized(from: "  workspace-a  "), "workspace-a")
+        XCTAssertNil(WorkspaceDisplayName.normalized(from: " \n "))
+    }
+
     func testNormalizedPlanLabelPrefersLatestUsagePlanType() {
         let account = AccountSummary(
             id: "acct-1",
