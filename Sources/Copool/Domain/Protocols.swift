@@ -110,6 +110,11 @@ protocol ConfigTomlServiceProtocol: Sendable {
     func writeForChatGPTMode() throws
 }
 
+protocol ClaudeConfigServiceProtocol: Sendable {
+    func writeForAPIKeyMode(profile: ClaudeAPIKeyProfile) throws
+    func readCurrentAPIKey() -> String?
+}
+
 protocol AuthBackupServiceProtocol: Sendable {
     func backupCurrentAuthFiles() throws
 }

@@ -8,16 +8,18 @@ import UIKit
 #endif
 
 struct RootScene: View {
-    @State private var selectedTab: AppTab = .accounts
+    @State private var selectedTab: AppTab = .codex
     @StateObject private var chromeStore: RootSceneChromeStore
     private let trayModel: TrayMenuModel
     private let accountsModel: AccountsPageModel
+    private let claudeModel: ClaudePageModel
     private let settingsModel: SettingsPageModel
     private let container: AppContainer
 
     init(container: AppContainer, trayModel: TrayMenuModel) {
         self.container = container
         self.accountsModel = container.accountsModel
+        self.claudeModel = container.claudeModel
         self.settingsModel = container.settingsModel
         _chromeStore = StateObject(
             wrappedValue: RootSceneChromeStore(
@@ -34,8 +36,10 @@ struct RootScene: View {
 
     private var currentNotice: NoticeMessage? {
         switch selectedTab {
-        case .accounts:
+        case .codex:
             return chromeStore.accountsNotice
+        case .claude:
+            return chromeStore.claudeNotice
         case .settings:
             return chromeStore.settingsNotice
         }
@@ -47,7 +51,7 @@ struct RootScene: View {
 
     private var visibleTabs: [AppTab] {
         #if os(iOS)
-        [.accounts]
+        [.codex]
         #else
         AppTab.allCases
         #endif
@@ -123,7 +127,7 @@ struct RootScene: View {
     @ViewBuilder
     private var activePage: some View {
         switch selectedTab {
-        case .accounts:
+        case .codex:
             AccountsPageView(
                 model: accountsModel,
                 currentLocale: currentAppLocale,
@@ -131,6 +135,8 @@ struct RootScene: View {
                     settingsModel.setLocale(locale.identifier)
                 }
             )
+        case .claude:
+            ClaudePageView(model: claudeModel)
         case .settings:
             SettingsPageView(model: settingsModel)
         }
@@ -141,6 +147,7 @@ struct RootScene: View {
 private final class RootSceneChromeStore: ObservableObject {
     @Published private(set) var localeIdentifier: String
     @Published private(set) var accountsNotice: NoticeMessage?
+    @Published private(set) var claudeNotice: NoticeMessage?
     @Published private(set) var settingsNotice: NoticeMessage?
 
     private var cancellables: Set<AnyCancellable> = []
@@ -271,21 +278,24 @@ private struct AppTabToolbarSwitcher: View {
 private extension AppTab {
     var iconName: String {
         switch self {
-        case .accounts: return "person.2"
+        case .codex: return "command"
+        case .claude: return "brain"
         case .settings: return "gearshape"
         }
     }
 
     var titleTranslationKey: String {
         switch self {
-        case .accounts: return "tab.accounts"
+        case .codex: return "tab.codex"
+        case .claude: return "tab.claude"
         case .settings: return "tab.settings"
         }
     }
 
     var titleKey: LocalizedStringKey {
         switch self {
-        case .accounts: return "tab.accounts"
+        case .codex: return "tab.codex"
+        case .claude: return "tab.claude"
         case .settings: return "tab.settings"
         }
     }

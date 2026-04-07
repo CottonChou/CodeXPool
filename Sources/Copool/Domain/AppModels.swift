@@ -1,7 +1,8 @@
 import Foundation
 
 enum AppTab: String, CaseIterable, Identifiable {
-    case accounts
+    case codex
+    case claude
     case settings
 
     var id: String { rawValue }

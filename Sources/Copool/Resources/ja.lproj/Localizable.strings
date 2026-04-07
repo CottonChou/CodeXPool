@@ -1,4 +1,5 @@
-"tab.accounts" = "アカウント";
+"tab.codex" = "Codex";
+"tab.claude" = "Claude";
 "tab.settings" = "設定";
 
 "common.save" = "保存";
@@ -134,7 +135,7 @@
 
 "tray.refresh_usage" = "使用量を更新";
 "tray.no_accounts" = "アカウントなし";
-"tray.title.app" = "Copool";
+"tray.title.app" = "CodeSwitch";
 "tray.title.placeholder" = "5h -- / 1w --";
 "tray.title.format" = "5h %@ / 1w %@";
 "tray.account.current_prefix" = "現在 · ";
@@ -203,3 +204,17 @@
 "accounts.pending.error.hint" = "このアカウントの認証を更新または再取り込みしてから、再試行してください。";
 "accounts.card.status.deactivated" = "無効化済み";
 "accounts.notice.workspace_authorized_format" = "ワークスペースを認証しました: %@";
+
+"claude.section.title" = "Claude Code API Key Profiles";
+"claude.action.add_profile" = "Add Profile";
+"claude.empty.title" = "No Claude API key profiles";
+"claude.empty.message" = "Add an API key profile to configure Claude Code with your Anthropic API key or third-party provider.";
+"claude.editor.title_new" = "New Claude API Key Profile";
+"claude.editor.title_edit" = "Edit Claude API Key Profile";
+"claude.field.label" = "Profile Name";
+"claude.field.api_key" = "API Key";
+"claude.field.base_url" = "Base URL";
+"claude.field.model" = "Model";
+"claude.notice.saved" = "Claude API key profile saved";
+"claude.notice.deleted" = "Claude API key profile deleted";
+"claude.notice.switched" = "Switched Claude Code API key profile";

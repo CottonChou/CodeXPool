@@ -1,4 +1,5 @@
-"tab.accounts" = "Аккаунты";
+"tab.codex" = "Codex";
+"tab.claude" = "Claude";
 "tab.settings" = "Настройки";
 
 "common.save" = "Сохранить";
@@ -134,7 +135,7 @@
 
 "tray.refresh_usage" = "Обновить использование";
 "tray.no_accounts" = "Нет аккаунтов";
-"tray.title.app" = "Copool";
+"tray.title.app" = "CodeSwitch";
 "tray.title.placeholder" = "5h -- / 1w --";
 "tray.title.format" = "5h %@ / 1w %@";
 "tray.account.current_prefix" = "Текущий · ";
@@ -165,6 +166,20 @@
 "error.auth.decode_id_token_failed" = "Не удалось декодировать id_token";
 "error.json.unsupported_value" = "Неподдерживаемое значение JSON";
 "error.json.unsupported_payload_type" = "Неподдерживаемый тип JSON payload";
+
+"claude.section.title" = "Claude Code API Key Profiles";
+"claude.action.add_profile" = "Add Profile";
+"claude.empty.title" = "No Claude API key profiles";
+"claude.empty.message" = "Add an API key profile to configure Claude Code with your Anthropic API key or third-party provider.";
+"claude.editor.title_new" = "New Claude API Key Profile";
+"claude.editor.title_edit" = "Edit Claude API Key Profile";
+"claude.field.label" = "Profile Name";
+"claude.field.api_key" = "API Key";
+"claude.field.base_url" = "Base URL";
+"claude.field.model" = "Model";
+"claude.notice.saved" = "Claude API key profile saved";
+"claude.notice.deleted" = "Claude API key profile deleted";
+"claude.notice.switched" = "Switched Claude Code API key profile";
 "error.codex_cli.launch_login_failed_format" = "Не удалось запустить codex login: %@";
 "error.codex_cli.launch_app_open_failed" = "Не удалось запустить Codex.app";
 "error.codex_cli.launch_app_fallback_failed_format" = "Codex.app не найден, и резервный запуск через codex app тоже не удался: %@";

@@ -108,7 +108,14 @@ struct APIKeyProfileListView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 40)
             } else {
-                LazyVStack(spacing: 10) {
+                LazyVGrid(
+                    columns: [
+                        GridItem(.fixed(LayoutRules.accountsCardWidth), spacing: LayoutRules.accountsRowSpacing, alignment: .top),
+                        GridItem(.fixed(LayoutRules.accountsCardWidth), spacing: LayoutRules.accountsRowSpacing, alignment: .top)
+                    ],
+                    alignment: .leading,
+                    spacing: LayoutRules.accountsRowSpacing
+                ) {
                     ForEach(model.apiKeyProfiles) { profile in
                         APIKeyProfileCardView(
                             profile: profile,
@@ -123,6 +130,7 @@ struct APIKeyProfileListView: View {
                                 Task { await model.deleteAPIKeyProfile(id: profile.id) }
                             }
                         )
+                        .frame(width: LayoutRules.accountsCardWidth)
                     }
                 }
             }
@@ -145,7 +153,7 @@ struct APIKeyProfileCardView: View {
     let onDelete: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
@@ -163,7 +171,7 @@ struct APIKeyProfileCardView: View {
                 actionButtons
             }
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 detailRow(L10n.tr("apikey.field.model"), value: profile.model)
                 detailRow(L10n.tr("apikey.field.base_url"), value: profile.baseURL)
                 detailRow(L10n.tr("apikey.field.api_key"), value: profile.maskedAPIKey)
@@ -173,8 +181,8 @@ struct APIKeyProfileCardView: View {
                 detailRow(L10n.tr("apikey.field.wire_api"), value: profile.wireAPI)
             }
         }
-        .padding(14)
-        .cardSurface(cornerRadius: LayoutRules.cardRadius)
+        .padding(10)
+        .accountCardSurface(cornerRadius: 12)
     }
 
     private var currentBadge: some View {

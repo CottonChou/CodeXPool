@@ -150,6 +150,8 @@ struct AccountsStore: Codable, Equatable {
     var apiKeyProfiles: [APIKeyProfile] = []
     var activeAuthMode: ActiveAuthMode = .chatgpt
     var currentAPIKeySelection: APIKeySelection?
+    var claudeAPIKeyProfiles: [ClaudeAPIKeyProfile] = []
+    var currentClaudeAPIKeySelection: ClaudeAPIKeySelection?
 
     enum CodingKeys: String, CodingKey {
         case version
@@ -159,6 +161,8 @@ struct AccountsStore: Codable, Equatable {
         case apiKeyProfiles
         case activeAuthMode
         case currentAPIKeySelection
+        case claudeAPIKeyProfiles
+        case currentClaudeAPIKeySelection
     }
 
     init(
@@ -168,7 +172,9 @@ struct AccountsStore: Codable, Equatable {
         currentSelection: CurrentAccountSelection? = nil,
         apiKeyProfiles: [APIKeyProfile] = [],
         activeAuthMode: ActiveAuthMode = .chatgpt,
-        currentAPIKeySelection: APIKeySelection? = nil
+        currentAPIKeySelection: APIKeySelection? = nil,
+        claudeAPIKeyProfiles: [ClaudeAPIKeyProfile] = [],
+        currentClaudeAPIKeySelection: ClaudeAPIKeySelection? = nil
     ) {
         self.version = version
         self.accounts = accounts
@@ -177,6 +183,8 @@ struct AccountsStore: Codable, Equatable {
         self.apiKeyProfiles = apiKeyProfiles
         self.activeAuthMode = activeAuthMode
         self.currentAPIKeySelection = currentAPIKeySelection
+        self.claudeAPIKeyProfiles = claudeAPIKeyProfiles
+        self.currentClaudeAPIKeySelection = currentClaudeAPIKeySelection
     }
 
     init(from decoder: any Decoder) throws {
@@ -188,6 +196,8 @@ struct AccountsStore: Codable, Equatable {
         apiKeyProfiles = try container.decodeIfPresent([APIKeyProfile].self, forKey: .apiKeyProfiles) ?? []
         activeAuthMode = try container.decodeIfPresent(ActiveAuthMode.self, forKey: .activeAuthMode) ?? .chatgpt
         currentAPIKeySelection = try container.decodeIfPresent(APIKeySelection.self, forKey: .currentAPIKeySelection)
+        claudeAPIKeyProfiles = try container.decodeIfPresent([ClaudeAPIKeyProfile].self, forKey: .claudeAPIKeyProfiles) ?? []
+        currentClaudeAPIKeySelection = try container.decodeIfPresent(ClaudeAPIKeySelection.self, forKey: .currentClaudeAPIKeySelection)
     }
 }
 
@@ -578,6 +588,65 @@ struct APIKeyProfile: Codable, Equatable, Identifiable, Sendable {
 }
 
 struct APIKeySelection: Codable, Equatable {
+    var profileID: String
+    var selectedAt: Int64
+}
+
+// MARK: - Claude API Key Profiles
+
+struct ClaudeAPIKeyProfile: Codable, Equatable, Identifiable, Sendable {
+    var id: String
+    var label: String
+    var apiKey: String
+    var baseURL: String
+    var model: String
+    var addedAt: Int64
+    var updatedAt: Int64
+
+    enum CodingKeys: String, CodingKey {
+        case id, label, apiKey, baseURL = "baseUrl", model, addedAt, updatedAt
+    }
+
+    var isCurrent: Bool = false
+
+    init(
+        id: String,
+        label: String,
+        apiKey: String,
+        baseURL: String,
+        model: String = "",
+        addedAt: Int64,
+        updatedAt: Int64
+    ) {
+        self.id = id
+        self.label = label
+        self.apiKey = apiKey
+        self.baseURL = baseURL
+        self.model = model
+        self.addedAt = addedAt
+        self.updatedAt = updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        label = try container.decode(String.self, forKey: .label)
+        apiKey = try container.decode(String.self, forKey: .apiKey)
+        baseURL = try container.decode(String.self, forKey: .baseURL)
+        model = try container.decodeIfPresent(String.self, forKey: .model) ?? ""
+        addedAt = try container.decode(Int64.self, forKey: .addedAt)
+        updatedAt = try container.decode(Int64.self, forKey: .updatedAt)
+    }
+
+    var maskedAPIKey: String {
+        guard apiKey.count > 8 else { return String(repeating: "*", count: apiKey.count) }
+        let prefix = apiKey.prefix(4)
+        let suffix = apiKey.suffix(4)
+        return "\(prefix)****\(suffix)"
+    }
+}
+
+struct ClaudeAPIKeySelection: Codable, Equatable {
     var profileID: String
     var selectedAt: Int64
 }

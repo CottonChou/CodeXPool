@@ -1,4 +1,5 @@
-"tab.accounts" = "Account";
+"tab.codex" = "Codex";
+"tab.claude" = "Claude";
 "tab.settings" = "Impostazioni";
 
 "common.save" = "Salva";
@@ -134,7 +135,7 @@
 
 "tray.refresh_usage" = "Aggiorna utilizzo";
 "tray.no_accounts" = "Nessun account";
-"tray.title.app" = "Copool";
+"tray.title.app" = "CodeSwitch";
 "tray.title.placeholder" = "5h -- / 1w --";
 "tray.title.format" = "5h %@ / 1w %@";
 "tray.account.current_prefix" = "Attuale · ";
@@ -188,3 +189,17 @@
 "error.opencode.auth_path_not_found" = "Unable to locate opencode auth file path";
 "error.opencode.missing_tokens" = "auth.json missing tokens";
 "error.opencode.missing_refresh_token" = "auth.json missing refresh_token";
+
+"claude.section.title" = "Claude Code API Key Profiles";
+"claude.action.add_profile" = "Add Profile";
+"claude.empty.title" = "No Claude API key profiles";
+"claude.empty.message" = "Add an API key profile to configure Claude Code with your Anthropic API key or third-party provider.";
+"claude.editor.title_new" = "New Claude API Key Profile";
+"claude.editor.title_edit" = "Edit Claude API Key Profile";
+"claude.field.label" = "Profile Name";
+"claude.field.api_key" = "API Key";
+"claude.field.base_url" = "Base URL";
+"claude.field.model" = "Model";
+"claude.notice.saved" = "Claude API key profile saved";
+"claude.notice.deleted" = "Claude API key profile deleted";
+"claude.notice.switched" = "Switched Claude Code API key profile";

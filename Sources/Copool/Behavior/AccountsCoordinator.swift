@@ -20,6 +20,7 @@ actor AccountsCoordinator {
     let editorAppService: EditorAppServiceProtocol
     let opencodeAuthSyncService: OpencodeAuthSyncServiceProtocol
     let configTomlService: ConfigTomlServiceProtocol
+    let claudeConfigService: ClaudeConfigServiceProtocol
     let authBackupService: AuthBackupServiceProtocol
     let dateProvider: DateProviding
     let runtimePlatform: RuntimePlatform
@@ -35,6 +36,7 @@ actor AccountsCoordinator {
         editorAppService: EditorAppServiceProtocol,
         opencodeAuthSyncService: OpencodeAuthSyncServiceProtocol,
         configTomlService: ConfigTomlServiceProtocol,
+        claudeConfigService: ClaudeConfigServiceProtocol,
         authBackupService: AuthBackupServiceProtocol,
         dateProvider: DateProviding = SystemDateProvider(),
         runtimePlatform: RuntimePlatform = PlatformCapabilities.currentPlatform
@@ -49,6 +51,7 @@ actor AccountsCoordinator {
         self.editorAppService = editorAppService
         self.opencodeAuthSyncService = opencodeAuthSyncService
         self.configTomlService = configTomlService
+        self.claudeConfigService = claudeConfigService
         self.authBackupService = authBackupService
         self.dateProvider = dateProvider
         self.runtimePlatform = runtimePlatform
@@ -377,5 +380,66 @@ actor AccountsCoordinator {
         }
 
         return result
+    }
+
+    // MARK: - Claude API Key Profiles
+
+    func listClaudeAPIKeyProfiles() throws -> [ClaudeAPIKeyProfile] {
+        let store = try storeRepository.loadStore()
+        let currentID = store.currentClaudeAPIKeySelection?.profileID
+        return store.claudeAPIKeyProfiles.map { profile in
+            var p = profile
+            p.isCurrent = (p.id == currentID)
+            return p
+        }
+    }
+
+    func addClaudeAPIKeyProfile(_ profile: ClaudeAPIKeyProfile) throws -> ClaudeAPIKeyProfile {
+        var store = try storeRepository.loadStore()
+        var newProfile = profile
+        if newProfile.id.isEmpty {
+            newProfile.id = UUID().uuidString
+        }
+        newProfile.addedAt = dateProvider.unixSecondsNow()
+        newProfile.updatedAt = newProfile.addedAt
+        store.claudeAPIKeyProfiles.append(newProfile)
+        try storeRepository.saveStore(store)
+        return newProfile
+    }
+
+    func updateClaudeAPIKeyProfile(_ profile: ClaudeAPIKeyProfile) throws -> ClaudeAPIKeyProfile {
+        var store = try storeRepository.loadStore()
+        guard let index = store.claudeAPIKeyProfiles.firstIndex(where: { $0.id == profile.id }) else {
+            throw AppError.invalidData(L10n.tr("error.accounts.account_not_found_for_update"))
+        }
+        var updated = profile
+        updated.updatedAt = dateProvider.unixSecondsNow()
+        store.claudeAPIKeyProfiles[index] = updated
+        try storeRepository.saveStore(store)
+        return updated
+    }
+
+    func deleteClaudeAPIKeyProfile(id: String) throws {
+        var store = try storeRepository.loadStore()
+        store.claudeAPIKeyProfiles.removeAll { $0.id == id }
+        if store.currentClaudeAPIKeySelection?.profileID == id {
+            store.currentClaudeAPIKeySelection = nil
+        }
+        try storeRepository.saveStore(store)
+    }
+
+    func switchToClaudeAPIKeyProfile(id: String) throws {
+        var store = try storeRepository.loadStore()
+        guard let profile = store.claudeAPIKeyProfiles.first(where: { $0.id == id }) else {
+            throw AppError.invalidData(L10n.tr("error.accounts.account_not_found_for_switch"))
+        }
+
+        try claudeConfigService.writeForAPIKeyMode(profile: profile)
+
+        store.currentClaudeAPIKeySelection = ClaudeAPIKeySelection(
+            profileID: profile.id,
+            selectedAt: dateProvider.unixMillisecondsNow()
+        )
+        try storeRepository.saveStore(store)
     }
 }

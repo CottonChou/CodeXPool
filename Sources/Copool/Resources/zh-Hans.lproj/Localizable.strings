@@ -1,4 +1,5 @@
-"tab.accounts" = "账号";
+"tab.codex" = "Codex";
+"tab.claude" = "Claude";
 "tab.settings" = "设置";
 
 "common.save" = "保存";
@@ -146,7 +147,7 @@
 
 "tray.refresh_usage" = "刷新用量";
 "tray.no_accounts" = "暂无账号";
-"tray.title.app" = "Copool";
+"tray.title.app" = "CodeSwitch";
 "tray.title.placeholder" = "5h -- / 1w --";
 "tray.title.format" = "5h %@ / 1w %@";
 "tray.account.current_prefix" = "当前 · ";
@@ -210,3 +211,17 @@
 "error.opencode.auth_path_not_found" = "未能定位 opencode 认证文件路径";
 "error.opencode.missing_tokens" = "auth.json 缺少 tokens";
 "error.opencode.missing_refresh_token" = "auth.json 缺少 refresh_token";
+
+"claude.section.title" = "Claude Code API Key 配置";
+"claude.action.add_profile" = "添加配置";
+"claude.empty.title" = "暂无 Claude API Key 配置";
+"claude.empty.message" = "添加一个 API Key 配置，使用 Anthropic API Key 或第三方供应商来搭配 Claude Code 使用。";
+"claude.editor.title_new" = "新建 Claude API Key 配置";
+"claude.editor.title_edit" = "编辑 Claude API Key 配置";
+"claude.field.label" = "配置名称";
+"claude.field.api_key" = "API Key";
+"claude.field.base_url" = "Base URL";
+"claude.field.model" = "模型";
+"claude.notice.saved" = "Claude API Key 配置已保存";
+"claude.notice.deleted" = "Claude API Key 配置已删除";
+"claude.notice.switched" = "已切换 Claude Code API Key 配置";

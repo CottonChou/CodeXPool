@@ -7,6 +7,7 @@ import AppKit
 @MainActor
 final class AppContainer {
     let accountsModel: AccountsPageModel
+    let claudeModel: ClaudePageModel
     let settingsModel: SettingsPageModel
     let trayModel: TrayMenuModel
 
@@ -37,6 +38,7 @@ final class AppContainer {
                 authRepository: authRepository
             )
             let configTomlService = ConfigTomlService(paths: paths)
+            let claudeConfigService = ClaudeConfigService(paths: paths)
             let authBackupService = AuthBackupService(paths: paths)
 
             let settingsCoordinator = SettingsCoordinator(
@@ -65,6 +67,7 @@ final class AppContainer {
                 editorAppService: editorAppService,
                 opencodeAuthSyncService: opencodeSyncService,
                 configTomlService: configTomlService,
+                claudeConfigService: claudeConfigService,
                 authBackupService: authBackupService
             )
             let trayModel = TrayMenuModel(
@@ -108,6 +111,7 @@ final class AppContainer {
                 },
                 initialAccounts: initialAccounts
             )
+            let claudeModel = ClaudePageModel(coordinator: accountsCoordinator)
             let settingsModel = SettingsPageModel(
                 settingsCoordinator: settingsCoordinator,
                 editorAppService: editorAppService,
@@ -127,6 +131,7 @@ final class AppContainer {
                 accountsWidgetDisplayModeStore: accountsWidgetDisplayModeStore,
                 widgetUsageProgressDisplayMode: initialSettings.usageProgressDisplayMode,
                 accountsModel: accountsModel,
+                claudeModel: claudeModel,
                 settingsModel: settingsModel,
                 trayModel: trayModel
             )
@@ -145,6 +150,7 @@ final class AppContainer {
         accountsWidgetDisplayModeStore: AccountsWidgetDisplayModeStore,
         widgetUsageProgressDisplayMode: UsageProgressDisplayMode,
         accountsModel: AccountsPageModel,
+        claudeModel: ClaudePageModel,
         settingsModel: SettingsPageModel,
         trayModel: TrayMenuModel
     ) {
@@ -153,6 +159,7 @@ final class AppContainer {
         self.accountsWidgetDisplayModeStore = accountsWidgetDisplayModeStore
         self.widgetUsageProgressDisplayMode = widgetUsageProgressDisplayMode
         self.accountsModel = accountsModel
+        self.claudeModel = claudeModel
         self.settingsModel = settingsModel
         self.trayModel = trayModel
         accountsWidgetDisplayModeStore.save(rawValue: widgetUsageProgressDisplayMode.rawValue)

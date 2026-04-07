@@ -262,6 +262,12 @@
 		F802F802F802F802F802F802 /* CodexThreadRepairService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F800F800F800F800F800F800 /* CodexThreadRepairService.swift */; };
 		E705E705E705E705E705E705 /* ConfigTomlService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E704E704E704E704E704E704 /* ConfigTomlService.swift */; };
 		E706E706E706E706E706E706 /* ConfigTomlService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E704E704E704E704E704E704 /* ConfigTomlService.swift */; };
+		CC01CC01CC01CC01CC01CC01 /* ClaudeConfigService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00CC00CC00CC00CC00CC00 /* ClaudeConfigService.swift */; };
+		CC02CC02CC02CC02CC02CC02 /* ClaudeConfigService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00CC00CC00CC00CC00CC00 /* ClaudeConfigService.swift */; };
+		CC03CC03CC03CC03CC03CC03 /* ClaudePageModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC04CC04CC04CC04CC04CC04 /* ClaudePageModel.swift */; };
+		CC05CC05CC05CC05CC05CC05 /* ClaudePageModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC04CC04CC04CC04CC04CC04 /* ClaudePageModel.swift */; };
+		CC06CC06CC06CC06CC06CC06 /* ClaudePageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC07CC07CC07CC07CC07CC07 /* ClaudePageView.swift */; };
+		CC08CC08CC08CC08CC08CC08 /* ClaudePageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC07CC07CC07CC07CC07CC07 /* ClaudePageView.swift */; };
 		E708E708E708E708E708E708 /* APIKeyProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E707E707E707E707E707E707 /* APIKeyProfileTests.swift */; };
 		E710E710E710E710E710E710 /* WorkspaceMetadataServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E709E709E709E709E709E709 /* WorkspaceMetadataServiceTests.swift */; };
 /* End PBXBuildFile section */
@@ -502,6 +508,9 @@
 		E701E701E701E701E701E701 /* AuthBackupService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthBackupService.swift; sourceTree = "<group>"; };
 		F800F800F800F800F800F800 /* CodexThreadRepairService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexThreadRepairService.swift; sourceTree = "<group>"; };
 		E704E704E704E704E704E704 /* ConfigTomlService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigTomlService.swift; sourceTree = "<group>"; };
+		CC00CC00CC00CC00CC00CC00 /* ClaudeConfigService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeConfigService.swift; sourceTree = "<group>"; };
+		CC04CC04CC04CC04CC04CC04 /* ClaudePageModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudePageModel.swift; sourceTree = "<group>"; };
+		CC07CC07CC07CC07CC07CC07 /* ClaudePageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudePageView.swift; sourceTree = "<group>"; };
 		E707E707E707E707E707E707 /* APIKeyProfileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIKeyProfileTests.swift; sourceTree = "<group>"; };
 		E709E709E709E709E709E709 /* WorkspaceMetadataServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceMetadataServiceTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -567,6 +576,7 @@
 				71A09814A1367166B896F523 /* CloudKitCurrentAccountSelectionSyncService.swift */,
 				84C752A57468AA033ACB2ED9 /* CloudSyncAvailabilityService.swift */,
 				E704E704E704E704E704E704 /* ConfigTomlService.swift */,
+				CC00CC00CC00CC00CC00CC00 /* ClaudeConfigService.swift */,
 				03E5D59CB180CA82AFDB0F45 /* OpenAIChatGPTOAuthSupport.swift */,
 			);
 			path = Infrastructure;
@@ -692,6 +702,15 @@
 			path = Accounts;
 			sourceTree = "<group>";
 		};
+		CC09CC09CC09CC09CC09CC09 /* Claude */ = {
+			isa = PBXGroup;
+			children = (
+				CC04CC04CC04CC04CC04CC04 /* ClaudePageModel.swift */,
+				CC07CC07CC07CC07CC07CC07 /* ClaudePageView.swift */,
+			);
+			path = Claude;
+			sourceTree = "<group>";
+		};
 		5FD8EC0D7CFA39F354A2D9B6 /* Domain */ = {
 			isa = PBXGroup;
 			children = (
@@ -795,6 +814,7 @@
 			isa = PBXGroup;
 			children = (
 				5C54B5BE2BF9D7A86FF3D780 /* Accounts */,
+				CC09CC09CC09CC09CC09CC09 /* Claude */,
 				8495462C524B0C9B515D2F1A /* Proxy */,
 				596621B3395F4D9CF54DC584 /* Settings */,
 			);
@@ -1134,6 +1154,9 @@
 				A305A305A305A305A305A305 /* AccountsPageShells.swift in Sources */,
 				FCB8E6490AA6D2891320E69F /* AccountsPageView.swift in Sources */,
 				B716B716B716B716B716B716 /* APIKeyProfileViews.swift in Sources */,
+				CC01CC01CC01CC01CC01CC01 /* ClaudeConfigService.swift in Sources */,
+				CC03CC03CC03CC03CC03CC03 /* ClaudePageModel.swift in Sources */,
+				CC06CC06CC06CC06CC06CC06 /* ClaudePageView.swift in Sources */,
 				92D4545930140988AE210FB7 /* AppContainer.swift in Sources */,
 				D047CEC66C8024EB35E197E5 /* AppError.swift in Sources */,
 				ACC1397FF859F745A017E4F2 /* AppLocale.swift in Sources */,
@@ -1285,6 +1308,9 @@
 				A315A315A315A315A315A315 /* AccountsPageShells.swift in Sources */,
 				137936A0518C78C5549E919E /* AccountsPageView.swift in Sources */,
 				B717B717B717B717B717B717 /* APIKeyProfileViews.swift in Sources */,
+				CC02CC02CC02CC02CC02CC02 /* ClaudeConfigService.swift in Sources */,
+				CC05CC05CC05CC05CC05CC05 /* ClaudePageModel.swift in Sources */,
+				CC08CC08CC08CC08CC08CC08 /* ClaudePageView.swift in Sources */,
 				A39DE0252B7DE1B089DB14D1 /* AppContainer.swift in Sources */,
 				A7144A42D2FC21D789B3FB49 /* AppError.swift in Sources */,
 				93F291DBC9FD57E847EB6519 /* AppLocale.swift in Sources */,
