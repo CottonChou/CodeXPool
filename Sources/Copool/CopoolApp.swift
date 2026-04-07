@@ -21,16 +21,9 @@ struct CopoolApp: App {
         let container = AppContainer.liveOrCrash()
         self.container = container
         _trayModel = StateObject(wrappedValue: container.trayModel)
-        #if os(macOS)
-        appDelegate.proxyControlBridge = container.proxyControlBridge
-        #endif
         Task { @MainActor in
             container.trayModel.startBackgroundRefresh()
-            #if os(macOS)
-            await container.proxyControlBridge.start()
-            #endif
             await container.settingsModel.loadIfNeeded()
-            await container.proxyModel.bootstrapOnAppLaunch(using: container.settingsModel.settings)
         }
     }
 
@@ -82,7 +75,6 @@ struct CopoolApp: App {
             return configured
         }
 
-        // Keep aspect ratio while slightly enlarging to improve optical size.
         let fitScale = min(canvasSize.width / symbolSize.width, canvasSize.height / symbolSize.height) * 1.08
         let drawSize = NSSize(width: symbolSize.width * fitScale, height: symbolSize.height * fitScale)
         let drawRect = NSRect(
@@ -111,27 +103,9 @@ struct CopoolApp: App {
 #if os(macOS)
 @MainActor
 private final class CopoolAppDelegate: NSObject, NSApplicationDelegate {
-    var proxyControlBridge: ProxyControlBridge?
-
     func applicationDidFinishLaunching(_ notification: Notification) {
         _ = notification
         NSApplication.shared.registerForRemoteNotifications()
-    }
-
-    func applicationDidBecomeActive(_ notification: Notification) {
-        _ = notification
-        guard let proxyControlBridge else { return }
-        Task {
-            await proxyControlBridge.setAppActive(true)
-        }
-    }
-
-    func applicationDidResignActive(_ notification: Notification) {
-        _ = notification
-        guard let proxyControlBridge else { return }
-        Task {
-            await proxyControlBridge.setAppActive(false)
-        }
     }
 
     func application(_ application: NSApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
@@ -192,11 +166,6 @@ private func handleRemoteNotification(_ userInfo: [AnyHashable: Any]) -> Bool {
 
     if notification.subscriptionID == CloudKitAccountsSyncService.pushSubscriptionID {
         NotificationCenter.default.post(name: .copoolAccountsSnapshotPushDidArrive, object: nil)
-        return true
-    }
-
-    if notification.subscriptionID == CloudKitProxyControlSyncService.pushSubscriptionID {
-        NotificationCenter.default.post(name: .copoolProxyControlPushDidArrive, object: nil)
         return true
     }
 

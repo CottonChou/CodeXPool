@@ -4,12 +4,6 @@ import Combine
 extension Notification.Name {
     static let copoolAccountsSnapshotPushDidArrive = Notification.Name("copool.accounts-snapshot.push")
     static let copoolCurrentAccountSelectionPushDidArrive = Notification.Name("copool.current-account-selection.push")
-    static let copoolProxyControlPushDidArrive = Notification.Name("copool.proxy-control.push")
-    static let copoolLocalProxySnapshotDidUpdate = Notification.Name("copool.proxy.snapshot.local-update")
-}
-
-enum ProxyControlNotificationPayloadKey {
-    static let snapshot = "snapshot"
 }
 
 @MainActor
@@ -76,7 +70,6 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
     let settingsCoordinator: SettingsCoordinator
     let cloudSyncService: AccountsCloudSyncServiceProtocol?
     let currentAccountSelectionSyncService: CurrentAccountSelectionSyncServiceProtocol?
-    let remoteAccountsMutationSyncService: RemoteAccountsMutationSyncServiceProtocol?
     let backgroundRefreshPolicy: BackgroundRefreshPolicy
     let dateProvider: DateProviding
     let snapshotFreshnessPolicy: AccountsSnapshotFreshnessPolicy
@@ -104,7 +97,6 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
         settingsCoordinator: SettingsCoordinator,
         cloudSyncService: AccountsCloudSyncServiceProtocol?,
         currentAccountSelectionSyncService: CurrentAccountSelectionSyncServiceProtocol?,
-        remoteAccountsMutationSyncService: RemoteAccountsMutationSyncServiceProtocol? = nil,
         backgroundRefreshPolicy: BackgroundRefreshPolicy,
         dateProvider: DateProviding = SystemDateProvider(),
         snapshotFreshnessPolicy: AccountsSnapshotFreshnessPolicy = AccountsSnapshotFreshnessPolicy(),
@@ -115,7 +107,6 @@ final class TrayMenuModel: ObservableObject, AccountsManualRefreshServiceProtoco
         self.settingsCoordinator = settingsCoordinator
         self.cloudSyncService = cloudSyncService
         self.currentAccountSelectionSyncService = currentAccountSelectionSyncService
-        self.remoteAccountsMutationSyncService = remoteAccountsMutationSyncService
         self.backgroundRefreshPolicy = backgroundRefreshPolicy
         self.dateProvider = dateProvider
         self.snapshotFreshnessPolicy = snapshotFreshnessPolicy

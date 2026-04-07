@@ -42,12 +42,8 @@ final class SettingsControlPresentationTests: XCTestCase {
             launchCodexAfterSwitch: true,
             autoSmartSwitch: true,
             syncOpencodeOpenaiAuth: true,
-            localProxyHostAPIOnly: true,
             restartEditorsOnSwitch: true,
             restartEditorTargets: [.vscode],
-            autoStartApiProxy: false,
-            proxyConfiguration: .defaultValue,
-            remoteServers: [],
             usageProgressDisplayMode: .used,
             locale: AppLocale.english.identifier
         )
@@ -72,12 +68,8 @@ final class SettingsControlPresentationTests: XCTestCase {
             launchCodexAfterSwitch: true,
             autoSmartSwitch: false,
             syncOpencodeOpenaiAuth: false,
-            localProxyHostAPIOnly: false,
             restartEditorsOnSwitch: false,
             restartEditorTargets: [],
-            autoStartApiProxy: false,
-            proxyConfiguration: .defaultValue,
-            remoteServers: [],
             usageProgressDisplayMode: .used,
             locale: "zh_CN"
         )

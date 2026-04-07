@@ -90,6 +90,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
 
@@ -141,6 +143,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
 
@@ -194,6 +198,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
 
@@ -249,6 +255,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
 
@@ -281,6 +289,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
 
@@ -330,6 +340,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
 
@@ -374,6 +386,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
 
@@ -425,6 +439,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
 
@@ -482,6 +498,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
 
@@ -523,6 +541,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now),
             runtimePlatform: .iOS
         )
@@ -570,6 +590,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
 
@@ -613,6 +635,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
 
@@ -670,6 +694,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
 
@@ -721,6 +747,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
 
@@ -758,6 +786,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             runtimePlatform: .iOS
         )
 
@@ -816,6 +846,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
 
@@ -869,6 +901,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
 
@@ -962,6 +996,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
 
@@ -1018,8 +1054,6 @@ final class AccountsCoordinatorTests: XCTestCase {
                 syncOpencodeOpenaiAuth: false,
                 restartEditorsOnSwitch: true,
                 restartEditorTargets: [.cursor],
-                autoStartApiProxy: false,
-                remoteServers: [],
                 locale: AppLocale.english.identifier
             )),
             authRepository: authRepository,
@@ -1036,6 +1070,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: codexService,
             editorAppService: editorService,
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now),
             runtimePlatform: .iOS
         )
@@ -1080,7 +1116,9 @@ final class AccountsCoordinatorTests: XCTestCase {
             chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
-            opencodeAuthSyncService: StubOpencodeAuthSyncService()
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService()
         )
         let model = AccountsPageModel(
             coordinator: coordinator,
@@ -1110,7 +1148,9 @@ final class AccountsCoordinatorTests: XCTestCase {
             chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
-            opencodeAuthSyncService: StubOpencodeAuthSyncService()
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService()
         )
         let model = AccountsPageModel(
             coordinator: coordinator,
@@ -1372,7 +1412,9 @@ final class AccountsCoordinatorTests: XCTestCase {
             chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
-            opencodeAuthSyncService: StubOpencodeAuthSyncService()
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService()
         )
         let model = AccountsPageModel(
             coordinator: coordinator,
@@ -1503,7 +1545,9 @@ final class AccountsCoordinatorTests: XCTestCase {
             chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
-            opencodeAuthSyncService: StubOpencodeAuthSyncService()
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService()
         )
 
         let started = expectation(description: "manual refresh started")
@@ -1555,7 +1599,9 @@ final class AccountsCoordinatorTests: XCTestCase {
             chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
-            opencodeAuthSyncService: StubOpencodeAuthSyncService()
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService()
         )
         let gate = ManualRefreshGate()
         let callCounter = ManualRefreshCallCounter()
@@ -1615,7 +1661,9 @@ final class AccountsCoordinatorTests: XCTestCase {
             chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
-            opencodeAuthSyncService: StubOpencodeAuthSyncService()
+            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService()
         )
         let syncSpy = SpyAccountsLocalMutationSyncService()
         let model = AccountsPageModel(
@@ -1667,6 +1715,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let syncSpy = SpyAccountsLocalMutationSyncService()
@@ -1710,6 +1760,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             runtimePlatform: .iOS
         )
         let model = AccountsPageModel(
@@ -1722,34 +1774,6 @@ final class AccountsCoordinatorTests: XCTestCase {
         let requestedAccountIDs = await usageService.readRequestedAccountIDs()
         XCTAssertEqual(requestedAccountIDs, [])
         XCTAssertEqual(model.notice?.text, PlatformCapabilities.unsupportedOperationMessage)
-    }
-
-    @MainActor
-    func testAccountsPageModelRefreshUsageOnIOSEnqueuesRemoteRefreshCommand() async throws {
-        let cloudSyncService = RecordingProxyControlCloudSyncService()
-        let coordinator = AccountsCoordinator(
-            storeRepository: InMemoryAccountsStoreRepository(store: AccountsStore()),
-            settingsRepository: TestSettingsRepository(),
-            authRepository: StubAuthRepository(),
-            usageService: RecordingAccountUsageService(results: [:]),
-            chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
-            codexCLIService: StubCodexCLIService(),
-            editorAppService: StubEditorAppService(),
-            opencodeAuthSyncService: StubOpencodeAuthSyncService(),
-            runtimePlatform: .iOS
-        )
-        let model = AccountsPageModel(
-            coordinator: coordinator,
-            proxyControlCloudSyncService: cloudSyncService,
-            runtimePlatform: .iOS
-        )
-
-        await model.refreshUsage()
-
-        let commands = await cloudSyncService.readEnqueuedCommands()
-        XCTAssertEqual(commands.count, 1)
-        XCTAssertEqual(commands.first?.kind, .refreshAccounts)
-        XCTAssertEqual(model.notice?.text, L10n.tr("accounts.notice.remote_refresh_requested"))
     }
 
     @MainActor
@@ -1777,6 +1801,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             runtimePlatform: .iOS
         )
         let model = AccountsPageModel(
@@ -1832,6 +1858,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let model = AccountsPageModel(coordinator: coordinator)
@@ -1872,6 +1900,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let model = AccountsPageModel(coordinator: coordinator)
@@ -1903,6 +1933,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: 1)
         )
         let model = AccountsPageModel(coordinator: coordinator)
@@ -1977,6 +2009,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let model = AccountsPageModel(coordinator: coordinator)
@@ -2050,6 +2084,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let model = AccountsPageModel(
@@ -2148,6 +2184,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let model = AccountsPageModel(coordinator: coordinator)
@@ -2225,6 +2263,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let model = AccountsPageModel(coordinator: coordinator)
@@ -2287,6 +2327,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let model = AccountsPageModel(coordinator: coordinator)
@@ -2323,6 +2365,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let model = AccountsPageModel(coordinator: coordinator)
@@ -2421,6 +2465,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let model = AccountsPageModel(coordinator: coordinator)
@@ -2523,6 +2569,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let model = AccountsPageModel(coordinator: coordinator)
@@ -2588,6 +2636,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let model = AccountsPageModel(coordinator: coordinator)
@@ -2693,6 +2743,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let model = AccountsPageModel(coordinator: coordinator)
@@ -2762,6 +2814,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let model = AccountsPageModel(coordinator: coordinator)
@@ -2831,6 +2885,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let model = AccountsPageModel(coordinator: coordinator)
@@ -2891,6 +2947,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let model = AccountsPageModel(coordinator: coordinator)
@@ -3015,6 +3073,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let model = AccountsPageModel(coordinator: coordinator)
@@ -3107,6 +3167,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let model = AccountsPageModel(coordinator: coordinator)
@@ -3180,6 +3242,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let model = AccountsPageModel(coordinator: coordinator)
@@ -3289,6 +3353,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let model = AccountsPageModel(coordinator: coordinator)
@@ -3383,6 +3449,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
 
@@ -3459,6 +3527,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
 
@@ -3527,6 +3597,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
 
@@ -3601,6 +3673,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
 
@@ -3687,6 +3761,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
 
@@ -3772,6 +3848,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
 
@@ -3844,6 +3922,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
 
@@ -3893,6 +3973,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
 
@@ -3957,6 +4039,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
 
@@ -4018,6 +4102,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let model = AccountsPageModel(coordinator: coordinator)
@@ -4103,6 +4189,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let model = AccountsPageModel(coordinator: coordinator)
@@ -4194,6 +4282,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let model = AccountsPageModel(coordinator: coordinator)
@@ -4229,6 +4319,8 @@ final class AccountsCoordinatorTests: XCTestCase {
                 codexCLIService: StubCodexCLIService(),
                 editorAppService: StubEditorAppService(),
                 opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+                configTomlService: StubConfigTomlService(),
+                authBackupService: StubAuthBackupService(),
                 dateProvider: FixedDateProvider(now: 1)
             ),
             initialAccounts: [account]
@@ -4261,6 +4353,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let cloudSyncService = SpyAccountsCloudSyncService(pullResult: .noChange)
@@ -4310,6 +4404,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let cloudSyncService = SpyAccountsCloudSyncService(pullResult: .noChange)
@@ -4369,6 +4465,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let cloudSyncService = SpyAccountsCloudSyncService(
@@ -4452,6 +4550,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let trayModel = TrayMenuModel(
@@ -4509,6 +4609,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let cloudSyncService = SpyAccountsCloudSyncService(pullResult: .noChange)
@@ -4578,6 +4680,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let trayModel = TrayMenuModel(
@@ -4651,6 +4755,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let trayModel = TrayMenuModel(
@@ -4708,6 +4814,8 @@ final class AccountsCoordinatorTests: XCTestCase {
             codexCLIService: StubCodexCLIService(),
             editorAppService: StubEditorAppService(),
             opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: FixedDateProvider(now: now)
         )
         let initialAccounts = try await coordinator.listAccounts()
@@ -4807,7 +4915,9 @@ private func makeAccountsPageModelForViewStoreTests(
         chatGPTOAuthLoginService: StubChatGPTOAuthLoginService(),
         codexCLIService: StubCodexCLIService(),
         editorAppService: StubEditorAppService(),
-        opencodeAuthSyncService: StubOpencodeAuthSyncService()
+        opencodeAuthSyncService: StubOpencodeAuthSyncService(),
+        configTomlService: StubConfigTomlService(),
+        authBackupService: StubAuthBackupService()
     )
 
     return AccountsPageModel(
@@ -5224,32 +5334,6 @@ private actor SpyRemoteAccountsMutationSyncService: RemoteAccountsMutationSyncSe
 
     func readCallCount() -> Int {
         callCount
-    }
-}
-
-private actor RecordingProxyControlCloudSyncService: ProxyControlCloudSyncServiceProtocol {
-    private var enqueuedCommands: [ProxyControlCommand] = []
-
-    func pushLocalSnapshot(_ snapshot: ProxyControlSnapshot) async throws {
-        _ = snapshot
-    }
-
-    func pullRemoteSnapshot() async throws -> ProxyControlSnapshot? {
-        nil
-    }
-
-    func enqueueCommand(_ command: ProxyControlCommand) async throws {
-        enqueuedCommands.append(command)
-    }
-
-    func pullPendingCommand() async throws -> ProxyControlCommand? {
-        nil
-    }
-
-    func ensurePushSubscriptionIfNeeded() async throws {}
-
-    func readEnqueuedCommands() -> [ProxyControlCommand] {
-        enqueuedCommands
     }
 }
 
@@ -5865,6 +5949,16 @@ private final class StubOpencodeAuthSyncService: OpencodeAuthSyncServiceProtocol
     func syncFromCodexAuth(_ authJSON: JSONValue) throws {
         _ = authJSON
     }
+}
+
+private final class StubConfigTomlService: ConfigTomlServiceProtocol, @unchecked Sendable {
+    func readModelProvider() -> String? { nil }
+    func writeForAPIKeyMode(profile: APIKeyProfile) throws {}
+    func writeForChatGPTMode() throws {}
+}
+
+private final class StubAuthBackupService: AuthBackupServiceProtocol, @unchecked Sendable {
+    func backupCurrentAuthFiles() throws {}
 }
 
 private actor SpyAccountsCloudSyncService: AccountsCloudSyncServiceProtocol {

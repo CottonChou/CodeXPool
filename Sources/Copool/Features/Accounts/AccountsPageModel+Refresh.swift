@@ -2,10 +2,6 @@ import Foundation
 
 extension AccountsPageModel {
     func refreshUsage() async {
-        if runtimePlatform == .iOS {
-            await requestRemoteAccountsRefresh()
-            return
-        }
         guard !isRefreshing else { return }
         isManualRefreshing = true
         defer { isManualRefreshing = false }
@@ -68,40 +64,6 @@ extension AccountsPageModel {
             applyAccounts(accounts)
             await refreshPendingWorkspaceAuthorizations(from: accounts)
             publishAndSyncLocalAccountsMutation(accounts)
-        } catch {
-            notice = NoticeMessage(style: .error, text: error.localizedDescription)
-        }
-    }
-
-    private func requestRemoteAccountsRefresh() async {
-        guard let proxyControlCloudSyncService else {
-            notice = NoticeMessage(style: .error, text: PlatformCapabilities.unsupportedOperationMessage)
-            return
-        }
-        guard !isRefreshing else { return }
-
-        isManualRefreshing = true
-        defer { isManualRefreshing = false }
-
-        let command = ProxyControlCommand(
-            id: UUID().uuidString,
-            createdAt: Int64(Date().timeIntervalSince1970 * 1_000),
-            sourceDeviceID: "ios-accounts",
-            kind: .refreshAccounts,
-            preferredProxyPort: nil,
-            autoStartProxy: nil,
-            cloudflaredInput: nil,
-            remoteServer: nil,
-            remoteServerID: nil,
-            logLines: nil
-        )
-
-        do {
-            try await proxyControlCloudSyncService.enqueueCommand(command)
-            notice = NoticeMessage(
-                style: .info,
-                text: L10n.tr("accounts.notice.remote_refresh_requested")
-            )
         } catch {
             notice = NoticeMessage(style: .error, text: error.localizedDescription)
         }

@@ -180,6 +180,8 @@ final class AccountsIdentityRegressionTests: XCTestCase {
             codexCLIService: IdentityRegressionCodexCLIService(),
             editorAppService: IdentityRegressionEditorAppService(),
             opencodeAuthSyncService: IdentityRegressionOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: IdentityRegressionDateProvider()
         )
     }
@@ -290,4 +292,14 @@ private struct IdentityRegressionEditorAppService: EditorAppServiceProtocol {
 
 private struct IdentityRegressionOpencodeAuthSyncService: OpencodeAuthSyncServiceProtocol {
     func syncFromCodexAuth(_ authJSON: JSONValue) throws {}
+}
+
+private final class StubConfigTomlService: ConfigTomlServiceProtocol, @unchecked Sendable {
+    func readModelProvider() -> String? { nil }
+    func writeForAPIKeyMode(profile: APIKeyProfile) throws {}
+    func writeForChatGPTMode() throws {}
+}
+
+private final class StubAuthBackupService: AuthBackupServiceProtocol, @unchecked Sendable {
+    func backupCurrentAuthFiles() throws {}
 }

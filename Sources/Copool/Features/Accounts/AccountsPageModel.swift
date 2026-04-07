@@ -6,7 +6,6 @@ final class AccountsPageModel: ObservableObject {
     let coordinator: AccountsCoordinator
     let settingsCoordinator: SettingsCoordinator?
     let manualRefreshService: AccountsManualRefreshServiceProtocol?
-    let proxyControlCloudSyncService: ProxyControlCloudSyncServiceProtocol?
     let localAccountsMutationSyncService: AccountsLocalMutationSyncServiceProtocol?
     let currentAccountSelectionSyncService: CurrentAccountSelectionSyncServiceProtocol?
     let cloudSyncAvailabilityService: CloudSyncAvailabilityService?
@@ -45,11 +44,16 @@ final class AccountsPageModel: ObservableObject {
     @Published var pendingWorkspaceAuthorizationError: String?
     @Published var authorizingWorkspaceID: String?
 
+    @Published var activeAuthMode: ActiveAuthMode = .chatgpt
+    @Published var apiKeyProfiles: [APIKeyProfile] = []
+    @Published var switchingAPIKeyProfileID: String?
+    @Published var isEditingAPIKeyProfile = false
+    @Published var editingAPIKeyProfile: APIKeyProfile?
+
     init(
         coordinator: AccountsCoordinator,
         settingsCoordinator: SettingsCoordinator? = nil,
         manualRefreshService: AccountsManualRefreshServiceProtocol? = nil,
-        proxyControlCloudSyncService: ProxyControlCloudSyncServiceProtocol? = nil,
         localAccountsMutationSyncService: AccountsLocalMutationSyncServiceProtocol? = nil,
         currentAccountSelectionSyncService: CurrentAccountSelectionSyncServiceProtocol? = nil,
         cloudSyncAvailabilityService: CloudSyncAvailabilityService? = nil,
@@ -63,7 +67,6 @@ final class AccountsPageModel: ObservableObject {
         self.coordinator = coordinator
         self.settingsCoordinator = settingsCoordinator
         self.manualRefreshService = manualRefreshService
-        self.proxyControlCloudSyncService = proxyControlCloudSyncService
         self.localAccountsMutationSyncService = localAccountsMutationSyncService
         self.currentAccountSelectionSyncService = currentAccountSelectionSyncService
         self.cloudSyncAvailabilityService = cloudSyncAvailabilityService
@@ -81,12 +84,7 @@ final class AccountsPageModel: ObservableObject {
     }
 
     var canRefreshUsageAction: Bool {
-        switch runtimePlatform {
-        case .macOS:
-            return !isAdding
-        case .iOS:
-            return proxyControlCloudSyncService != nil && !isAdding
-        }
+        !isAdding
     }
 
     var areAllAccountsCollapsed: Bool {
@@ -188,6 +186,95 @@ final class AccountsPageModel: ObservableObject {
             await refreshUsage()
         case .toggleCollapse:
             toggleAllAccountsCollapsed()
+        }
+    }
+
+    // MARK: - Auth Mode
+
+    func loadAPIKeyProfiles() async {
+        do {
+            let mode = try await coordinator.activeAuthMode()
+            let profiles = try await coordinator.listAPIKeyProfiles()
+            activeAuthMode = mode
+            apiKeyProfiles = profiles
+        } catch {
+            notice = NoticeMessage(style: .error, text: error.localizedDescription)
+        }
+    }
+
+    func setActiveAuthMode(_ mode: ActiveAuthMode) {
+        activeAuthMode = mode
+    }
+
+    // MARK: - API Key Profile CRUD
+
+    func beginAddAPIKeyProfile() {
+        editingAPIKeyProfile = nil
+        isEditingAPIKeyProfile = true
+    }
+
+    func beginEditAPIKeyProfile(_ profile: APIKeyProfile) {
+        editingAPIKeyProfile = profile
+        isEditingAPIKeyProfile = true
+    }
+
+    func saveAPIKeyProfile(_ profile: APIKeyProfile) async {
+        do {
+            if editingAPIKeyProfile != nil {
+                _ = try await coordinator.updateAPIKeyProfile(profile)
+            } else {
+                _ = try await coordinator.addAPIKeyProfile(profile)
+            }
+            isEditingAPIKeyProfile = false
+            editingAPIKeyProfile = nil
+            await loadAPIKeyProfiles()
+            notice = NoticeMessage(style: .success, text: L10n.tr("apikey.notice.saved"))
+        } catch {
+            notice = NoticeMessage(style: .error, text: error.localizedDescription)
+        }
+    }
+
+    func deleteAPIKeyProfile(id: String) async {
+        do {
+            try await coordinator.deleteAPIKeyProfile(id: id)
+            await loadAPIKeyProfiles()
+            notice = NoticeMessage(style: .success, text: L10n.tr("apikey.notice.deleted"))
+        } catch {
+            notice = NoticeMessage(style: .error, text: error.localizedDescription)
+        }
+    }
+
+    func switchToAPIKeyProfile(id: String) async {
+        switchingAPIKeyProfileID = id
+        do {
+            let result = try await coordinator.switchToAPIKeyProfile(id: id)
+            await loadAPIKeyProfiles()
+            let message = result.usedFallbackCLI
+                ? L10n.tr("apikey.notice.switched_fallback")
+                : L10n.tr("apikey.notice.switched")
+            notice = NoticeMessage(style: .success, text: message)
+        } catch {
+            notice = NoticeMessage(style: .error, text: error.localizedDescription)
+        }
+        switchingAPIKeyProfileID = nil
+    }
+
+    func switchToChatGPTAccount(id: String) async {
+        switchingAccountID = id
+        defer { switchingAccountID = nil }
+
+        do {
+            let result = try await coordinator.switchToChatGPTAccount(id: id)
+            await loadAPIKeyProfiles()
+            let accounts = try await coordinator.listAccounts()
+            applyAccounts(accounts)
+            publishAndSyncLocalAccountsMutation(accounts)
+            if let selectedAccount = accounts.first(where: { $0.id == id }) {
+                syncCurrentAccountSelectionInBackground(accountID: selectedAccount.accountID)
+            }
+            notice = buildSwitchNotice(execution: result)
+        } catch {
+            notice = NoticeMessage(style: .error, text: error.localizedDescription)
         }
     }
 }

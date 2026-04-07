@@ -36,6 +36,8 @@ final class SettingsPageModelTests: XCTestCase {
             codexCLIService: SettingsStubCodexCLIService(),
             editorAppService: SettingsStubEditorAppService(),
             opencodeAuthSyncService: SettingsStubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: SettingsFixedDateProvider(now: 1)
         )
         let model = AccountsPageModel(
@@ -74,6 +76,8 @@ final class SettingsPageModelTests: XCTestCase {
             codexCLIService: SettingsStubCodexCLIService(),
             editorAppService: SettingsStubEditorAppService(),
             opencodeAuthSyncService: SettingsStubOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: SettingsFixedDateProvider(now: 1)
         )
         var callbackMode: UsageProgressDisplayMode?
@@ -204,4 +208,14 @@ private struct SettingsFixedDateProvider: DateProviding {
     func unixSecondsNow() -> Int64 {
         now
     }
+}
+
+private final class StubConfigTomlService: ConfigTomlServiceProtocol, @unchecked Sendable {
+    func readModelProvider() -> String? { nil }
+    func writeForAPIKeyMode(profile: APIKeyProfile) throws {}
+    func writeForChatGPTMode() throws {}
+}
+
+private final class StubAuthBackupService: AuthBackupServiceProtocol, @unchecked Sendable {
+    func backupCurrentAuthFiles() throws {}
 }

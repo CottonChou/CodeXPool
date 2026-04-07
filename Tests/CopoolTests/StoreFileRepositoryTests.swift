@@ -247,8 +247,6 @@ final class StoreFileRepositoryTests: XCTestCase {
             syncOpencodeOpenaiAuth: true,
             restartEditorsOnSwitch: true,
             restartEditorTargets: [.cursor],
-            autoStartApiProxy: true,
-            remoteServers: [],
             locale: AppLocale.english.identifier
         )
         let account = StoredAccount(

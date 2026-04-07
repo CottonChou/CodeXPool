@@ -58,38 +58,15 @@ extension AuthRepository {
     }
 }
 
-protocol ProxyRuntimeService: Sendable {
-    func status() async -> ApiProxyStatus
-    func start(preferredPort: Int?) async throws -> ApiProxyStatus
-    func stop() async -> ApiProxyStatus
-    func refreshAPIKey() async throws -> ApiProxyStatus
-    func syncAccountsStore() async throws
-}
-
-protocol CloudflaredServiceProtocol: Sendable {
-    func status() async -> CloudflaredStatus
-    func install() async throws -> CloudflaredStatus
-    func start(_ input: StartCloudflaredTunnelInput) async throws -> CloudflaredStatus
-    func stop() async -> CloudflaredStatus
-}
-
-protocol RemoteProxyServiceProtocol: Sendable {
-    func status(server: RemoteServerConfig) async -> RemoteProxyStatus
-    func discover(server: RemoteServerConfig) async throws -> [DiscoveredRemoteProxyInstance]
-    func deploy(server: RemoteServerConfig) async throws -> RemoteProxyStatus
-    func syncAccounts(server: RemoteServerConfig) async throws -> RemoteProxyStatus
-    func start(server: RemoteServerConfig) async throws -> RemoteProxyStatus
-    func stop(server: RemoteServerConfig) async throws -> RemoteProxyStatus
-    func readLogs(server: RemoteServerConfig, lines: Int) async throws -> String
-    func uninstall(server: RemoteServerConfig, removeRemoteDirectory: Bool) async throws -> RemoteProxyStatus
-}
-
-protocol RemoteAccountsMutationSyncServiceProtocol: Sendable {
-    func syncConfiguredRemoteAccounts() async -> RemoteAccountsMutationSyncReport
-}
-
 protocol CodexCLIServiceProtocol: Sendable {
     func launchApp(workspacePath: String?) throws -> Bool
+    func launchApp(workspacePath: String?, environment: [String: String]) throws -> Bool
+}
+
+extension CodexCLIServiceProtocol {
+    func launchApp(workspacePath: String?, environment: [String: String]) throws -> Bool {
+        try launchApp(workspacePath: workspacePath)
+    }
 }
 
 protocol ChatGPTOAuthLoginServiceProtocol: Sendable {
@@ -127,16 +104,14 @@ protocol AccountsCloudSyncServiceProtocol: Sendable {
     func ensurePushSubscriptionIfNeeded() async throws
 }
 
-protocol ProxyControlCloudSyncServiceProtocol: Sendable {
-    func pushLocalSnapshot(_ snapshot: ProxyControlSnapshot) async throws
-    func pullRemoteSnapshot() async throws -> ProxyControlSnapshot?
-    func enqueueCommand(_ command: ProxyControlCommand) async throws
-    func pullPendingCommand() async throws -> ProxyControlCommand?
-    func ensurePushSubscriptionIfNeeded() async throws
+protocol ConfigTomlServiceProtocol: Sendable {
+    func readModelProvider() -> String?
+    func writeForAPIKeyMode(profile: APIKeyProfile) throws
+    func writeForChatGPTMode() throws
 }
 
-protocol ProxyLocalCommandServiceProtocol: Sendable {
-    func performLocalCommand(_ command: ProxyControlCommand) async throws -> ProxyControlSnapshot
+protocol AuthBackupServiceProtocol: Sendable {
+    func backupCurrentAuthFiles() throws
 }
 
 protocol CurrentAccountSelectionSyncServiceProtocol: Sendable {

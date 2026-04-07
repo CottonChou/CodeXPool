@@ -26,6 +26,7 @@ struct AccountCardViewState: Equatable, Identifiable {
     let isRefreshEnabled: Bool
     let isUsageRefreshActive: Bool
     let usageProgressDisplayMode: UsageProgressDisplayMode
+    let isEffectivelyCurrent: Bool
 
     var id: String {
         account.id
@@ -39,6 +40,7 @@ struct AccountCardViewState: Equatable, Identifiable {
             && lhs.isRefreshEnabled == rhs.isRefreshEnabled
             && lhs.isUsageRefreshActive == rhs.isUsageRefreshActive
             && lhs.usageProgressDisplayMode == rhs.usageProgressDisplayMode
+            && lhs.isEffectivelyCurrent == rhs.isEffectivelyCurrent
             && lhs.account.id == rhs.account.id
             && lhs.account.label == rhs.account.label
             && lhs.account.email == rhs.account.email
@@ -109,6 +111,7 @@ extension AccountsPageModel {
         locale: Locale = .autoupdatingCurrent
     ) -> AccountCardViewState {
         let isCollapsed = isAccountCollapsed(account.id)
+        let effectivelyCurrent = account.isCurrent && activeAuthMode == .chatgpt
         return AccountCardViewState(
             account: account,
             presentation: AccountCardPresentation(
@@ -123,7 +126,8 @@ extension AccountsPageModel {
             showsRefreshButton: runtimePlatform == .macOS,
             isRefreshEnabled: canRefreshAccount(account.id),
             isUsageRefreshActive: isUsageRefreshActive(forAccountID: account.id),
-            usageProgressDisplayMode: usageProgressDisplayMode
+            usageProgressDisplayMode: usageProgressDisplayMode,
+            isEffectivelyCurrent: effectivelyCurrent
         )
     }
 

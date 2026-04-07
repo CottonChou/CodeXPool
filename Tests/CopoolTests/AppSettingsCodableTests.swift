@@ -2,17 +2,23 @@ import XCTest
 @testable import Copool
 
 final class AppSettingsCodableTests: XCTestCase {
-    func testDecodeSettingsRequiresFullCurrentShape() throws {
+    func testDecodeSettingsWithMinimalFieldsSucceeds() throws {
         let json = """
         {
           "launchAtStartup": true,
           "launchCodexAfterSwitch": true,
           "autoSmartSwitch": false,
-          "syncOpencodeOpenaiAuth": false
+          "syncOpencodeOpenaiAuth": false,
+          "restartEditorsOnSwitch": false,
+          "restartEditorTargets": [],
+          "locale": "en"
         }
         """
 
-        XCTAssertThrowsError(try JSONDecoder().decode(AppSettings.self, from: Data(json.utf8)))
+        let settings = try JSONDecoder().decode(AppSettings.self, from: Data(json.utf8))
+
+        XCTAssertEqual(settings.launchAtStartup, true)
+        XCTAssertEqual(settings.usageProgressDisplayMode, .used)
     }
 
     func testDecodeSettingsWithoutUsageProgressDisplayModeDefaultsToUsed() throws {
@@ -22,10 +28,29 @@ final class AppSettingsCodableTests: XCTestCase {
           "launchCodexAfterSwitch": true,
           "autoSmartSwitch": false,
           "syncOpencodeOpenaiAuth": false,
-          "localProxyHostAPIOnly": false,
           "restartEditorsOnSwitch": false,
           "restartEditorTargets": [],
-          "autoStartApiProxy": false,
+          "locale": "en"
+        }
+        """
+
+        let settings = try JSONDecoder().decode(AppSettings.self, from: Data(json.utf8))
+
+        XCTAssertEqual(settings.usageProgressDisplayMode, .used)
+    }
+
+    func testDecodeSettingsWithLegacyProxyFieldsIgnoredGracefully() throws {
+        let json = """
+        {
+          "launchAtStartup": false,
+          "launchCodexAfterSwitch": true,
+          "autoSmartSwitch": false,
+          "syncOpencodeOpenaiAuth": false,
+          "restartEditorsOnSwitch": false,
+          "restartEditorTargets": [],
+          "locale": "en",
+          "autoStartApiProxy": true,
+          "localProxyHostAPIOnly": false,
           "proxyConfiguration": {
             "preferredPortText": "4141",
             "cloudflared": {
@@ -35,13 +60,11 @@ final class AppSettingsCodableTests: XCTestCase {
               "namedHostname": ""
             }
           },
-          "remoteServers": [],
-          "locale": "en"
+          "remoteServers": []
         }
         """
 
         let settings = try JSONDecoder().decode(AppSettings.self, from: Data(json.utf8))
-
-        XCTAssertEqual(settings.usageProgressDisplayMode, .used)
+        XCTAssertEqual(settings.launchAtStartup, false)
     }
 }

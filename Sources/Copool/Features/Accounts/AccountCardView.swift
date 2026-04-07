@@ -22,13 +22,13 @@ struct AccountCardView: View {
     }
 
     private var palette: AccountCardPalette {
-        AccountCardPalette(accent: card.presentation.accent, isCurrent: card.account.isCurrent)
+        AccountCardPalette(accent: card.presentation.accent, isCurrent: card.isEffectivelyCurrent)
     }
 
     private var interactionPresentation: AccountCardInteractionPresentation {
         AccountCardInteractionPresentation(
             isCollapsed: card.isCollapsed,
-            isCurrent: card.account.isCurrent,
+            isCurrent: card.isEffectivelyCurrent,
             switching: card.switching,
             isHoveringCollapsedSwitch: isHoveringCollapsedSwitch,
             isCollapsedSwitchOverlayPresented: isCollapsedSwitchOverlayPresented,
@@ -67,7 +67,7 @@ struct AccountCardView: View {
                     dismissCollapsedSwitchOverlay()
                 }
             }
-            .onChange(of: card.account.isCurrent) { _, isCurrent in
+            .onChange(of: card.isEffectivelyCurrent) { _, isCurrent in
                 if isCurrent {
                     dismissCollapsedSwitchOverlay()
                 }
@@ -86,7 +86,7 @@ struct AccountCardView: View {
                         accountName: presentation.displayAccountName,
                         accentColor: palette.toneColor,
                         titleFont: .headline,
-                        titleColor: card.account.isCurrent ? palette.toneColor : .primary,
+                        titleColor: card.isEffectivelyCurrent ? palette.toneColor : .primary,
                         spacing: 8
                     )
                     AccountCardCompactUsageSection(presentation: presentation)
@@ -96,14 +96,14 @@ struct AccountCardView: View {
                     AccountCardHeaderSection(
                         presentation: presentation,
                         isCollapsed: card.isCollapsed,
-                        isCurrent: card.account.isCurrent,
+                        isCurrent: card.isEffectivelyCurrent,
                         palette: palette,
                         onDelete: onDelete
                     )
 
                     Text(presentation.displayAccountName)
                         .font(.headline)
-                        .foregroundStyle(card.account.isCurrent ? palette.toneColor : .primary)
+                        .foregroundStyle(card.isEffectivelyCurrent ? palette.toneColor : .primary)
                         .lineLimit(1)
                         .truncationMode(.tail)
 
@@ -120,7 +120,7 @@ struct AccountCardView: View {
         .overlay(alignment: .bottomTrailing) {
             AccountCardBottomOverlay(
                 isCollapsed: card.isCollapsed,
-                isCurrent: card.account.isCurrent,
+                isCurrent: card.isEffectivelyCurrent,
                 switching: card.switching,
                 refreshing: card.refreshing,
                 showsRefreshButton: card.showsRefreshButton,
@@ -132,7 +132,7 @@ struct AccountCardView: View {
             )
         }
         .animation(AccountCardMorphRules.animation, value: card.isCollapsed)
-        .animation(AccountCardMorphRules.animation, value: card.account.isCurrent)
+        .animation(AccountCardMorphRules.animation, value: card.isEffectivelyCurrent)
         .overlay {
             AccountCollapsedSwitchOverlay(
                 isVisible: interactionPresentation.isCollapsedSwitchOverlayVisible,

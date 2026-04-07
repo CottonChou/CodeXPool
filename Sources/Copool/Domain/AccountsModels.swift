@@ -147,24 +147,36 @@ struct AccountsStore: Codable, Equatable {
     var accounts: [StoredAccount] = []
     var workspaceDirectory: [WorkspaceDirectoryEntry] = []
     var currentSelection: CurrentAccountSelection?
+    var apiKeyProfiles: [APIKeyProfile] = []
+    var activeAuthMode: ActiveAuthMode = .chatgpt
+    var currentAPIKeySelection: APIKeySelection?
 
     enum CodingKeys: String, CodingKey {
         case version
         case accounts
         case workspaceDirectory
         case currentSelection
+        case apiKeyProfiles
+        case activeAuthMode
+        case currentAPIKeySelection
     }
 
     init(
         version: Int = 1,
         accounts: [StoredAccount] = [],
         workspaceDirectory: [WorkspaceDirectoryEntry] = [],
-        currentSelection: CurrentAccountSelection? = nil
+        currentSelection: CurrentAccountSelection? = nil,
+        apiKeyProfiles: [APIKeyProfile] = [],
+        activeAuthMode: ActiveAuthMode = .chatgpt,
+        currentAPIKeySelection: APIKeySelection? = nil
     ) {
         self.version = version
         self.accounts = accounts
         self.workspaceDirectory = workspaceDirectory
         self.currentSelection = currentSelection
+        self.apiKeyProfiles = apiKeyProfiles
+        self.activeAuthMode = activeAuthMode
+        self.currentAPIKeySelection = currentAPIKeySelection
     }
 
     init(from decoder: any Decoder) throws {
@@ -173,6 +185,9 @@ struct AccountsStore: Codable, Equatable {
         accounts = try container.decodeIfPresent([StoredAccount].self, forKey: .accounts) ?? []
         workspaceDirectory = try container.decodeIfPresent([WorkspaceDirectoryEntry].self, forKey: .workspaceDirectory) ?? []
         currentSelection = try container.decodeIfPresent(CurrentAccountSelection.self, forKey: .currentSelection)
+        apiKeyProfiles = try container.decodeIfPresent([APIKeyProfile].self, forKey: .apiKeyProfiles) ?? []
+        activeAuthMode = try container.decodeIfPresent(ActiveAuthMode.self, forKey: .activeAuthMode) ?? .chatgpt
+        currentAPIKeySelection = try container.decodeIfPresent(APIKeySelection.self, forKey: .currentAPIKeySelection)
     }
 }
 
@@ -480,4 +495,89 @@ struct ChatGPTOAuthTokens: Equatable, Sendable {
     var idToken: String
     var apiKey: String?
     var consentWorkspaces: [ConsentWorkspaceOption] = []
+}
+
+// MARK: - API Key Profiles
+
+enum ActiveAuthMode: String, Codable, Equatable, Sendable {
+    case chatgpt
+    case apiKey
+}
+
+struct APIKeyProfile: Codable, Equatable, Identifiable, Sendable {
+    var id: String
+    var label: String
+    var providerLabel: String
+    var apiKey: String
+    var baseURL: String
+    var model: String
+    var reasoningEffort: String?
+    var wireAPI: String
+    var addedAt: Int64
+    var updatedAt: Int64
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case label
+        case providerLabel
+        case apiKey
+        case baseURL = "baseUrl"
+        case model
+        case reasoningEffort
+        case wireAPI = "wireApi"
+        case addedAt
+        case updatedAt
+    }
+
+    var isCurrent: Bool = false
+
+    init(
+        id: String,
+        label: String,
+        providerLabel: String,
+        apiKey: String,
+        baseURL: String,
+        model: String,
+        reasoningEffort: String? = nil,
+        wireAPI: String = "responses",
+        addedAt: Int64,
+        updatedAt: Int64
+    ) {
+        self.id = id
+        self.label = label
+        self.providerLabel = providerLabel
+        self.apiKey = apiKey
+        self.baseURL = baseURL
+        self.model = model
+        self.reasoningEffort = reasoningEffort
+        self.wireAPI = wireAPI
+        self.addedAt = addedAt
+        self.updatedAt = updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        label = try container.decode(String.self, forKey: .label)
+        providerLabel = try container.decode(String.self, forKey: .providerLabel)
+        apiKey = try container.decode(String.self, forKey: .apiKey)
+        baseURL = try container.decode(String.self, forKey: .baseURL)
+        model = try container.decode(String.self, forKey: .model)
+        reasoningEffort = try container.decodeIfPresent(String.self, forKey: .reasoningEffort)
+        wireAPI = try container.decodeIfPresent(String.self, forKey: .wireAPI) ?? "responses"
+        addedAt = try container.decode(Int64.self, forKey: .addedAt)
+        updatedAt = try container.decode(Int64.self, forKey: .updatedAt)
+    }
+
+    var maskedAPIKey: String {
+        guard apiKey.count > 8 else { return String(repeating: "*", count: apiKey.count) }
+        let prefix = apiKey.prefix(4)
+        let suffix = apiKey.suffix(4)
+        return "\(prefix)****\(suffix)"
+    }
+}
+
+struct APIKeySelection: Codable, Equatable {
+    var profileID: String
+    var selectedAt: Int64
 }

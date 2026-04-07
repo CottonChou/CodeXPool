@@ -13,41 +13,8 @@ final class AppContainer {
     private let settingsCoordinator: SettingsCoordinator
     private let accountsWidgetSnapshotWriter: AccountsWidgetSnapshotWriter
     private let accountsWidgetDisplayModeStore: AccountsWidgetDisplayModeStore
-    private let proxyCoordinator: ProxyCoordinator
-    private let proxyControlCloudSyncService: CloudKitProxyControlSyncService
     private var accountsWidgetSnapshotCancellable: AnyCancellable?
     private var widgetUsageProgressDisplayMode: UsageProgressDisplayMode
-
-    lazy var proxyControlBridge: ProxyControlBridge = ProxyControlBridge(
-        proxyCoordinator: proxyCoordinator,
-        settingsCoordinator: settingsCoordinator,
-        cloudSyncService: proxyControlCloudSyncService,
-        performAccountsRefresh: { [weak trayModel] in
-            guard let trayModel else { return }
-            _ = try await trayModel.performManualRefresh()
-        }
-    )
-
-    lazy var proxyModel: ProxyPageModel = ProxyPageModel(
-        coordinator: proxyCoordinator,
-        settingsCoordinator: settingsCoordinator,
-        proxyControlCloudSyncService: proxyControlCloudSyncService,
-        localProxyCommandService: proxyControlBridge,
-        chooseIdentityFilePath: {
-            #if canImport(AppKit)
-            let panel = NSOpenPanel()
-            panel.canChooseFiles = true
-            panel.canChooseDirectories = false
-            panel.allowsMultipleSelection = false
-            panel.canCreateDirectories = false
-            panel.title = "Select SSH key file"
-            guard panel.runModal() == .OK else { return nil }
-            return panel.url?.path
-            #else
-            return nil
-            #endif
-        }
-    )
 
     static func liveOrCrash() -> AppContainer {
         do {
@@ -69,20 +36,8 @@ final class AppContainer {
                 storeRepository: storeRepository,
                 authRepository: authRepository
             )
-            let proxyCoordinator = ProxyCoordinator(
-                proxyService: SwiftNativeProxyRuntimeService(
-                    paths: paths,
-                    storeRepository: storeRepository,
-                    settingsRepository: settingsRepository,
-                    authRepository: authRepository
-                ),
-                cloudflaredService: CloudflaredService(paths: paths),
-                remoteService: RemoteProxyService(
-                    repoRoot: RepositoryLocator.findRepoRoot(startingAt: URL(fileURLWithPath: #filePath)),
-                    sourceAccountStorePath: paths.accountStorePath
-                )
-            )
-            let proxyControlCloudSyncService = CloudKitProxyControlSyncService()
+            let configTomlService = ConfigTomlService(paths: paths)
+            let authBackupService = AuthBackupService(paths: paths)
 
             let settingsCoordinator = SettingsCoordinator(
                 settingsRepository: settingsRepository,
@@ -108,18 +63,15 @@ final class AppContainer {
                 chatGPTOAuthLoginService: chatGPTOAuthLoginService,
                 codexCLIService: codexCLIService,
                 editorAppService: editorAppService,
-                opencodeAuthSyncService: opencodeSyncService
-            )
-            let remoteAccountsMutationSyncService = RemoteAccountsMutationSyncService(
-                settingsCoordinator: settingsCoordinator,
-                proxyCoordinator: proxyCoordinator
+                opencodeAuthSyncService: opencodeSyncService,
+                configTomlService: configTomlService,
+                authBackupService: authBackupService
             )
             let trayModel = TrayMenuModel(
                 accountsCoordinator: accountsCoordinator,
                 settingsCoordinator: settingsCoordinator,
                 cloudSyncService: cloudSyncService,
                 currentAccountSelectionSyncService: currentAccountSelectionSyncService,
-                remoteAccountsMutationSyncService: remoteAccountsMutationSyncService,
                 backgroundRefreshPolicy: .forPlatform(PlatformCapabilities.currentPlatform),
                 initialAccounts: initialAccounts
             )
@@ -127,7 +79,6 @@ final class AppContainer {
                 coordinator: accountsCoordinator,
                 settingsCoordinator: settingsCoordinator,
                 manualRefreshService: trayModel,
-                proxyControlCloudSyncService: proxyControlCloudSyncService,
                 localAccountsMutationSyncService: trayModel,
                 currentAccountSelectionSyncService: currentAccountSelectionSyncService,
                 cloudSyncAvailabilityService: cloudSyncAvailabilityService,
@@ -174,8 +125,6 @@ final class AppContainer {
                 settingsCoordinator: settingsCoordinator,
                 accountsWidgetSnapshotWriter: accountsWidgetSnapshotWriter,
                 accountsWidgetDisplayModeStore: accountsWidgetDisplayModeStore,
-                proxyCoordinator: proxyCoordinator,
-                proxyControlCloudSyncService: proxyControlCloudSyncService,
                 widgetUsageProgressDisplayMode: initialSettings.usageProgressDisplayMode,
                 accountsModel: accountsModel,
                 settingsModel: settingsModel,
@@ -194,8 +143,6 @@ final class AppContainer {
         settingsCoordinator: SettingsCoordinator,
         accountsWidgetSnapshotWriter: AccountsWidgetSnapshotWriter,
         accountsWidgetDisplayModeStore: AccountsWidgetDisplayModeStore,
-        proxyCoordinator: ProxyCoordinator,
-        proxyControlCloudSyncService: CloudKitProxyControlSyncService,
         widgetUsageProgressDisplayMode: UsageProgressDisplayMode,
         accountsModel: AccountsPageModel,
         settingsModel: SettingsPageModel,
@@ -204,8 +151,6 @@ final class AppContainer {
         self.settingsCoordinator = settingsCoordinator
         self.accountsWidgetSnapshotWriter = accountsWidgetSnapshotWriter
         self.accountsWidgetDisplayModeStore = accountsWidgetDisplayModeStore
-        self.proxyCoordinator = proxyCoordinator
-        self.proxyControlCloudSyncService = proxyControlCloudSyncService
         self.widgetUsageProgressDisplayMode = widgetUsageProgressDisplayMode
         self.accountsModel = accountsModel
         self.settingsModel = settingsModel

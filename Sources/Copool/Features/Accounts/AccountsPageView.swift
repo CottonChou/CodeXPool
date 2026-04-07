@@ -5,6 +5,9 @@ struct AccountsPageView: View {
     @State private var areCardsPresented = false
     @State private var didRunInitialCardEntrance = false
     @State private var isImportingAuthFile = false
+    @State private var displayMode: ActiveAuthMode = .chatgpt
+    @State private var isShowingAPIKeyEditor = false
+    @State private var editingProfile: APIKeyProfile?
     @StateObject private var contentStore: AccountsPageViewStore
     @StateObject private var chromeStore: AccountsPageChromeStore
 
@@ -22,12 +25,79 @@ struct AccountsPageView: View {
         self.onSelectLocale = onSelectLocale
         _contentStore = StateObject(wrappedValue: AccountsPageViewStore(model: model))
         _chromeStore = StateObject(wrappedValue: AccountsPageChromeStore(model: model))
+        let initMode = model.activeAuthMode
+        _displayMode = State(initialValue: initMode)
         let hasResolvedInitialState = model.hasResolvedInitialState
         _areCardsPresented = State(initialValue: hasResolvedInitialState)
         _didRunInitialCardEntrance = State(initialValue: hasResolvedInitialState)
     }
 
     var body: some View {
+        ZStack {
+            VStack(spacing: 0) {
+                AuthModeSwitcher(activeMode: $displayMode)
+                    .frame(maxWidth: 240)
+                    .padding(.horizontal, LayoutRules.pagePadding)
+                    .padding(.vertical, 8)
+
+                ZStack {
+                    chatGPTContent
+                        .opacity(displayMode == .chatgpt ? 1 : 0)
+                        .allowsHitTesting(displayMode == .chatgpt)
+
+                    APIKeyProfileListView(
+                        model: model,
+                        onAddProfile: {
+                            editingProfile = nil
+                            isShowingAPIKeyEditor = true
+                        },
+                        onEditProfile: { profile in
+                            editingProfile = profile
+                            isShowingAPIKeyEditor = true
+                        }
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .opacity(displayMode == .apiKey ? 1 : 0)
+                    .allowsHitTesting(displayMode == .apiKey)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+            if isShowingAPIKeyEditor {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        isShowingAPIKeyEditor = false
+                    }
+
+                APIKeyProfileEditorView(
+                    existingProfile: editingProfile,
+                    onSave: { profile in
+                        isShowingAPIKeyEditor = false
+                        Task { await model.saveAPIKeyProfile(profile) }
+                    },
+                    onCancel: {
+                        isShowingAPIKeyEditor = false
+                    }
+                )
+                .frame(width: 420, height: 520)
+                .background(.regularMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .shadow(color: .black.opacity(0.2), radius: 20, y: 10)
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: isShowingAPIKeyEditor)
+        .task {
+            for await mode in model.$activeAuthMode.values {
+                if displayMode != mode {
+                    displayMode = mode
+                }
+            }
+        }
+    }
+
+    private var chatGPTContent: some View {
         AccountsPageShell(
             contentStore: contentStore,
             chromeStore: chromeStore,
@@ -97,7 +167,11 @@ struct AccountsPageView: View {
     }
 
     private func switchAccount(id: String) {
-        Task { await model.switchAccount(id: id) }
+        if model.activeAuthMode == .apiKey {
+            Task { await model.switchToChatGPTAccount(id: id) }
+        } else {
+            Task { await model.switchAccount(id: id) }
+        }
     }
 
     private func refreshUsage(forAccountID id: String) {

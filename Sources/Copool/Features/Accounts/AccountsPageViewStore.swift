@@ -205,6 +205,14 @@ final class AccountsPageViewStore: ObservableObject {
             }
             .store(in: &cancellables)
 
+        makeDependencyPublisher(model.$activeAuthMode)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.refreshAllPresentations(trigger: "activeAuthMode")
+                }
+            }
+            .store(in: &cancellables)
+
         makeDependencyPublisher(model.$pendingWorkspaceAuthorizations)
             .sink { [weak self] _ in
                 Task { @MainActor [weak self] in

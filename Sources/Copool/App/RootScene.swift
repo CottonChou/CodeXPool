@@ -10,7 +10,6 @@ import UIKit
 struct RootScene: View {
     @State private var selectedTab: AppTab = .accounts
     @StateObject private var chromeStore: RootSceneChromeStore
-    @StateObject private var deferredProxyModel = DeferredProxyModelStore()
     private let trayModel: TrayMenuModel
     private let accountsModel: AccountsPageModel
     private let settingsModel: SettingsPageModel
@@ -37,8 +36,6 @@ struct RootScene: View {
         switch selectedTab {
         case .accounts:
             return chromeStore.accountsNotice
-        case .proxy:
-            return deferredProxyModel.model?.notice
         case .settings:
             return chromeStore.settingsNotice
         }
@@ -50,7 +47,7 @@ struct RootScene: View {
 
     private var visibleTabs: [AppTab] {
         #if os(iOS)
-        [.accounts, .proxy]
+        [.accounts]
         #else
         AppTab.allCases
         #endif
@@ -70,10 +67,6 @@ struct RootScene: View {
         }
         .onReceive(trayModel.$remoteUsageRefreshingAccountIDs.removeDuplicates()) { accountIDs in
             accountsModel.syncRemoteUsageRefreshActivity(refreshingAccountIDs: accountIDs)
-        }
-        .onChange(of: selectedTab) { _, value in
-            guard value == .proxy else { return }
-            deferredProxyModel.loadIfNeeded(using: container)
         }
         .task {
             #if os(iOS)
@@ -102,44 +95,25 @@ struct RootScene: View {
     @ViewBuilder
     private var platformTabShell: some View {
         #if os(iOS)
-        TabView(selection: $selectedTab) {
-            NavigationStack {
-                AccountsPageView(
-                    model: accountsModel,
-                    currentLocale: currentAppLocale,
-                    onSelectLocale: { locale in
-                        settingsModel.setLocale(locale.identifier)
-                    }
-                )
-            }
-            .tag(AppTab.accounts)
-            .tabItem {
-                Label {
-                    Text(AppTab.accounts.toolbarTitle)
-                } icon: {
-                    Image(systemName: AppTab.accounts.iconName)
+        NavigationStack {
+            AccountsPageView(
+                model: accountsModel,
+                currentLocale: currentAppLocale,
+                onSelectLocale: { locale in
+                    settingsModel.setLocale(locale.identifier)
                 }
-            }
-            NavigationStack {
-                proxyTabContent
-            }
-            .tag(AppTab.proxy)
-            .tabItem {
-                Label {
-                    Text(AppTab.proxy.toolbarTitle)
-                } icon: {
-                    Image(systemName: AppTab.proxy.iconName)
-                }
-            }
+            )
         }
         #else
         VStack(spacing: 0) {
-            AppTabToolbarSwitcher(selection: $selectedTab, tabs: visibleTabs)
-                .frame(maxWidth: LayoutRules.tabSwitcherMaxWidth)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.horizontal, LayoutRules.pagePadding)
-                .padding(.top, 10)
-                .padding(.bottom, 8)
+            if visibleTabs.count > 1 {
+                AppTabToolbarSwitcher(selection: $selectedTab, tabs: visibleTabs)
+                    .frame(maxWidth: LayoutRules.tabSwitcherMaxWidth)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.horizontal, LayoutRules.pagePadding)
+                    .padding(.top, 10)
+                    .padding(.bottom, 8)
+            }
 
             activePage
         }
@@ -157,22 +131,8 @@ struct RootScene: View {
                     settingsModel.setLocale(locale.identifier)
                 }
             )
-        case .proxy:
-            proxyTabContent
         case .settings:
             SettingsPageView(model: settingsModel)
-        }
-    }
-
-    @ViewBuilder
-    private var proxyTabContent: some View {
-        if let proxyModel = deferredProxyModel.model {
-            ProxyPageView(model: proxyModel)
-        } else {
-            DeferredPagePlaceholder()
-                .task {
-                    deferredProxyModel.loadIfNeeded(using: container)
-                }
         }
     }
 }
@@ -211,51 +171,6 @@ private final class RootSceneChromeStore: ObservableObject {
                 self?.settingsNotice = notice
             }
             .store(in: &cancellables)
-    }
-}
-
-@MainActor
-private final class DeferredProxyModelStore: ObservableObject {
-    @Published private(set) var model: ProxyPageModel?
-
-    func loadIfNeeded(using container: AppContainer) {
-        guard model == nil else { return }
-        model = container.proxyModel
-    }
-}
-
-private struct DeferredPagePlaceholder: View {
-    var body: some View {
-        VStack {
-            ProgressView()
-                .controlSize(.large)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-    }
-}
-
-private extension View {
-    @ViewBuilder
-    func rootSceneNoticePresentation(_ notice: NoticeMessage?) -> some View {
-        #if os(iOS)
-        self
-            .animation(.easeInOut(duration: 0.2), value: notice)
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                NoticeBanner(notice: notice)
-                    .allowsHitTesting(false)
-                    .padding(.horizontal, LayoutRules.pagePadding)
-                    .padding(.bottom, 6)
-            }
-        #else
-        self
-            .overlay(alignment: .top) {
-                NoticeBanner(notice: notice)
-                    .padding(.horizontal, LayoutRules.pagePadding)
-                    .padding(.top, 6)
-                    .allowsHitTesting(false)
-                    .zIndex(10)
-            }
-        #endif
     }
 }
 
@@ -357,7 +272,6 @@ private extension AppTab {
     var iconName: String {
         switch self {
         case .accounts: return "person.2"
-        case .proxy: return "network"
         case .settings: return "gearshape"
         }
     }
@@ -365,7 +279,6 @@ private extension AppTab {
     var titleTranslationKey: String {
         switch self {
         case .accounts: return "tab.accounts"
-        case .proxy: return "tab.proxy"
         case .settings: return "tab.settings"
         }
     }
@@ -373,12 +286,36 @@ private extension AppTab {
     var titleKey: LocalizedStringKey {
         switch self {
         case .accounts: return "tab.accounts"
-        case .proxy: return "tab.proxy"
         case .settings: return "tab.settings"
         }
     }
 
     var toolbarTitle: String {
         L10n.tr(titleTranslationKey)
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func rootSceneNoticePresentation(_ notice: NoticeMessage?) -> some View {
+        #if os(iOS)
+        self
+            .animation(.easeInOut(duration: 0.2), value: notice)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                NoticeBanner(notice: notice)
+                    .allowsHitTesting(false)
+                    .padding(.horizontal, LayoutRules.pagePadding)
+                    .padding(.bottom, 6)
+            }
+        #else
+        self
+            .overlay(alignment: .top) {
+                NoticeBanner(notice: notice)
+                    .padding(.horizontal, LayoutRules.pagePadding)
+                    .padding(.top, 6)
+                    .allowsHitTesting(false)
+                    .zIndex(10)
+            }
+        #endif
     }
 }

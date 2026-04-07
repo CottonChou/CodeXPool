@@ -57,6 +57,8 @@ final class AppSmokeTests: XCTestCase {
             codexCLIService: SmokeCodexCLIService(),
             editorAppService: SmokeEditorAppService(),
             opencodeAuthSyncService: SmokeOpencodeAuthSyncService(),
+            configTomlService: StubConfigTomlService(),
+            authBackupService: StubAuthBackupService(),
             dateProvider: SmokeDateProvider(now: now)
         )
         let settingsCoordinator = SettingsCoordinator(
@@ -88,39 +90,11 @@ final class AppSmokeTests: XCTestCase {
         XCTAssertEqual(authRepository.currentAccountKey, "account-next")
 
         settingsModel.settings = try await settingsCoordinator.currentSettings()
-        settingsModel.setAutoStartProxy(true)
+        settingsModel.setLaunchAtStartup(true)
         try await Task.sleep(for: .milliseconds(50))
 
-        XCTAssertTrue(settingsModel.settings.autoStartApiProxy)
-        XCTAssertEqual(try settingsRepository.loadSettings().autoStartApiProxy, true)
-    }
-
-    func testProxyPageStartAndStopFlow() async {
-        let localCommandService = SmokeProxyLocalCommandService()
-        let settingsCoordinator = SettingsCoordinator(
-            settingsRepository: TestSettingsRepository(),
-            launchAtStartupService: SmokeLaunchAtStartupService()
-        )
-        let model = ProxyPageModel(
-            coordinator: ProxyCoordinator(
-                proxyService: SmokeProxyRuntimeService(),
-                cloudflaredService: SmokeCloudflaredService(),
-                remoteService: SmokeRemoteProxyService()
-            ),
-            settingsCoordinator: settingsCoordinator,
-            localProxyCommandService: localCommandService,
-            runtimePlatform: .macOS
-        )
-
-        await model.startProxy()
-        XCTAssertTrue(model.proxyStatus.running)
-        let commandsAfterStart = await localCommandService.readCommands()
-        XCTAssertEqual(commandsAfterStart, [.startProxy])
-
-        await model.stopProxy()
-        XCTAssertFalse(model.proxyStatus.running)
-        let commandsAfterStop = await localCommandService.readCommands()
-        XCTAssertEqual(commandsAfterStop, [.startProxy, .stopProxy])
+        XCTAssertTrue(settingsModel.settings.launchAtStartup)
+        XCTAssertEqual(try settingsRepository.loadSettings().launchAtStartup, true)
     }
 }
 
@@ -295,134 +269,12 @@ private actor SmokeCurrentAccountSelectionSyncService: CurrentAccountSelectionSy
     func ensurePushSubscriptionIfNeeded() async throws {}
 }
 
-private actor SmokeProxyLocalCommandService: ProxyLocalCommandServiceProtocol {
-    private var commands: [ProxyControlCommandKind] = []
-    private var running = false
-
-    func performLocalCommand(_ command: ProxyControlCommand) async throws -> ProxyControlSnapshot {
-        commands.append(command.kind)
-        switch command.kind {
-        case .startProxy:
-            running = true
-        case .stopProxy:
-            running = false
-        default:
-            break
-        }
-
-        return ProxyControlSnapshot(
-            syncedAt: 1,
-            sourceDeviceID: "smoke",
-            proxyStatus: running
-                ? ApiProxyStatus(running: true, port: 8787, apiKey: "key", availableAccounts: 2)
-                : .idle,
-            preferredProxyPort: 8787,
-            preferredProxyPortText: "8787",
-            autoStartProxy: false,
-            cloudflaredStatus: .idle,
-            cloudflaredTunnelMode: .quick,
-            cloudflaredNamedInput: NamedCloudflaredTunnelInput(
-                apiToken: "",
-                accountID: "",
-                zoneID: "",
-                hostname: ""
-            ),
-            cloudflaredUseHTTP2: false,
-            publicAccessEnabled: false,
-            remoteServers: [],
-            remoteStatusesSyncedAt: nil,
-            remoteStatuses: [:],
-            remoteLogs: [:],
-            lastHandledCommandID: command.id,
-            lastCommandError: nil
-        )
-    }
-
-    func readCommands() -> [ProxyControlCommandKind] {
-        commands
-    }
+private final class StubConfigTomlService: ConfigTomlServiceProtocol, @unchecked Sendable {
+    func readModelProvider() -> String? { nil }
+    func writeForAPIKeyMode(profile: APIKeyProfile) throws {}
+    func writeForChatGPTMode() throws {}
 }
 
-private struct SmokeProxyRuntimeService: ProxyRuntimeService {
-    func status() async -> ApiProxyStatus { .idle }
-
-    func start(preferredPort: Int?) async throws -> ApiProxyStatus {
-        ApiProxyStatus(running: true, port: preferredPort ?? 8787, apiKey: "key", availableAccounts: 2)
-    }
-
-    func stop() async -> ApiProxyStatus { .idle }
-    func refreshAPIKey() async throws -> ApiProxyStatus { .idle }
-    func syncAccountsStore() async throws {}
-}
-
-private struct SmokeCloudflaredService: CloudflaredServiceProtocol {
-    func status() async -> CloudflaredStatus { .idle }
-    func install() async throws -> CloudflaredStatus { .idle }
-
-    func start(_ input: StartCloudflaredTunnelInput) async throws -> CloudflaredStatus {
-        _ = input
-        return .idle
-    }
-
-    func stop() async -> CloudflaredStatus { .idle }
-}
-
-private struct SmokeRemoteProxyService: RemoteProxyServiceProtocol {
-    func status(server: RemoteServerConfig) async -> RemoteProxyStatus {
-        _ = server
-        return RemoteProxyStatus(
-            installed: false,
-            serviceInstalled: false,
-            running: false,
-            enabled: false,
-            serviceName: "",
-            pid: nil,
-            baseURL: "",
-            apiKey: nil,
-            lastError: nil
-        )
-    }
-
-    func discover(server: RemoteServerConfig) async throws -> [DiscoveredRemoteProxyInstance] {
-        _ = server
-        return []
-    }
-
-    func deploy(server: RemoteServerConfig) async throws -> RemoteProxyStatus {
-        await status(server: server)
-    }
-
-    func syncAccounts(server: RemoteServerConfig) async throws -> RemoteProxyStatus {
-        await status(server: server)
-    }
-
-    func start(server: RemoteServerConfig) async throws -> RemoteProxyStatus {
-        await status(server: server)
-    }
-
-    func stop(server: RemoteServerConfig) async throws -> RemoteProxyStatus {
-        await status(server: server)
-    }
-
-    func readLogs(server: RemoteServerConfig, lines: Int) async throws -> String {
-        _ = server
-        _ = lines
-        return ""
-    }
-
-    func uninstall(server: RemoteServerConfig, removeRemoteDirectory: Bool) async throws -> RemoteProxyStatus {
-        _ = server
-        _ = removeRemoteDirectory
-        return RemoteProxyStatus(
-            installed: false,
-            serviceInstalled: false,
-            running: false,
-            enabled: false,
-            serviceName: "",
-            pid: nil,
-            baseURL: "",
-            apiKey: nil,
-            lastError: nil
-        )
-    }
+private final class StubAuthBackupService: AuthBackupServiceProtocol, @unchecked Sendable {
+    func backupCurrentAuthFiles() throws {}
 }

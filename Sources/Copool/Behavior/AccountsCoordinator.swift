@@ -19,6 +19,8 @@ actor AccountsCoordinator {
     let codexCLIService: CodexCLIServiceProtocol
     let editorAppService: EditorAppServiceProtocol
     let opencodeAuthSyncService: OpencodeAuthSyncServiceProtocol
+    let configTomlService: ConfigTomlServiceProtocol
+    let authBackupService: AuthBackupServiceProtocol
     let dateProvider: DateProviding
     let runtimePlatform: RuntimePlatform
 
@@ -32,6 +34,8 @@ actor AccountsCoordinator {
         codexCLIService: CodexCLIServiceProtocol,
         editorAppService: EditorAppServiceProtocol,
         opencodeAuthSyncService: OpencodeAuthSyncServiceProtocol,
+        configTomlService: ConfigTomlServiceProtocol,
+        authBackupService: AuthBackupServiceProtocol,
         dateProvider: DateProviding = SystemDateProvider(),
         runtimePlatform: RuntimePlatform = PlatformCapabilities.currentPlatform
     ) {
@@ -44,6 +48,8 @@ actor AccountsCoordinator {
         self.codexCLIService = codexCLIService
         self.editorAppService = editorAppService
         self.opencodeAuthSyncService = opencodeAuthSyncService
+        self.configTomlService = configTomlService
+        self.authBackupService = authBackupService
         self.dateProvider = dateProvider
         self.runtimePlatform = runtimePlatform
     }
@@ -233,5 +239,143 @@ actor AccountsCoordinator {
             return nil
         }
         return accounts[index]
+    }
+
+    // MARK: - API Key Profiles
+
+    func listAPIKeyProfiles() throws -> [APIKeyProfile] {
+        let store = try storeRepository.loadStore()
+        let currentID = store.currentAPIKeySelection?.profileID
+        return store.apiKeyProfiles.map { profile in
+            var p = profile
+            p.isCurrent = (store.activeAuthMode == .apiKey && p.id == currentID)
+            return p
+        }
+    }
+
+    func addAPIKeyProfile(_ profile: APIKeyProfile) throws -> APIKeyProfile {
+        var store = try storeRepository.loadStore()
+        var newProfile = profile
+        if newProfile.id.isEmpty {
+            newProfile.id = UUID().uuidString
+        }
+        newProfile.addedAt = dateProvider.unixSecondsNow()
+        newProfile.updatedAt = newProfile.addedAt
+        store.apiKeyProfiles.append(newProfile)
+        try storeRepository.saveStore(store)
+        return newProfile
+    }
+
+    func updateAPIKeyProfile(_ profile: APIKeyProfile) throws -> APIKeyProfile {
+        var store = try storeRepository.loadStore()
+        guard let index = store.apiKeyProfiles.firstIndex(where: { $0.id == profile.id }) else {
+            throw AppError.invalidData(L10n.tr("error.accounts.account_not_found_for_update"))
+        }
+        var updated = profile
+        updated.updatedAt = dateProvider.unixSecondsNow()
+        store.apiKeyProfiles[index] = updated
+        try storeRepository.saveStore(store)
+        return updated
+    }
+
+    func deleteAPIKeyProfile(id: String) throws {
+        var store = try storeRepository.loadStore()
+        store.apiKeyProfiles.removeAll { $0.id == id }
+        if store.currentAPIKeySelection?.profileID == id {
+            store.currentAPIKeySelection = nil
+        }
+        try storeRepository.saveStore(store)
+    }
+
+    func activeAuthMode() throws -> ActiveAuthMode {
+        try storeRepository.loadStore().activeAuthMode
+    }
+
+    func switchToAPIKeyProfile(id: String, workspacePath: String? = nil) throws -> SwitchAccountExecutionResult {
+        var store = try storeRepository.loadStore()
+        guard let profile = store.apiKeyProfiles.first(where: { $0.id == id }) else {
+            throw AppError.invalidData(L10n.tr("error.accounts.account_not_found_for_switch"))
+        }
+
+        try authBackupService.backupCurrentAuthFiles()
+        try configTomlService.writeForAPIKeyMode(profile: profile)
+
+        #if os(macOS)
+        let targetProvider = profile.providerLabel
+            .lowercased()
+            .replacingOccurrences(of: " ", with: "_")
+        let repairService = CodexThreadRepairService()
+        _ = repairService.repairThreadVisibility(
+            targetProvider: targetProvider,
+            targetModel: profile.model
+        )
+        #endif
+
+        store.activeAuthMode = .apiKey
+        store.currentAPIKeySelection = APIKeySelection(
+            profileID: profile.id,
+            selectedAt: dateProvider.unixMillisecondsNow()
+        )
+        try storeRepository.saveStore(store)
+
+        let settings = try settingsRepository.loadSettings()
+        return try applySwitchSideEffectsForAPIKey(
+            profile: profile,
+            settings: settings,
+            workspacePath: workspacePath
+        )
+    }
+
+    func switchToChatGPTAccount(id: String, workspacePath: String? = nil) throws -> SwitchAccountExecutionResult {
+        let store = try storeRepository.loadStore()
+        guard let account = store.accounts.first(where: { $0.id == id }) else {
+            throw AppError.invalidData(L10n.tr("error.accounts.account_not_found_for_switch"))
+        }
+
+        try authBackupService.backupCurrentAuthFiles()
+        try configTomlService.writeForChatGPTMode()
+        try updateCurrentAccountProjection(authJSON: account.authJSON)
+
+        #if os(macOS)
+        let repairService = CodexThreadRepairService()
+        _ = repairService.repairThreadVisibility(targetProvider: "openai")
+        #endif
+
+        var updatedStore = try storeRepository.loadStore()
+        updatedStore.activeAuthMode = .chatgpt
+        try storeRepository.saveStore(updatedStore)
+
+        let settings = try settingsRepository.loadSettings()
+        return try applySwitchSideEffects(
+            for: account,
+            settings: settings,
+            workspacePath: workspacePath
+        )
+    }
+
+    private func applySwitchSideEffectsForAPIKey(
+        profile: APIKeyProfile,
+        settings: AppSettings,
+        workspacePath: String?
+    ) throws -> SwitchAccountExecutionResult {
+        var result = SwitchAccountExecutionResult.idle
+
+        guard runtimePlatform == .macOS else {
+            return result
+        }
+
+        if settings.restartEditorsOnSwitch {
+            let restart = editorAppService.restartSelectedApps(settings.restartEditorTargets)
+            result.restartedEditorApps = restart.restarted
+            result.editorRestartError = restart.error
+        }
+
+        if settings.launchCodexAfterSwitch {
+            result.usedFallbackCLI = try codexCLIService.launchApp(
+                workspacePath: workspacePath
+            )
+        }
+
+        return result
     }
 }

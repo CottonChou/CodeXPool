@@ -42,6 +42,9 @@ extension AccountsPageModel {
     func load() async {
         async let cloudSyncAvailableTask = cloudSyncAvailabilityService?.isICloudAvailable() ?? true
         do {
+            let mode = try await coordinator.activeAuthMode()
+            activeAuthMode = mode
+
             let accounts = try await coordinator.listAccounts()
 
             if accounts.isEmpty {

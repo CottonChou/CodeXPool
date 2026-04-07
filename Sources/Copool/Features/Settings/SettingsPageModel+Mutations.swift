@@ -14,10 +14,6 @@ extension SettingsPageModel {
         updateToggle(.autoSmartSwitch, to: value)
     }
 
-    func setAutoStartProxy(_ value: Bool) {
-        updateToggle(.autoStartProxy, to: value)
-    }
-
     func setLocale(_ value: String) {
         updateLocale(AppLocale.resolve(value))
     }
@@ -28,10 +24,6 @@ extension SettingsPageModel {
 
     func setSyncOpencodeOpenaiAuth(_ value: Bool) {
         updateToggle(.syncOpencodeOpenaiAuth, to: value)
-    }
-
-    func setLocalProxyHostAPIOnly(_ value: Bool) {
-        updateToggle(.localProxyHostAPIOnly, to: value)
     }
 
     func setRestartEditorsOnSwitch(_ value: Bool) {
@@ -52,10 +44,6 @@ extension SettingsPageModel {
             Task { await update(AppSettingsPatch(launchAtStartup: value)) }
         case .launchAfterSwitch:
             Task { await update(AppSettingsPatch(launchCodexAfterSwitch: value)) }
-        case .autoStartProxy:
-            Task { await update(AppSettingsPatch(autoStartApiProxy: value)) }
-        case .localProxyHostAPIOnly:
-            Task { await update(AppSettingsPatch(localProxyHostAPIOnly: value)) }
         case .autoSmartSwitch:
             Task { await update(AppSettingsPatch(autoSmartSwitch: value)) }
         case .syncOpencodeOpenaiAuth:

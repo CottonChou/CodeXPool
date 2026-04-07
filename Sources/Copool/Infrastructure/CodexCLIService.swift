@@ -2,7 +2,14 @@ import Foundation
 
 #if os(macOS)
 final class CodexCLIService: CodexCLIServiceProtocol, @unchecked Sendable {
-    /// Returns `true` when it falls back to `codex app`.
+    private var pendingEnvironment: [String: String] = [:]
+
+    func launchApp(workspacePath: String?, environment: [String: String]) throws -> Bool {
+        pendingEnvironment = environment
+        defer { pendingEnvironment = [:] }
+        return try launchApp(workspacePath: workspacePath)
+    }
+
     func launchApp(workspacePath: String?) throws -> Bool {
         forceStopRunningCodex()
 
@@ -117,20 +124,38 @@ final class CodexCLIService: CodexCLIServiceProtocol, @unchecked Sendable {
         let current = env["PATH"] ?? ""
         let parent = URL(fileURLWithPath: executablePath).deletingLastPathComponent().path
         env["PATH"] = parent + (current.isEmpty ? "" : ":\(current)")
+        for (key, value) in pendingEnvironment {
+            env[key] = value
+        }
         return env
     }
 
     private func launchCodexBundleApp(at appPath: URL, workspacePath: String?) throws {
-        var arguments = ["-na", appPath.path]
-        if let workspacePath, !workspacePath.isEmpty {
-            arguments.append(workspacePath)
+        if !pendingEnvironment.isEmpty {
+            var envArgs: [String] = []
+            for (key, value) in pendingEnvironment {
+                envArgs.append("\(key)=\(value)")
+            }
+            envArgs.append(contentsOf: ["/usr/bin/open", "-na", appPath.path])
+            if let workspacePath, !workspacePath.isEmpty {
+                envArgs.append(workspacePath)
+            }
+            _ = try CommandRunner.runChecked(
+                "/usr/bin/env",
+                arguments: envArgs,
+                errorPrefix: L10n.tr("error.codex_cli.launch_app_open_failed")
+            )
+        } else {
+            var arguments = ["-na", appPath.path]
+            if let workspacePath, !workspacePath.isEmpty {
+                arguments.append(workspacePath)
+            }
+            _ = try CommandRunner.runChecked(
+                "/usr/bin/open",
+                arguments: arguments,
+                errorPrefix: L10n.tr("error.codex_cli.launch_app_open_failed")
+            )
         }
-
-        _ = try CommandRunner.runChecked(
-            "/usr/bin/open",
-            arguments: arguments,
-            errorPrefix: L10n.tr("error.codex_cli.launch_app_open_failed")
-        )
     }
 
     private func launchViaCodexCLI(workspacePath: String?) throws {
@@ -187,6 +212,12 @@ final class CodexCLIService: CodexCLIServiceProtocol, @unchecked Sendable {
 final class CodexCLIService: CodexCLIServiceProtocol, @unchecked Sendable {
     func launchApp(workspacePath: String?) throws -> Bool {
         _ = workspacePath
+        throw AppError.io(PlatformCapabilities.unsupportedOperationMessage)
+    }
+
+    func launchApp(workspacePath: String?, environment: [String: String]) throws -> Bool {
+        _ = workspacePath
+        _ = environment
         throw AppError.io(PlatformCapabilities.unsupportedOperationMessage)
     }
 }

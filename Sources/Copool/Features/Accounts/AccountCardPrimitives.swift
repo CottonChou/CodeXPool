@@ -296,8 +296,8 @@ private struct AccountSwitchButton: View {
             } else {
                 switch labelStyle {
                 case .iconOnly:
-                    Image(systemName: "arrow.left.arrow.right.circle.fill")
-                        .font(.system(size: 14, weight: .semibold))
+                    Text(L10n.tr("apikey.action.switch"))
+                        .lineLimit(1)
                 case .expanded:
                     Label(L10n.tr("accounts.card.switch_to_this"), systemImage: "arrow.left.arrow.right.circle.fill")
                         .lineLimit(1)
