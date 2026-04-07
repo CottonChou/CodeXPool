@@ -4,21 +4,9 @@
   <img src="./Copool.png" alt="Copool Icon" width="160" />
 </p>
 
-Copool is a SwiftUI app for macOS and iOS that manages Codex/ChatGPT auth accounts, API Key profiles, usage-based smart switching, and seamless auth mode switching between ChatGPT login and API Key workflows.
+Copool is a macOS SwiftUI app that manages Codex/ChatGPT auth accounts, API Key profiles, usage-based smart switching, and seamless auth mode switching between ChatGPT login and API Key workflows.
 
-Copool 是一个面向 macOS 和 iOS 的 SwiftUI 应用，用于管理 Codex/ChatGPT 授权账号与 API Key 配置、按用量智能切换，以及 ChatGPT 登录与 API Key 两种认证模式的无缝切换。
-
-The iOS app is only a controller and status viewer for the macOS app.
-
-iOS 版仅作为 macOS 版的控制器和状态展示器。
-
-<a href="https://testflight.apple.com/join/dDySzkA8"><img src="./testflight.webp" alt="TestFlight" width="228" /></a>
-
-## Screenshots / 截图
-
-<img src="./account.png" alt="Accounts Overview" width="560" />
-<img src="./account_2.png" alt="Accounts Detail" width="560" />
-<img src="./setting.png" alt="Settings" width="560" />
+Copool 是一个 macOS SwiftUI 应用，用于管理 Codex/ChatGPT 授权账号与 API Key 配置、按用量智能切换，以及 ChatGPT 登录与 API Key 两种认证模式的无缝切换。
 
 ## Features / 功能
 
@@ -58,7 +46,6 @@ iOS 版仅作为 macOS 版的控制器和状态展示器。
 ## Requirements / 环境要求
 
 - macOS 14+
-- iOS 26+
 - Xcode 17+
 - Swift 6 toolchain
 
@@ -68,12 +55,11 @@ iOS 版仅作为 macOS 版的控制器和状态展示器。
 cd Copool
 xcodebuild test -project Copool.xcodeproj -scheme Copool -destination 'platform=macOS'
 xcodebuild -project Copool.xcodeproj -scheme Copool -configuration Debug -destination 'platform=macOS' build
-xcodebuild -project Copool.xcodeproj -scheme CopooliOS -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17' build
 ```
 
-Open `Copool.xcodeproj` in Xcode and run `Copool` for macOS or `CopooliOS` for iOS.
+Open `Copool.xcodeproj` in Xcode and run the `Copool` scheme.
 
-使用 Xcode 打开 `Copool.xcodeproj`，macOS 运行 `Copool` scheme，iOS 运行 `CopooliOS` scheme。
+使用 Xcode 打开 `Copool.xcodeproj`，运行 `Copool` scheme 即可。
 
 ## Release Channels / 发布渠道
 
@@ -81,10 +67,6 @@ Open `Copool.xcodeproj` in Xcode and run `Copool` for macOS or `CopooliOS` for i
 - macOS 发布产物通过 GitHub Releases 分发。
 - See [`docs/release-macos.md`](docs/release-macos.md) for the Developer ID signing and notarization flow.
 - macOS 的 Developer ID 签名与公证流程见 `docs/release-macos.md`。
-- iOS builds are archived from the `CopooliOS` scheme and distributed through TestFlight.
-- iOS 构建通过 `CopooliOS` scheme 归档，并通过 TestFlight 分发。
-- The iOS app is only a controller and status viewer for the macOS app.
-- iOS 版仅作为 macOS 版的控制器和状态展示器。
 
 ## Project Structure / 项目结构
 
