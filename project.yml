@@ -14,6 +14,13 @@ targets:
       - path: Sources/CodeXPool
     resources:
       - path: Sources/CodeXPool/Resources
+        excludes:
+          - proxyd-prebuilt-archives
+          - proxyd-prebuilt
+      - path: Sources/CodeXPool/Resources/proxyd-prebuilt-archives
+        type: folder
+      - path: Sources/CodeXPool/Resources/proxyd-prebuilt
+        type: folder
     settings:
       base:
         PRODUCT_NAME: CodeXPool
