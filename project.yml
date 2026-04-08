@@ -1,4 +1,4 @@
-name: Copool
+name: CodeXPool
 options:
   createIntermediateGroups: true
 settings:
@@ -6,20 +6,20 @@ settings:
     SWIFT_VERSION: 6.0
     MACOSX_DEPLOYMENT_TARGET: "14.0"
 targets:
-  Copool:
+  CodeXPool:
     type: application
     platform: macOS
     deploymentTarget: "14.0"
     sources:
-      - path: Sources/Copool
+      - path: Sources/CodeXPool
     resources:
-      - path: Sources/Copool/Resources
+      - path: Sources/CodeXPool/Resources
     settings:
       base:
-        PRODUCT_NAME: Copool
+        PRODUCT_NAME: CodeXPool
         GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleName: Copool
-        INFOPLIST_KEY_CFBundleDisplayName: Copool
+        INFOPLIST_KEY_CFBundleName: CodeXPool
+        INFOPLIST_KEY_CFBundleDisplayName: CodeXPool
         INFOPLIST_KEY_LSMinimumSystemVersion: "14.0"
         INFOPLIST_KEY_LSUIElement: YES
         CODE_SIGN_STYLE: Automatic
@@ -27,20 +27,20 @@ targets:
         MARKETING_VERSION: 1.0.11
         DEVELOPMENT_TEAM: KLU8GF65GP
         PRODUCT_BUNDLE_IDENTIFIER: com.alick.copool
-  CopoolTests:
+  CodeXPoolTests:
     type: bundle.unit-test
     platform: macOS
     deploymentTarget: "14.0"
     sources:
-      - path: Tests/CopoolTests
+      - path: Tests/CodeXPoolTests
     dependencies:
-      - target: Copool
+      - target: CodeXPool
 schemes:
-  Copool:
+  CodeXPool:
     build:
       targets:
-        Copool: all
-        CopoolTests: [test]
+        CodeXPool: all
+        CodeXPoolTests: [test]
     test:
       targets:
-        - CopoolTests
+        - CodeXPoolTests

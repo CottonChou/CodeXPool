@@ -1,4 +1,4 @@
-# Copool Repository Rules
+# CodeXPool Repository Rules
 
 ## Release Terminology
 

@@ -1,7 +1,7 @@
 # macOS Release Workflow
 
 ## Scope
-- Builds the macOS `Copool.app` from `Copool.xcodeproj`
+- Builds the macOS `CodeXPool.app` from `CodeXPool.xcodeproj`
 - Exports a Developer ID signed `.app`
 - Optionally notarizes it with `asc` or `notarytool`
 - Packages a distributable zip and checksum

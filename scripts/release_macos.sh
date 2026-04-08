@@ -4,8 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
-PROJECT_PATH="${PROJECT_PATH:-Copool.xcodeproj}"
-SCHEME="${SCHEME:-Copool}"
+PROJECT_PATH="${PROJECT_PATH:-CodeXPool.xcodeproj}"
+SCHEME="${SCHEME:-CodeXPool}"
 CONFIGURATION="${CONFIGURATION:-Release}"
 DEVELOPMENT_TEAM="${DEVELOPMENT_TEAM:-KLU8GF65GP}"
 CODESIGN_IDENTITY="${CODESIGN_IDENTITY:-Developer ID Application: Ning Huang (KLU8GF65GP)}"
@@ -13,8 +13,8 @@ WORK_ROOT="${WORK_ROOT:-}"
 KEEP_WORK_ROOT="${KEEP_WORK_ROOT:-0}"
 RELEASE_ROOT="${RELEASE_ROOT:-}"
 PRODUCT_BUNDLE_IDENTIFIER="${PRODUCT_BUNDLE_IDENTIFIER:-com.alick.copool}"
-APP_ENTITLEMENTS_PATH="${APP_ENTITLEMENTS_PATH:-$ROOT_DIR/Copool.release.entitlements}"
-PLUGIN_ENTITLEMENTS_PATH="${PLUGIN_ENTITLEMENTS_PATH:-$ROOT_DIR/CopoolWidgetsMac.entitlements}"
+APP_ENTITLEMENTS_PATH="${APP_ENTITLEMENTS_PATH:-$ROOT_DIR/CodeXPool.release.entitlements}"
+PLUGIN_ENTITLEMENTS_PATH="${PLUGIN_ENTITLEMENTS_PATH:-$ROOT_DIR/CodeXPoolWidgetsMac.entitlements}"
 NOTARIZE_WITH="${NOTARIZE_WITH:-auto}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-}"
 CREATE_GITHUB_RELEASE="${CREATE_GITHUB_RELEASE:-0}"
@@ -39,7 +39,7 @@ ensure_clean_dir() {
 
 cleanup_work_root() {
   if [[ "${KEEP_WORK_ROOT}" == "1" || -z "${WORK_ROOT:-}" ]]; then
-    if [[ -n "${STAGE_ROOT:-}" && "${STAGE_ROOT}" == "${TMPDIR:-/tmp}"/copool-stage.* ]]; then
+    if [[ -n "${STAGE_ROOT:-}" && "${STAGE_ROOT}" == "${TMPDIR:-/tmp}"/codexpool-stage.* ]]; then
       rm -rf "$STAGE_ROOT"
     fi
     return
@@ -81,7 +81,7 @@ resolve_provisioning_profile_specifier_for_bundle_id() {
   local bundle_identifier_suffix
   local tmp_dir
 
-  tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/copool-profile-scan.XXXXXX")"
+  tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/codexpool-profile-scan.XXXXXX")"
   trap 'rm -rf "$tmp_dir"' RETURN
 
   for profile_dir in \
@@ -130,7 +130,7 @@ resolve_profile_path_by_name() {
   local name
   local tmp_dir
 
-  tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/copool-profile-path.XXXXXX")"
+  tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/codexpool-profile-path.XXXXXX")"
   trap 'rm -rf "$tmp_dir"' RETURN
 
   for profile_dir in \
@@ -240,7 +240,7 @@ release_notes() {
   fi
 
   cat <<EOF
-macOS release for Copool ${APP_VERSION}.
+macOS release for CodeXPool ${APP_VERSION}.
 
 Notes:
 - Built from commit ${GIT_COMMIT}.
@@ -250,7 +250,7 @@ EOF
 }
 
 if [[ -z "$WORK_ROOT" ]]; then
-  WORK_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/copool-release.XXXXXX")"
+  WORK_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/codexpool-release.XXXXXX")"
 fi
 
 if [[ -z "$RELEASE_ROOT" ]]; then
@@ -259,7 +259,7 @@ fi
 
 DERIVED_DATA_PATH="${DERIVED_DATA_PATH:-$WORK_ROOT/DerivedData}"
 ARCHIVE_PATH="${ARCHIVE_PATH:-$WORK_ROOT/$SCHEME.xcarchive}"
-STAGE_ROOT="${STAGE_ROOT:-$(mktemp -d "${TMPDIR:-/tmp}/copool-stage.XXXXXX")}"
+STAGE_ROOT="${STAGE_ROOT:-$(mktemp -d "${TMPDIR:-/tmp}/codexpool-stage.XXXXXX")}"
 
 trap cleanup_work_root EXIT
 
@@ -369,7 +369,7 @@ esac
 if [[ "$CREATE_GITHUB_RELEASE" == "1" ]]; then
   require_command gh
   TAG="v${APP_VERSION}"
-  TITLE="Copool ${APP_VERSION}"
+  TITLE="CodeXPool ${APP_VERSION}"
   NOTES_FILE="$RELEASE_ROOT/release-notes.txt"
   release_notes >"$NOTES_FILE"
 

@@ -1,113 +1,147 @@
-# CodeSwitch
+# CodeXPool
 
 <p align="center">
-  <img src="./Copool.png" alt="CodeSwitch Icon" width="160" />
+  <img src="./Copool.png" alt="CodeXPool Icon" width="160" />
 </p>
 
-CodeSwitch is a macOS SwiftUI menu-bar app for managing and switching between multiple AI coding assistant configurations — **Codex** (ChatGPT accounts + API Key profiles) and **Claude Code** (API Key profiles).
+**Your AI coding assistants, one pool to switch them all.**
 
-CodeSwitch 是一个 macOS SwiftUI 菜单栏应用，用于管理和切换多个 AI 编程助手的配置——**Codex**（ChatGPT 账号 + API Key 配置）和 **Claude Code**（API Key 配置）。
+CodeXPool is a macOS menu bar utility that lets you manage and instantly switch between multiple accounts and API Key configurations for **Codex** and **Claude Code** — no manual file editing, no terminal juggling, just one click.
 
-## Features / 功能
+CodeXPool 是一个 macOS 菜单栏工具，让你在 **Codex** 和 **Claude Code** 的多个账号与 API Key 配置之间一键切换——无需手动编辑文件，无需在终端来回操作。
 
-### Product Tabs / 产品标签
+---
 
-- **Codex tab**: Manage ChatGPT login accounts and API Key profiles for OpenAI Codex
-- **Codex 标签**: 管理 OpenAI Codex 的 ChatGPT 登录账号和 API Key 配置
-- **Claude tab**: Manage API Key profiles for Anthropic Claude Code
-- **Claude 标签**: 管理 Anthropic Claude Code 的 API Key 配置
+## Why CodeXPool?
 
-### Codex — Auth Mode Switching / 认证模式切换
+AI coding assistants like Codex and Claude Code are incredibly powerful, but managing multiple identities is painful:
 
-- Switch between ChatGPT login mode and API Key mode in a single click
-- 一键切换 ChatGPT 登录模式与 API Key 模式
-- Manage multiple API Key profiles with custom provider, base URL, model, wire API, and reasoning effort
-- 管理多组 API Key 配置，支持自定义供应商、Base URL、模型、Wire API 和推理强度
-- Thread visibility repair on every switch — all Codex conversations stay visible regardless of auth mode
-- 每次切换时自动修复线程可见性——无论认证模式如何切换，所有 Codex 会话始终可见
-- Automatic backup of `auth.json` and `config.toml` before each switch
-- 每次切换前自动备份 `auth.json` 和 `config.toml`
+- **Codex** stores credentials in `auth.json` / `config.toml` — switching between ChatGPT login accounts and API Key providers means overwriting files every time.
+- **Claude Code** reads its API key from `~/.claude/settings.json` — there's no built-in way to maintain multiple profiles.
+- Switching auth modes in Codex can **hide all your conversation threads** due to `model_provider` mismatches.
 
-### Claude Code — API Key Management / API Key 管理
+CodeXPool solves all of this with a clean, native SwiftUI interface.
 
-- Manage multiple Anthropic API Key profiles with base URL configuration
-- 管理多组 Anthropic API Key 配置，支持 Base URL 自定义
-- One-click switching writes directly to `~/.claude/settings.json`
-- 一键切换直接写入 `~/.claude/settings.json`
-- Support for third-party API providers (relay services, custom endpoints)
-- 支持第三方 API 供应商（中继服务、自定义端点）
+---
 
-### Account Management / 账号管理
+## Features
 
-- ChatGPT OAuth import with multi-account support
-- ChatGPT OAuth 导入，支持多账号
-- Smart switch based on remaining quota score
-- 基于剩余额度评分的智能切换
-- iCloud-backed account sync and current-selection sync
-- 基于 iCloud 的账号同步与当前账号选择同步
-- Editor restart / Codex launch integration on account switch
-- 切换账号时的编辑器重启 / Codex 拉起集成
+### Codex — Account & API Key Switching
 
-### Architecture / 架构
+| Mode | What you can do |
+|------|----------------|
+| **ChatGPT Accounts** | Import multiple ChatGPT OAuth logins, view 5h / weekly usage, one-click switch |
+| **API Key Profiles** | Configure provider, base URL, model, wire API, reasoning effort per profile |
+| **Smart Switch** | Auto-pick the account with the most remaining quota |
+| **Thread Repair** | All Codex conversations stay visible regardless of which auth mode you're in |
 
-- Native SwiftUI with layered design (`App`, `Features`, `UI`, `Behavior`, `Infrastructure`, `Domain`, `Layout`)
-- 纯 SwiftUI 分层架构
-- Menu bar integration (MenuBarExtra)
-- 菜单栏集成
+### Claude Code — API Key Switching
 
-## Requirements / 环境要求
+| Feature | Detail |
+|---------|--------|
+| **Multi-profile** | Maintain multiple Anthropic API keys with different base URLs |
+| **One-click switch** | Writes `ANTHROPIC_AUTH_TOKEN` and `ANTHROPIC_BASE_URL` to `~/.claude/settings.json` instantly |
+| **Third-party support** | Works with relay services and custom API endpoints |
 
-- macOS 14+
-- Xcode 17+
-- Swift 6 toolchain
+### General
 
-## Build & Run / 构建与运行
+- Native macOS 14+ menu bar app — no Dock icon, minimal footprint
+- Two-tab navigation: **Codex** (terminal icon) and **Claude** (sparkles icon), plus **Settings**
+- iCloud account sync across devices
+- Auto-backup of `auth.json` and `config.toml` before every switch
+- Editor restart integration (Cursor, VS Code, etc.) on account switch
+- 11-language localization (EN, 简中, 繁中, 日, 韩, 法, 德, 意, 西, 俄, 荷)
+
+---
+
+## Install
+
+### Requirements
+
+- macOS 14+ (Sonoma)
+- Xcode 17+ / Swift 6 (for building from source)
+
+### Download
+
+Grab the latest `.dmg` from [GitHub Releases](https://github.com/AlickH/Copool/releases).
+
+### Build from source
 
 ```bash
-xcodebuild -project Copool.xcodeproj -scheme Copool -configuration Debug -destination 'platform=macOS' build
+git clone https://github.com/AlickH/Copool.git
+cd Copool
+xcodebuild -project CodeXPool.xcodeproj -scheme CodeXPool -configuration Release -destination 'platform=macOS' build
 ```
 
-Open `Copool.xcodeproj` in Xcode and run the `Copool` scheme.
+---
 
-使用 Xcode 打开 `Copool.xcodeproj`，运行 `Copool` scheme 即可。
+## How It Works
 
-## How It Works / 工作原理
+```
+┌─────────────────────────────────────────────────┐
+│                  CodeXPool                      │
+│  ┌───────────┐  ┌───────────┐  ┌────────────┐  │
+│  │  Codex    │  │  Claude   │  │  Settings   │  │
+│  │ (terminal)│  │ (sparkles)│  │ (gear)      │  │
+│  └─────┬─────┘  └─────┬─────┘  └────────────┘  │
+│        │              │                         │
+│  ┌─────┴──────┐  ┌────┴──────┐                  │
+│  │ ChatGPT    │  │ API Key   │                  │
+│  │ Accounts   │  │ Profiles  │                  │
+│  ├────────────┤  └───────────┘                  │
+│  │ API Key    │                                 │
+│  │ Profiles   │        writes to                │
+│  └────────────┘   ~/.claude/settings.json       │
+│        │                                        │
+│   writes to                                     │
+│   ~/.codex/auth.json                            │
+│   ~/.codex/config.toml                          │
+│   ~/.codex/state_5.sqlite                       │
+└─────────────────────────────────────────────────┘
+```
 
-### Codex Config Files / Codex 配置文件
+### Config Files Managed
 
-- `~/.codex/config.toml` — model provider, API endpoint, wire API settings
-- `~/.codex/auth.json` — authentication credentials
-- `~/.codex/state_5.sqlite` — thread visibility normalization on switch
+| Tool | File | What CodeXPool writes |
+|------|------|-----------------------|
+| Codex | `~/.codex/auth.json` | OAuth credentials (ChatGPT mode) |
+| Codex | `~/.codex/config.toml` | Model, provider, base URL, wire API (API Key mode) |
+| Codex | `~/.codex/state_5.sqlite` | Thread `model_provider` normalization |
+| Claude | `~/.claude/settings.json` | `env.ANTHROPIC_AUTH_TOKEN`, `env.ANTHROPIC_BASE_URL` |
 
-### Claude Code Config Files / Claude Code 配置文件
+### Thread Visibility Repair
 
-- `~/.claude/settings.json` — `env.ANTHROPIC_AUTH_TOKEN` and `env.ANTHROPIC_BASE_URL`
+Codex desktop only displays threads whose `model_provider` matches the currently active provider. When you switch between ChatGPT login and API Key mode, threads created under the other mode become invisible. CodeXPool automatically normalizes all unarchived threads to the target provider on every switch, so **nothing disappears**.
 
-### Thread Visibility / 线程可见性
+---
 
-Codex desktop only shows threads whose `model_provider` matches the current active provider. CodeSwitch automatically normalizes all unarchived threads to the target provider/model pair on every switch, keeping all conversations visible.
+## Architecture
 
-Codex 桌面端仅显示 `model_provider` 与当前活跃供应商匹配的线程。CodeSwitch 在每次切换时自动将所有未归档线程的 provider/model 统一到目标值，确保所有会话始终可见。
+```
+Sources/CodeXPool/
+├── App/              # AppContainer, RootScene, entry point
+├── Domain/           # Models, protocols, business rules
+├── Behavior/         # AccountsCoordinator (central state machine)
+├── Features/
+│   ├── Accounts/     # ChatGPT account views + API Key profile views
+│   ├── Claude/       # Claude API Key profile views
+│   └── Settings/     # Preferences UI
+├── Infrastructure/   # File I/O, config services, iCloud sync
+├── UI/               # Shared components, layout rules
+└── Resources/        # Localized strings (11 languages)
+```
 
-## Reference Projects / 参考项目
+---
 
-- [AlickH/Copool](https://github.com/AlickH/Copool) — original Copool project
-- [170-carry/codex-tools](https://github.com/170-carry/codex-tools) — original Tauri-based implementation
+## Reference Projects
+
+- [AlickH/Copool](https://github.com/AlickH/Copool) — original CodeXPool project and SwiftUI architecture
+- [steipete/CodexBar](https://github.com/steipete/CodexBar) — macOS menu bar usage tracker for Codex, Claude, and more (UI/icon inspiration)
+- [170-carry/codex-tools](https://github.com/170-carry/codex-tools) — original Tauri-based Codex tools
 - [letdanceintherain/Codex-Auth-Switcher](https://github.com/letdanceintherain/Codex-Auth-Switcher) — Windows auth switching reference
-- [farion1231/cc-switch](https://github.com/farion1231/cc-switch) — cross-platform AI CLI tool manager (design reference)
+- [farion1231/cc-switch](https://github.com/farion1231/cc-switch) — cross-platform AI CLI tool manager (multi-tool design inspiration)
 
-## Acknowledgements / 致谢
-
-- Thanks to [AlickH/Copool](https://github.com/AlickH/Copool) for the original project and SwiftUI architecture.
-- 感谢 [AlickH/Copool](https://github.com/AlickH/Copool) 提供的原始项目和 SwiftUI 架构设计。
-- Thanks to the original authors and contributors of [170-carry/codex-tools](https://github.com/170-carry/codex-tools).
-- 感谢 [170-carry/codex-tools](https://github.com/170-carry/codex-tools) 的原作者与贡献者。
-- Thanks to [letdanceintherain/Codex-Auth-Switcher](https://github.com/letdanceintherain/Codex-Auth-Switcher) for the auth switching design reference.
-- 感谢 [letdanceintherain/Codex-Auth-Switcher](https://github.com/letdanceintherain/Codex-Auth-Switcher) 提供的认证切换设计参考。
-- Thanks to [farion1231/cc-switch](https://github.com/farion1231/cc-switch) for the multi-tool management design inspiration.
-- 感谢 [farion1231/cc-switch](https://github.com/farion1231/cc-switch) 提供的多工具管理设计灵感。
-
-## License / 许可证
+## License
 
 Please follow the upstream license and your organization's compliance requirements when reusing code from referenced projects.
 

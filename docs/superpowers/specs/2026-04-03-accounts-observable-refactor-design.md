@@ -1,7 +1,7 @@
 # Accounts Page Observable Refactor Design
 
 Date: 2026-04-03
-Repository: `Copool`
+Repository: `CodeXPool`
 Scope: macOS-first `Accounts` main page, with the same design applicable to iOS where the page uses the same state pipeline.
 
 ## Goal
@@ -30,12 +30,12 @@ The existing row-level `AccountCardStore` split already avoids some whole-page r
 
 Relevant files:
 
-- `Sources/Copool/Features/Accounts/AccountsPageViewStore.swift`
-- `Sources/Copool/Features/Accounts/AccountsPageShells.swift`
-- `Sources/Copool/Features/Accounts/AccountsPageSections.swift`
-- `Sources/Copool/Features/Accounts/AccountsPagePresentation.swift`
-- `Sources/Copool/App/RootScene.swift`
-- `Sources/Copool/App/TrayMenuModel+Refresh.swift`
+- `Sources/CodeXPool/Features/Accounts/AccountsPageViewStore.swift`
+- `Sources/CodeXPool/Features/Accounts/AccountsPageShells.swift`
+- `Sources/CodeXPool/Features/Accounts/AccountsPageSections.swift`
+- `Sources/CodeXPool/Features/Accounts/AccountsPagePresentation.swift`
+- `Sources/CodeXPool/App/RootScene.swift`
+- `Sources/CodeXPool/App/TrayMenuModel+Refresh.swift`
 
 Observed constraints from the current implementation:
 
@@ -211,12 +211,12 @@ The grid path should remain unaffected unless visible account structure also cha
 
 Expected primary files:
 
-- `Sources/Copool/Features/Accounts/AccountsPageViewStore.swift`
-- `Sources/Copool/Features/Accounts/AccountsPagePresentation.swift`
-- `Sources/Copool/Features/Accounts/AccountsPageSections.swift`
-- `Sources/Copool/Features/Accounts/AccountsPageShells.swift`
-- `Sources/Copool/Features/Accounts/AccountCardView.swift`
-- `Tests/CopoolTests/AccountsCoordinatorTests.swift`
+- `Sources/CodeXPool/Features/Accounts/AccountsPageViewStore.swift`
+- `Sources/CodeXPool/Features/Accounts/AccountsPagePresentation.swift`
+- `Sources/CodeXPool/Features/Accounts/AccountsPageSections.swift`
+- `Sources/CodeXPool/Features/Accounts/AccountsPageShells.swift`
+- `Sources/CodeXPool/Features/Accounts/AccountCardView.swift`
+- `Tests/CodeXPoolTests/AccountsCoordinatorTests.swift`
 
 New file creation is acceptable if it improves boundary clarity, but file splitting should stay moderate and limited to this feature area.
 

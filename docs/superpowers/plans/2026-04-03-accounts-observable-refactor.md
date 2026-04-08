@@ -13,24 +13,24 @@
 ### Task 1: Establish a Clean Test Baseline for the Accounts View-State Refactor
 
 **Files:**
-- Modify: `Sources/Copool/Features/Accounts/AccountsPageViewStore.swift`
-- Test: `Tests/CopoolTests/AccountsCoordinatorTests.swift`
+- Modify: `Sources/CodeXPool/Features/Accounts/AccountsPageViewStore.swift`
+- Test: `Tests/CodeXPoolTests/AccountsCoordinatorTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
-Add a focused test near the existing `AccountsPageViewStore` tests in `Tests/CopoolTests/AccountsCoordinatorTests.swift` that constructs the current `AccountsPageViewStore` and proves the test target can compile and instantiate it without relying on the current debug trace implementation details.
+Add a focused test near the existing `AccountsPageViewStore` tests in `Tests/CodeXPoolTests/AccountsCoordinatorTests.swift` that constructs the current `AccountsPageViewStore` and proves the test target can compile and instantiate it without relying on the current debug trace implementation details.
 
-Use the existing helper at `Tests/CopoolTests/AccountsCoordinatorTests.swift:4511` onward (`makeAccountsPageModelForViewStoreTests`) rather than introducing a new test fixture.
+Use the existing helper at `Tests/CodeXPoolTests/AccountsCoordinatorTests.swift:4511` onward (`makeAccountsPageModelForViewStoreTests`) rather than introducing a new test fixture.
 
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `swift test --filter AccountsCoordinatorTests/testAccountsPageViewStoreDoesNotRepublishContentForNoticeChanges`
 
-Expected: FAIL at compile time because `Sources/Copool/Features/Accounts/AccountsPageViewStore.swift` contains the current debug trace static mutable state that is not concurrency-safe.
+Expected: FAIL at compile time because `Sources/CodeXPool/Features/Accounts/AccountsPageViewStore.swift` contains the current debug trace static mutable state that is not concurrency-safe.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Adjust `Sources/Copool/Features/Accounts/AccountsPageViewStore.swift` so the debug trace helper is concurrency-safe and does not block the test target from compiling.
+Adjust `Sources/CodeXPool/Features/Accounts/AccountsPageViewStore.swift` so the debug trace helper is concurrency-safe and does not block the test target from compiling.
 
 Constraints:
 - Keep the current tracing behavior intact
@@ -46,16 +46,16 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Sources/Copool/Features/Accounts/AccountsPageViewStore.swift Tests/CopoolTests/AccountsCoordinatorTests.swift
+git add Sources/CodeXPool/Features/Accounts/AccountsPageViewStore.swift Tests/CodeXPoolTests/AccountsCoordinatorTests.swift
 git commit -m "test: restore accounts view store baseline"
 ```
 
 ### Task 2: Replace Aggregate Page Presentation Tests with Property-Scoped UI State Tests
 
 **Files:**
-- Modify: `Tests/CopoolTests/AccountsCoordinatorTests.swift`
-- Reference: `Sources/Copool/Features/Accounts/AccountsPagePresentation.swift`
-- Reference: `Sources/Copool/Features/Accounts/AccountsPageViewStore.swift`
+- Modify: `Tests/CodeXPoolTests/AccountsCoordinatorTests.swift`
+- Reference: `Sources/CodeXPool/Features/Accounts/AccountsPagePresentation.swift`
+- Reference: `Sources/CodeXPool/Features/Accounts/AccountsPageViewStore.swift`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -93,18 +93,18 @@ Expected: Some tests still fail logically, but compile succeeds and the failures
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Tests/CopoolTests/AccountsCoordinatorTests.swift Sources/Copool/Features/Accounts/AccountsPageViewStore.swift Sources/Copool/Features/Accounts/AccountsPagePresentation.swift
+git add Tests/CodeXPoolTests/AccountsCoordinatorTests.swift Sources/CodeXPool/Features/Accounts/AccountsPageViewStore.swift Sources/CodeXPool/Features/Accounts/AccountsPagePresentation.swift
 git commit -m "test: define accounts observable state expectations"
 ```
 
 ### Task 3: Implement Observable Page UI State and Stable Row Models
 
 **Files:**
-- Modify: `Sources/Copool/Features/Accounts/AccountsPageViewStore.swift`
-- Modify: `Sources/Copool/Features/Accounts/AccountsPagePresentation.swift`
-- Optionally Create: `Sources/Copool/Features/Accounts/AccountsPageUIState.swift`
-- Optionally Create: `Sources/Copool/Features/Accounts/AccountCardRowModel.swift`
-- Test: `Tests/CopoolTests/AccountsCoordinatorTests.swift`
+- Modify: `Sources/CodeXPool/Features/Accounts/AccountsPageViewStore.swift`
+- Modify: `Sources/CodeXPool/Features/Accounts/AccountsPagePresentation.swift`
+- Optionally Create: `Sources/CodeXPool/Features/Accounts/AccountsPageUIState.swift`
+- Optionally Create: `Sources/CodeXPool/Features/Accounts/AccountCardRowModel.swift`
+- Test: `Tests/CodeXPoolTests/AccountsCoordinatorTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -145,18 +145,18 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Sources/Copool/Features/Accounts/AccountsPageViewStore.swift Sources/Copool/Features/Accounts/AccountsPagePresentation.swift Sources/Copool/Features/Accounts/AccountsPageUIState.swift Sources/Copool/Features/Accounts/AccountCardRowModel.swift Tests/CopoolTests/AccountsCoordinatorTests.swift
+git add Sources/CodeXPool/Features/Accounts/AccountsPageViewStore.swift Sources/CodeXPool/Features/Accounts/AccountsPagePresentation.swift Sources/CodeXPool/Features/Accounts/AccountsPageUIState.swift Sources/CodeXPool/Features/Accounts/AccountCardRowModel.swift Tests/CodeXPoolTests/AccountsCoordinatorTests.swift
 git commit -m "refactor: adopt observable accounts page state"
 ```
 
 ### Task 4: Move the Accounts View Tree to the New Observation Boundaries
 
 **Files:**
-- Modify: `Sources/Copool/Features/Accounts/AccountsPageView.swift`
-- Modify: `Sources/Copool/Features/Accounts/AccountsPageShells.swift`
-- Modify: `Sources/Copool/Features/Accounts/AccountsPageSections.swift`
-- Modify: `Sources/Copool/Features/Accounts/AccountCardView.swift`
-- Test: `Tests/CopoolTests/AccountsCoordinatorTests.swift`
+- Modify: `Sources/CodeXPool/Features/Accounts/AccountsPageView.swift`
+- Modify: `Sources/CodeXPool/Features/Accounts/AccountsPageShells.swift`
+- Modify: `Sources/CodeXPool/Features/Accounts/AccountsPageSections.swift`
+- Modify: `Sources/CodeXPool/Features/Accounts/AccountCardView.swift`
+- Test: `Tests/CodeXPoolTests/AccountsCoordinatorTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -193,17 +193,17 @@ Expected: PASS for the view-state tests
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Sources/Copool/Features/Accounts/AccountsPageView.swift Sources/Copool/Features/Accounts/AccountsPageShells.swift Sources/Copool/Features/Accounts/AccountsPageSections.swift Sources/Copool/Features/Accounts/AccountCardView.swift Tests/CopoolTests/AccountsCoordinatorTests.swift
+git add Sources/CodeXPool/Features/Accounts/AccountsPageView.swift Sources/CodeXPool/Features/Accounts/AccountsPageShells.swift Sources/CodeXPool/Features/Accounts/AccountsPageSections.swift Sources/CodeXPool/Features/Accounts/AccountCardView.swift Tests/CodeXPoolTests/AccountsCoordinatorTests.swift
 git commit -m "refactor: narrow accounts page observation boundaries"
 ```
 
 ### Task 5: Remove Legacy Aggregate Presentation Path
 
 **Files:**
-- Modify: `Sources/Copool/Features/Accounts/AccountsPagePresentation.swift`
-- Modify: `Sources/Copool/Features/Accounts/AccountsPageViewStore.swift`
-- Modify: `Sources/Copool/Features/Accounts/AccountsPageSections.swift`
-- Test: `Tests/CopoolTests/AccountsCoordinatorTests.swift`
+- Modify: `Sources/CodeXPool/Features/Accounts/AccountsPagePresentation.swift`
+- Modify: `Sources/CodeXPool/Features/Accounts/AccountsPageViewStore.swift`
+- Modify: `Sources/CodeXPool/Features/Accounts/AccountsPageSections.swift`
+- Test: `Tests/CodeXPoolTests/AccountsCoordinatorTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -235,15 +235,15 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Sources/Copool/Features/Accounts/AccountsPagePresentation.swift Sources/Copool/Features/Accounts/AccountsPageViewStore.swift Sources/Copool/Features/Accounts/AccountsPageSections.swift Tests/CopoolTests/AccountsCoordinatorTests.swift
+git add Sources/CodeXPool/Features/Accounts/AccountsPagePresentation.swift Sources/CodeXPool/Features/Accounts/AccountsPageViewStore.swift Sources/CodeXPool/Features/Accounts/AccountsPageSections.swift Tests/CodeXPoolTests/AccountsCoordinatorTests.swift
 git commit -m "refactor: remove legacy accounts aggregate state"
 ```
 
 ### Task 6: Verify Behavior and Capture Performance Evidence
 
 **Files:**
-- Reference: `Sources/Copool/Features/Accounts/AccountsPageViewStore.swift`
-- Reference: `Sources/Copool/App/RootScene.swift`
+- Reference: `Sources/CodeXPool/Features/Accounts/AccountsPageViewStore.swift`
+- Reference: `Sources/CodeXPool/App/RootScene.swift`
 - Reference: `docs/superpowers/specs/2026-04-03-accounts-observable-refactor-design.md`
 
 - [ ] **Step 1: Run focused tests**
@@ -260,7 +260,7 @@ Expected: PASS
 
 - [ ] **Step 3: Manual macOS verification**
 
-Run the macOS app in Debug with `COPOOL_TRACE_INVALIDATION=1`, open the `Accounts` page, and verify:
+Run the macOS app in Debug with `CODEXPOOL_TRACE_INVALIDATION=1`, open the `Accounts` page, and verify:
 
 - idle background refresh no longer causes obvious whole-page structure churn
 - scrolling during background refresh feels smoother than before
@@ -285,7 +285,7 @@ git commit -m "test: verify accounts observable refactor"
 
 ## Notes for Execution
 
-- Reuse `Tests/CopoolTests/AccountsCoordinatorTests.swift` instead of creating a new test file.
+- Reuse `Tests/CodeXPoolTests/AccountsCoordinatorTests.swift` instead of creating a new test file.
 - Keep `AccountsPageModel` as the mutation owner. The new UI-state layer is projection/cache only.
 - Do not change `TrayMenuModel` refresh policy in this plan.
 - Preserve existing page behavior on macOS and keep the same architecture usable on iOS.

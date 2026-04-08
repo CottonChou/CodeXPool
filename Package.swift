@@ -2,20 +2,20 @@
 import PackageDescription
 
 let package = Package(
-    name: "Copool",
+    name: "CodeXPool",
     defaultLocalization: "en",
     platforms: [
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "Copool", targets: ["Copool"])
+        .executable(name: "CodeXPool", targets: ["CodeXPool"])
     ],
     targets: [
         .executableTarget(
-            name: "Copool",
-            path: "Sources/Copool",
+            name: "CodeXPool",
+            path: "Sources/CodeXPool",
             exclude: [
-                "Copool.icon",
+                "CodeXPool.icon",
                 "Info-iOS.plist",
                 "Info-macOS.plist"
             ],
@@ -39,9 +39,9 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "CopoolTests",
-            dependencies: ["Copool"],
-            path: "Tests/CopoolTests"
+            name: "CodeXPoolTests",
+            dependencies: ["CodeXPool"],
+            path: "Tests/CodeXPoolTests"
         )
     ]
 )
