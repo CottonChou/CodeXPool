@@ -4,11 +4,13 @@
   <img src="./Copool.png" alt="CodeXPool Icon" width="160" />
 </p>
 
+<p align="center">
+  <strong>English</strong> | <a href="./README_zh.md">中文</a>
+</p>
+
 **Your AI coding assistants, one pool to switch them all.**
 
 CodeXPool is a macOS menu bar utility that lets you manage and instantly switch between multiple accounts and API Key configurations for **Codex** and **Claude Code** — no manual file editing, no terminal juggling, just one click.
-
-CodeXPool 是一个 macOS 菜单栏工具，让你在 **Codex** 和 **Claude Code** 的多个账号与 API Key 配置之间一键切换——无需手动编辑文件，无需在终端来回操作。
 
 ---
 
@@ -144,5 +146,3 @@ Sources/CodeXPool/
 ## License
 
 Please follow the upstream license and your organization's compliance requirements when reusing code from referenced projects.
-
-复用参考项目代码时，请遵循上游许可证与所在组织的合规要求。
