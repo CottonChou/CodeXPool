@@ -63,13 +63,13 @@ CodeXPool solves all of this with a clean, native SwiftUI interface.
 
 ### Download
 
-Grab the latest `.dmg` from [GitHub Releases](https://github.com/AlickH/Copool/releases).
+Grab the latest `.dmg` from [GitHub Releases](https://github.com/CottonChou/CodeXPool/releases).
 
 ### Build from source
 
 ```bash
-git clone https://github.com/AlickH/Copool.git
-cd Copool
+git clone https://github.com/CottonChou/CodeXPool.git
+cd CodeXPool
 xcodebuild -project CodeXPool.xcodeproj -scheme CodeXPool -configuration Release -destination 'platform=macOS' build
 ```
 
