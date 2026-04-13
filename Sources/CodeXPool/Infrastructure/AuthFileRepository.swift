@@ -7,6 +7,12 @@ final class AuthFileRepository: AuthRepository, @unchecked Sendable {
     private let session: URLSession
     private let logger = Logger(subsystem: "CodeXPool", category: "AuthRepository")
 
+    private let cacheLock = NSLock()
+    private var cachedAuth: JSONValue?
+    private var cachedAuthModDate: Date?
+    private var lastCacheCheckTime: Date?
+    private static let cacheCheckInterval: TimeInterval = 30
+
     init(
         paths: FileSystemPaths,
         fileManager: FileManager = .default,
@@ -18,17 +24,57 @@ final class AuthFileRepository: AuthRepository, @unchecked Sendable {
     }
 
     func readCurrentAuth() throws -> JSONValue {
+        if let cached = cachedAuthIfFresh() {
+            return cached
+        }
         guard fileManager.fileExists(atPath: paths.codexAuthPath.path) else {
             throw AppError.fileNotFound(L10n.tr("error.auth.auth_file_not_found"))
         }
-        return try readJSONValue(from: paths.codexAuthPath)
+        let value = try readJSONValue(from: paths.codexAuthPath)
+        updateCache(value)
+        return value
     }
 
     func readCurrentAuthOptional() throws -> JSONValue? {
+        if let cached = cachedAuthIfFresh() {
+            return cached
+        }
         guard fileManager.fileExists(atPath: paths.codexAuthPath.path) else {
             return nil
         }
-        return try readJSONValue(from: paths.codexAuthPath)
+        let value = try readJSONValue(from: paths.codexAuthPath)
+        updateCache(value)
+        return value
+    }
+
+    private func cachedAuthIfFresh() -> JSONValue? {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        guard let lastCheck = lastCacheCheckTime,
+              let cached = cachedAuth,
+              Date().timeIntervalSince(lastCheck) < Self.cacheCheckInterval else {
+            return nil
+        }
+        return cached
+    }
+
+    private func updateCache(_ value: JSONValue?) {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        cachedAuth = value
+        lastCacheCheckTime = Date()
+    }
+
+    func invalidateReadCache() {
+        invalidateCache()
+    }
+
+    private func invalidateCache() {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        cachedAuth = nil
+        cachedAuthModDate = nil
+        lastCacheCheckTime = nil
     }
 
     func readAuth(from url: URL) throws -> JSONValue {
@@ -53,6 +99,7 @@ final class AuthFileRepository: AuthRepository, @unchecked Sendable {
         #if canImport(Darwin)
         _ = chmod(paths.codexAuthPath.path, S_IRUSR | S_IWUSR)
         #endif
+        invalidateCache()
     }
 
     func removeCurrentAuth() throws {
@@ -60,6 +107,7 @@ final class AuthFileRepository: AuthRepository, @unchecked Sendable {
             return
         }
         try fileManager.removeItem(at: paths.codexAuthPath)
+        invalidateCache()
     }
 
     func makeChatGPTAuth(from tokens: ChatGPTOAuthTokens) throws -> JSONValue {

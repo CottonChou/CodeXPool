@@ -249,6 +249,8 @@ final class AccountsPageModel: ObservableObject {
         do {
             let result = try await coordinator.switchToAPIKeyProfile(id: id)
             await loadAPIKeyProfiles()
+            let accounts = try await coordinator.listAccounts()
+            applyAccounts(accounts)
             let message = result.usedFallbackCLI
                 ? L10n.tr("apikey.notice.switched_fallback")
                 : L10n.tr("apikey.notice.switched")

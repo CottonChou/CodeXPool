@@ -147,6 +147,7 @@ actor AccountsCoordinator {
         }
 
         try updateCurrentAccountProjection(authJSON: account.authJSON)
+        authRepository.invalidateReadCache()
         let settings = try settingsRepository.loadSettings()
         return try applySwitchSideEffects(
             for: account,
@@ -302,14 +303,13 @@ actor AccountsCoordinator {
 
         try authBackupService.backupCurrentAuthFiles()
         try configTomlService.writeForAPIKeyMode(profile: profile)
+        authRepository.invalidateReadCache()
+        ChatGPTBaseOriginResolver.invalidateCache()
 
         #if os(macOS)
-        let targetProvider = profile.providerLabel
-            .lowercased()
-            .replacingOccurrences(of: " ", with: "_")
         let repairService = CodexThreadRepairService()
         _ = repairService.repairThreadVisibility(
-            targetProvider: targetProvider,
+            targetProvider: "openai",
             targetModel: profile.model
         )
         #endif
@@ -337,6 +337,8 @@ actor AccountsCoordinator {
 
         try authBackupService.backupCurrentAuthFiles()
         try configTomlService.writeForChatGPTMode()
+        authRepository.invalidateReadCache()
+        ChatGPTBaseOriginResolver.invalidateCache()
         try updateCurrentAccountProjection(authJSON: account.authJSON)
 
         #if os(macOS)
@@ -386,10 +388,25 @@ actor AccountsCoordinator {
 
     func listClaudeAPIKeyProfiles() throws -> [ClaudeAPIKeyProfile] {
         let store = try storeRepository.loadStore()
-        let currentID = store.currentClaudeAPIKeySelection?.profileID
+        let savedID = store.currentClaudeAPIKeySelection?.profileID
+
+        let hasSavedMatch = savedID != nil &&
+            store.claudeAPIKeyProfiles.contains { $0.id == savedID }
+
+        if hasSavedMatch {
+            return store.claudeAPIKeyProfiles.map { profile in
+                var p = profile
+                p.isCurrent = (p.id == savedID)
+                return p
+            }
+        }
+
+        let liveKey = claudeConfigService.readCurrentAPIKey()
+        let liveURL = claudeConfigService.readCurrentBaseURL()
+
         return store.claudeAPIKeyProfiles.map { profile in
             var p = profile
-            p.isCurrent = (p.id == currentID)
+            p.isCurrent = liveKey != nil && p.apiKey == liveKey && p.baseURL == (liveURL ?? "")
             return p
         }
     }

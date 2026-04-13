@@ -16,6 +16,7 @@ protocol AuthRepository: Sendable {
     func readAuth(from url: URL) throws -> JSONValue
     func writeCurrentAuth(_ auth: JSONValue) throws
     func removeCurrentAuth() throws
+    func invalidateReadCache()
     func makeChatGPTAuth(from tokens: ChatGPTOAuthTokens) throws -> JSONValue
     func extractAuth(from auth: JSONValue) throws -> ExtractedAuth
     func refreshChatGPTAuth(_ auth: JSONValue) async throws -> JSONValue
@@ -52,6 +53,8 @@ extension AuthRepository {
     func currentAuthAccountKey() -> String? {
         readCurrentExtractedAuth()?.accountKey
     }
+
+    func invalidateReadCache() {}
 
     func refreshChatGPTAuth(_ auth: JSONValue) async throws -> JSONValue {
         auth
@@ -113,6 +116,7 @@ protocol ConfigTomlServiceProtocol: Sendable {
 protocol ClaudeConfigServiceProtocol: Sendable {
     func writeForAPIKeyMode(profile: ClaudeAPIKeyProfile) throws
     func readCurrentAPIKey() -> String?
+    func readCurrentBaseURL() -> String?
 }
 
 protocol AuthBackupServiceProtocol: Sendable {

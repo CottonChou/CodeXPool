@@ -4,6 +4,11 @@ final class ClaudeConfigService: ClaudeConfigServiceProtocol, @unchecked Sendabl
     private let paths: FileSystemPaths
     private let fileManager: FileManager
 
+    private let cacheLock = NSLock()
+    private var cachedEnv: [String: Any]?
+    private var lastCacheTime: Date?
+    private static let cacheTTL: TimeInterval = 30
+
     init(paths: FileSystemPaths, fileManager: FileManager = .default) {
         self.paths = paths
         self.fileManager = fileManager
@@ -29,17 +34,53 @@ final class ClaudeConfigService: ClaudeConfigServiceProtocol, @unchecked Sendabl
 
         let data = try JSONSerialization.data(
             withJSONObject: settings,
-            options: [.prettyPrinted, .sortedKeys]
+            options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         )
         try data.write(to: settingsURL, options: .atomic)
+        invalidateCache()
     }
 
     func readCurrentAPIKey() -> String? {
+        readCachedEnvValue("ANTHROPIC_AUTH_TOKEN")
+    }
+
+    func readCurrentBaseURL() -> String? {
+        readCachedEnvValue("ANTHROPIC_BASE_URL")
+    }
+
+    private func readCachedEnvValue(_ key: String) -> String? {
+        cacheLock.lock()
+        if let env = cachedEnv,
+           let lastTime = lastCacheTime,
+           Date().timeIntervalSince(lastTime) < Self.cacheTTL {
+            cacheLock.unlock()
+            return env[key] as? String
+        }
+        cacheLock.unlock()
+
+        let env = readEnvFromDisk()
+
+        cacheLock.lock()
+        cachedEnv = env
+        lastCacheTime = Date()
+        cacheLock.unlock()
+
+        return env?[key] as? String
+    }
+
+    private func readEnvFromDisk() -> [String: Any]? {
         guard let data = try? Data(contentsOf: paths.claudeSettingsPath),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let env = json["env"] as? [String: Any] else {
             return nil
         }
-        return env["ANTHROPIC_AUTH_TOKEN"] as? String
+        return env
+    }
+
+    private func invalidateCache() {
+        cacheLock.lock()
+        cachedEnv = nil
+        lastCacheTime = nil
+        cacheLock.unlock()
     }
 }

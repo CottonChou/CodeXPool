@@ -31,9 +31,12 @@ final class ConfigTomlService: ConfigTomlServiceProtocol, @unchecked Sendable {
         let parentDirectory = paths.codexConfigPath.deletingLastPathComponent()
         try fileManager.createDirectory(at: parentDirectory, withIntermediateDirectories: true)
 
-        let providerName = profile.providerLabel
+        let reservedProviders: Set<String> = ["openai", "anthropic", "google", "amazon-bedrock", "azure"]
+        let rawProvider = profile.providerLabel
             .lowercased()
             .replacingOccurrences(of: " ", with: "_")
+        let candidate = rawProvider.isEmpty ? "openai-custom" : rawProvider
+        let providerName = reservedProviders.contains(candidate) ? "\(candidate)-custom" : candidate
 
         let (topLevel, sections) = existingPreservedLines(removingProviderSection: providerName)
 

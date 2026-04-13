@@ -96,6 +96,7 @@ struct RootScene: View {
         _chromeStore = StateObject(
             wrappedValue: RootSceneChromeStore(
                 accountsModel: container.accountsModel,
+                claudeModel: container.claudeModel,
                 settingsModel: container.settingsModel
             )
         )
@@ -224,9 +225,10 @@ private final class RootSceneChromeStore: ObservableObject {
 
     private var cancellables: Set<AnyCancellable> = []
 
-    init(accountsModel: AccountsPageModel, settingsModel: SettingsPageModel) {
+    init(accountsModel: AccountsPageModel, claudeModel: ClaudePageModel, settingsModel: SettingsPageModel) {
         localeIdentifier = settingsModel.settings.locale
         accountsNotice = accountsModel.notice
+        claudeNotice = claudeModel.notice
         settingsNotice = settingsModel.notice
 
         settingsModel.$settings
@@ -241,6 +243,13 @@ private final class RootSceneChromeStore: ObservableObject {
             .removeDuplicates()
             .sink { [weak self] notice in
                 self?.accountsNotice = notice
+            }
+            .store(in: &cancellables)
+
+        claudeModel.$notice
+            .removeDuplicates()
+            .sink { [weak self] notice in
+                self?.claudeNotice = notice
             }
             .store(in: &cancellables)
 
