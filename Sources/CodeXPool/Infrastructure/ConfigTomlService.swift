@@ -27,16 +27,20 @@ final class ConfigTomlService: ConfigTomlServiceProtocol, @unchecked Sendable {
         return nil
     }
 
-    func writeForAPIKeyMode(profile: APIKeyProfile) throws {
-        let parentDirectory = paths.codexConfigPath.deletingLastPathComponent()
-        try fileManager.createDirectory(at: parentDirectory, withIntermediateDirectories: true)
-
+    static func resolvedProviderName(for profile: APIKeyProfile) -> String {
         let reservedProviders: Set<String> = ["openai", "anthropic", "google", "amazon-bedrock", "azure"]
         let rawProvider = profile.providerLabel
             .lowercased()
             .replacingOccurrences(of: " ", with: "_")
         let candidate = rawProvider.isEmpty ? "openai-custom" : rawProvider
-        let providerName = reservedProviders.contains(candidate) ? "\(candidate)-custom" : candidate
+        return reservedProviders.contains(candidate) ? "\(candidate)-custom" : candidate
+    }
+
+    func writeForAPIKeyMode(profile: APIKeyProfile) throws {
+        let parentDirectory = paths.codexConfigPath.deletingLastPathComponent()
+        try fileManager.createDirectory(at: parentDirectory, withIntermediateDirectories: true)
+
+        let providerName = Self.resolvedProviderName(for: profile)
 
         let (topLevel, sections) = existingPreservedLines(removingProviderSection: providerName)
 

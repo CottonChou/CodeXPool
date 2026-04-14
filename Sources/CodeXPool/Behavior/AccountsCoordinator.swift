@@ -306,20 +306,21 @@ actor AccountsCoordinator {
         authRepository.invalidateReadCache()
         ChatGPTBaseOriginResolver.invalidateCache()
 
-        #if os(macOS)
-        let repairService = CodexThreadRepairService()
-        _ = repairService.repairThreadVisibility(
-            targetProvider: "openai",
-            targetModel: profile.model
-        )
-        #endif
-
         store.activeAuthMode = .apiKey
         store.currentAPIKeySelection = APIKeySelection(
             profileID: profile.id,
             selectedAt: dateProvider.unixMillisecondsNow()
         )
         try storeRepository.saveStore(store)
+
+        #if os(macOS)
+        let resolvedProvider = ConfigTomlService.resolvedProviderName(for: profile)
+        let repairService = CodexThreadRepairService()
+        _ = repairService.repairThreadVisibility(
+            targetProvider: resolvedProvider,
+            targetModel: profile.model
+        )
+        #endif
 
         let settings = try settingsRepository.loadSettings()
         return try applySwitchSideEffectsForAPIKey(
@@ -330,7 +331,7 @@ actor AccountsCoordinator {
     }
 
     func switchToChatGPTAccount(id: String, workspacePath: String? = nil) throws -> SwitchAccountExecutionResult {
-        let store = try storeRepository.loadStore()
+        var store = try storeRepository.loadStore()
         guard let account = store.accounts.first(where: { $0.id == id }) else {
             throw AppError.invalidData(L10n.tr("error.accounts.account_not_found_for_switch"))
         }
@@ -339,16 +340,16 @@ actor AccountsCoordinator {
         try configTomlService.writeForChatGPTMode()
         authRepository.invalidateReadCache()
         ChatGPTBaseOriginResolver.invalidateCache()
+
+        store.activeAuthMode = .chatgpt
+        try storeRepository.saveStore(store)
+
         try updateCurrentAccountProjection(authJSON: account.authJSON)
 
         #if os(macOS)
         let repairService = CodexThreadRepairService()
         _ = repairService.repairThreadVisibility(targetProvider: "openai")
         #endif
-
-        var updatedStore = try storeRepository.loadStore()
-        updatedStore.activeAuthMode = .chatgpt
-        try storeRepository.saveStore(updatedStore)
 
         let settings = try settingsRepository.loadSettings()
         return try applySwitchSideEffects(
